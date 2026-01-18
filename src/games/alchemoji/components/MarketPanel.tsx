@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, DollarSign } from 'lucide-react';
-import type { Inventory, MarketPrices } from '../types';
-import { getElement } from '../data/elements';
+import type { Inventory, MarketPrices, Element } from '../types';
 
 interface MarketPanelProps {
   inventory: Inventory;
   marketPrices: MarketPrices;
+  elements: Record<string, Element>;
   onSell: (elementId: string, amount: number) => void;
 }
 
-export function MarketPanel({ inventory, marketPrices, onSell }: MarketPanelProps) {
+export function MarketPanel({ inventory, marketPrices, elements, onSell }: MarketPanelProps) {
+  const getElement = (id: string) => elements[id];
   const [sellAmounts, setSellAmounts] = useState<Record<string, number>>({});
 
   const sellableItems = Object.entries(inventory)

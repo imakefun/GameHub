@@ -1,19 +1,39 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Beaker, X, Sparkles } from 'lucide-react';
-import type { Inventory, Resources } from '../types';
-import { getElement } from '../data/elements';
-import { findRecipeByInputs } from '../data/recipes';
+import type { Inventory, Resources, Element, Recipe } from '../types';
 
 interface InventoryPanelProps {
   inventory: Inventory;
   resources: Resources;
+  elements: Record<string, Element>;
+  recipes: Recipe[];
   onTryCraft: (elementIds: string[]) => void;
 }
 
-export function InventoryPanel({ inventory, resources, onTryCraft }: InventoryPanelProps) {
+// Find recipe by matching inputs
+function findRecipeByInputs(inputIds: string[], recipes: Recipe[]): Recipe | undefined {
+  const sortedInputs = [...inputIds].sort();
+
+  return recipes.find((recipe) => {
+    const recipeInputIds: string[] = [];
+    recipe.inputs.forEach((input) => {
+      for (let i = 0; i < input.amount; i++) {
+        recipeInputIds.push(input.elementId);
+      }
+    });
+    const sortedRecipeInputs = recipeInputIds.sort();
+
+    if (sortedInputs.length !== sortedRecipeInputs.length) return false;
+    return sortedInputs.every((id, idx) => id === sortedRecipeInputs[idx]);
+  });
+}
+
+export function InventoryPanel({ inventory, resources, elements, recipes, onTryCraft }: InventoryPanelProps) {
   const [craftingSlots, setCraftingSlots] = useState<string[]>([]);
   const [lastResult, setLastResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const getElement = (id: string) => elements[id];
 
   const inventoryItems = Object.entries(inventory)
     .filter(([_, count]) => count > 0)
@@ -49,7 +69,7 @@ export function InventoryPanel({ inventory, resources, onTryCraft }: InventoryPa
       return;
     }
 
-    const recipe = findRecipeByInputs(craftingSlots);
+    const recipe = findRecipeByInputs(craftingSlots, recipes);
     if (!recipe) {
       setLastResult({ success: false, message: 'No recipe found for this combination!' });
       return;
@@ -70,7 +90,7 @@ export function InventoryPanel({ inventory, resources, onTryCraft }: InventoryPa
   };
 
   // Preview what might be crafted
-  const previewRecipe = craftingSlots.length >= 2 ? findRecipeByInputs(craftingSlots) : null;
+  const previewRecipe = craftingSlots.length >= 2 ? findRecipeByInputs(craftingSlots, recipes) : null;
   const previewElement = previewRecipe ? getElement(previewRecipe.output.elementId) : null;
 
   return (

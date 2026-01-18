@@ -1,28 +1,43 @@
 import { motion } from 'framer-motion';
 import { Play, ArrowUp, Lock, ToggleLeft, ToggleRight } from 'lucide-react';
-import type { GeneratorState, Resources } from '../types';
-import { generators, getGeneratorById, getUpgradeForLevel, MAX_GENERATOR_LEVEL } from '../data/generators';
-import { getElement } from '../data/elements';
+import type { GeneratorState, Resources, Generator, Element } from '../types';
+import type { GameSettings } from '../services/sheetsService';
 
 interface GeneratorPanelProps {
   ownedGenerators: GeneratorState[];
   resources: Resources;
+  generators: Generator[];
+  elements: Record<string, Element>;
+  settings: GameSettings;
   onProduce: (generatorId: string) => void;
   onUpgrade: (generatorId: string) => void;
   onUnlock: (generatorId: string) => void;
   onToggleAuto: (generatorId: string) => void;
 }
 
+function getUpgradeForLevel(level: number, settings: GameSettings) {
+  const cost = Math.floor(settings.upgradeCostBase * Math.pow(settings.upgradeCostMultiplier, level - 1));
+  const productionMultiplier = 1 + (level - 1) * 0.1;
+  const cooldownMultiplier = Math.max(0.5, 1 - (level - 1) * 0.03);
+  const energyMultiplier = 1 + (level - 1) * 0.05;
+  return { level, cost, productionMultiplier, cooldownMultiplier, energyMultiplier };
+}
+
 export function GeneratorPanel({
   ownedGenerators,
   resources,
+  generators,
+  elements,
+  settings,
   onProduce,
   onUpgrade,
   onUnlock,
   onToggleAuto,
 }: GeneratorPanelProps) {
   const ownedIds = new Set(ownedGenerators.map((g) => g.generatorId));
-  const lockedGenerators = generators.filter((g) => !ownedIds.has(g.id));
+  const lockedGenerators = generators.filter((g) => !ownedIds.has(g.id) && !g.unlocked);
+  const getGeneratorById = (id: string) => generators.find((g) => g.id === id);
+  const getElement = (id: string) => elements[id];
 
   return (
     <div className="space-y-4">
@@ -36,8 +51,8 @@ export function GeneratorPanel({
           const generator = getGeneratorById(gs.generatorId);
           if (!generator) return null;
 
-          const upgrade = getUpgradeForLevel(gs.level);
-          const nextUpgrade = gs.level < MAX_GENERATOR_LEVEL ? getUpgradeForLevel(gs.level + 1) : null;
+          const upgrade = getUpgradeForLevel(gs.level, settings);
+          const nextUpgrade = gs.level < settings.maxGeneratorLevel ? getUpgradeForLevel(gs.level + 1, settings) : null;
           const cooldown = generator.baseCooldown * upgrade.cooldownMultiplier * 1000;
           const now = Date.now();
           const timeSinceProduced = now - gs.lastProduced;
@@ -58,7 +73,7 @@ export function GeneratorPanel({
                   <div>
                     <h3 className="font-semibold">{generator.name}</h3>
                     <p className="text-xs text-surface-400">
-                      Level {gs.level}/{MAX_GENERATOR_LEVEL}
+                      Level {gs.level}/{settings.maxGeneratorLevel}
                     </p>
                   </div>
                 </div>
@@ -88,7 +103,7 @@ export function GeneratorPanel({
                   return (
                     <span key={p.elementId}>
                       {i > 0 && ', '}
-                      {element?.emoji} {amount}x {element?.name}
+                      {element?.emoji || '❓'} {amount}x {element?.name || p.elementId}
                     </span>
                   );
                 })}

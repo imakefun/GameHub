@@ -1,17 +1,20 @@
 import { motion } from 'framer-motion';
 import { Book, Lock, ArrowRight, Zap } from 'lucide-react';
-import type { Inventory, Resources } from '../types';
-import { recipes, getRecipeById } from '../data/recipes';
-import { getElement } from '../data/elements';
+import type { Inventory, Resources, Element, Recipe } from '../types';
 
 interface RecipeBookProps {
   discoveredRecipes: string[];
   inventory: Inventory;
   resources: Resources;
+  recipes: Recipe[];
+  elements: Record<string, Element>;
   onCraft: (recipeId: string) => void;
 }
 
-export function RecipeBook({ discoveredRecipes, inventory, resources, onCraft }: RecipeBookProps) {
+export function RecipeBook({ discoveredRecipes, inventory, resources, recipes, elements, onCraft }: RecipeBookProps) {
+  const getElement = (id: string) => elements[id];
+  const getRecipeById = (id: string) => recipes.find((r) => r.id === id);
+
   const discovered = discoveredRecipes
     .map((id) => getRecipeById(id))
     .filter((r): r is NonNullable<typeof r> => r !== undefined);

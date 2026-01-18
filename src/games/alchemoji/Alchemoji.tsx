@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Settings, RotateCcw, Book, Beaker, Store, Cog } from 'lucide-react';
+import { ArrowLeft, Settings, RotateCcw, Book, Beaker, Store, Cog, RefreshCw, Database, Cloud } from 'lucide-react';
 import { useGameState } from './hooks/useGameState';
+import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
 import { GeneratorPanel } from './components/GeneratorPanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { RecipeBook } from './components/RecipeBook';
 import { MarketPanel } from './components/MarketPanel';
-import { recipes } from './data/recipes';
 
 type Tab = 'craft' | 'generators' | 'recipes' | 'market';
 
-export function Alchemoji() {
+function AlchemojiGame() {
+  const { elements, recipes, generators, settings, isLoading, error, isUsingSheets, refresh } = useGameData();
+
   const {
     state,
     produce,
@@ -23,7 +25,8 @@ export function Alchemoji() {
     unlockGenerator,
     toggleAuto,
     resetGame,
-  } = useGameState();
+    config,
+  } = useGameState({ elements, recipes, generators, settings });
 
   const [activeTab, setActiveTab] = useState<Tab>('craft');
   const [showSettings, setShowSettings] = useState(false);
@@ -42,6 +45,23 @@ export function Alchemoji() {
     return `${minutes}m`;
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="text-6xl mb-4"
+          >
+            🧪
+          </motion.div>
+          <p className="text-surface-400">Loading game data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-20">
       {/* Header */}
@@ -58,9 +78,14 @@ export function Alchemoji() {
               <div>
                 <h1 className="text-xl font-bold flex items-center gap-2">
                   <span className="text-2xl">🧪</span> Alchemoji
+                  {isUsingSheets && (
+                    <span title="Using Google Sheets">
+                      <Cloud className="w-4 h-4 text-green-400" />
+                    </span>
+                  )}
                 </h1>
                 <p className="text-xs text-surface-400">
-                  {state.stats.recipesDiscovered}/{recipes.length} recipes discovered
+                  {state.stats.recipesDiscovered}/{config.recipes.length} recipes discovered
                 </p>
               </div>
             </div>
@@ -76,6 +101,21 @@ export function Alchemoji() {
           </div>
         </div>
       </header>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="max-w-4xl mx-auto px-4 py-2">
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-yellow-400 text-sm flex items-center justify-between">
+            <span>Using local data: {error}</span>
+            <button
+              onClick={refresh}
+              className="p-1 hover:bg-yellow-500/20 rounded transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Resources */}
       <div className="max-w-4xl mx-auto px-4 py-4">
@@ -123,6 +163,8 @@ export function Alchemoji() {
               <InventoryPanel
                 inventory={state.inventory}
                 resources={state.resources}
+                elements={config.elements}
+                recipes={config.recipes}
                 onTryCraft={tryCraft}
               />
             )}
@@ -130,6 +172,9 @@ export function Alchemoji() {
               <GeneratorPanel
                 ownedGenerators={state.generators}
                 resources={state.resources}
+                generators={config.generators}
+                elements={config.elements}
+                settings={config.settings}
                 onProduce={produce}
                 onUpgrade={upgradeGenerator}
                 onUnlock={unlockGenerator}
@@ -141,6 +186,8 @@ export function Alchemoji() {
                 discoveredRecipes={state.discoveredRecipes}
                 inventory={state.inventory}
                 resources={state.resources}
+                recipes={config.recipes}
+                elements={config.elements}
                 onCraft={craft}
               />
             )}
@@ -148,6 +195,7 @@ export function Alchemoji() {
               <MarketPanel
                 inventory={state.inventory}
                 marketPrices={state.marketPrices}
+                elements={config.elements}
                 onSell={sell}
               />
             )}
@@ -176,6 +224,30 @@ export function Alchemoji() {
                 <Settings className="w-5 h-5" /> Settings
               </h2>
 
+              {/* Data Source */}
+              <div className="mb-4 p-3 bg-surface-800/50 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  {isUsingSheets ? (
+                    <>
+                      <Cloud className="w-4 h-4 text-green-400" />
+                      <span className="text-green-400">Using Google Sheets</span>
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 text-surface-400" />
+                      <span className="text-surface-400">Using local data</span>
+                    </>
+                  )}
+                  <button
+                    onClick={refresh}
+                    className="ml-auto p-1.5 hover:bg-white/10 rounded transition-colors"
+                    title="Refresh data from sheets"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
               {/* Stats */}
               <div className="space-y-2 mb-6">
                 <h3 className="font-semibold text-surface-400">Statistics</h3>
@@ -187,7 +259,7 @@ export function Alchemoji() {
                   <div className="p-3 bg-surface-800/50 rounded-lg">
                     <p className="text-surface-400">Recipes Found</p>
                     <p className="font-semibold">
-                      {state.stats.recipesDiscovered}/{recipes.length}
+                      {state.stats.recipesDiscovered}/{config.recipes.length}
                     </p>
                   </div>
                   <div className="p-3 bg-surface-800/50 rounded-lg">
@@ -199,6 +271,11 @@ export function Alchemoji() {
                     <p className="font-semibold">${state.stats.totalMoneyEarned.toLocaleString()}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Game Data Info */}
+              <div className="mb-4 text-xs text-surface-500">
+                <p>Elements: {Object.keys(config.elements).length} | Recipes: {config.recipes.length} | Generators: {config.generators.length}</p>
               </div>
 
               {/* Reset Button */}
@@ -229,5 +306,14 @@ export function Alchemoji() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// Wrapper component with provider
+export function Alchemoji() {
+  return (
+    <GameDataProvider>
+      <AlchemojiGame />
+    </GameDataProvider>
   );
 }
