@@ -1,39 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Beaker, X, Sparkles } from 'lucide-react';
-import type { Inventory, Resources, Element, Recipe } from '../types';
+import { Beaker, X } from 'lucide-react';
+import type { Inventory, Element, CraftResult } from '../types';
 
 interface InventoryPanelProps {
   inventory: Inventory;
-  resources: Resources;
   elements: Record<string, Element>;
-  recipes: Recipe[];
+  craftResult: CraftResult | null;
   onTryCraft: (elementIds: string[]) => void;
 }
 
-// Find recipe by matching inputs
-function findRecipeByInputs(inputIds: string[], recipes: Recipe[]): Recipe | undefined {
-  const sortedInputs = [...inputIds].sort();
-
-  return recipes.find((recipe) => {
-    const recipeInputIds: string[] = [];
-    recipe.inputs.forEach((input) => {
-      for (let i = 0; i < input.amount; i++) {
-        recipeInputIds.push(input.elementId);
-      }
-    });
-    const sortedRecipeInputs = recipeInputIds.sort();
-
-    if (sortedInputs.length !== sortedRecipeInputs.length) return false;
-    return sortedInputs.every((id, idx) => id === sortedRecipeInputs[idx]);
-  });
-}
-
-export function InventoryPanel({ inventory, resources, elements, recipes, onTryCraft }: InventoryPanelProps) {
+export function InventoryPanel({ inventory, elements, craftResult, onTryCraft }: InventoryPanelProps) {
   const [craftingSlots, setCraftingSlots] = useState<string[]>([]);
-  const [lastResult, setLastResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const getElement = (id: string) => elements[id];
+
+  // Clear crafting slots when a craft attempt is made
+  useEffect(() => {
+    if (craftResult) {
+      setCraftingSlots([]);
+    }
+  }, [craftResult?.timestamp]);
 
   const inventoryItems = Object.entries(inventory)
     .filter(([_, count]) => count > 0)
@@ -50,48 +37,20 @@ export function InventoryPanel({ inventory, resources, elements, recipes, onTryC
     if (currentInSlots >= inInventory) return;
 
     setCraftingSlots([...craftingSlots, elementId]);
-    setLastResult(null);
   };
 
   const removeFromCrafting = (index: number) => {
     setCraftingSlots(craftingSlots.filter((_, i) => i !== index));
-    setLastResult(null);
   };
 
   const clearCrafting = () => {
     setCraftingSlots([]);
-    setLastResult(null);
   };
 
   const attemptCraft = () => {
-    if (craftingSlots.length < 2) {
-      setLastResult({ success: false, message: 'Need at least 2 elements!' });
-      return;
-    }
-
-    const recipe = findRecipeByInputs(craftingSlots, recipes);
-    if (!recipe) {
-      setLastResult({ success: false, message: 'No recipe found for this combination!' });
-      return;
-    }
-
-    if (resources.energy < recipe.energyCost) {
-      setLastResult({ success: false, message: `Need ${recipe.energyCost} energy!` });
-      return;
-    }
-
+    if (craftingSlots.length < 2) return;
     onTryCraft(craftingSlots);
-    const output = getElement(recipe.output.elementId);
-    setLastResult({
-      success: true,
-      message: `Created ${output?.emoji} ${output?.name}!`,
-    });
-    setCraftingSlots([]);
   };
-
-  // Preview what might be crafted
-  const previewRecipe = craftingSlots.length >= 2 ? findRecipeByInputs(craftingSlots, recipes) : null;
-  const previewElement = previewRecipe ? getElement(previewRecipe.output.elementId) : null;
 
   return (
     <div className="space-y-4">
@@ -148,37 +107,21 @@ export function InventoryPanel({ inventory, resources, elements, recipes, onTryC
           )}
         </div>
 
-        {/* Preview */}
-        {previewElement && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 mb-3 p-2 bg-primary-500/10 border border-primary-500/30 rounded-lg"
-          >
-            <Sparkles className="w-4 h-4 text-primary-400" />
-            <span className="text-sm">
-              Will create: {previewElement.emoji} {previewElement.name}
-            </span>
-            <span className="text-xs text-surface-400">
-              ({previewRecipe?.energyCost} ⚡)
-            </span>
-          </motion.div>
-        )}
-
-        {/* Result message */}
+        {/* Result message (non-discovery results shown inline) */}
         <AnimatePresence>
-          {lastResult && (
+          {craftResult && !craftResult.isNewDiscovery && (
             <motion.div
+              key={craftResult.timestamp}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={`mb-3 p-2 rounded-lg text-sm ${
-                lastResult.success
+                craftResult.success
                   ? 'bg-green-500/10 border border-green-500/30 text-green-400'
                   : 'bg-red-500/10 border border-red-500/30 text-red-400'
               }`}
             >
-              {lastResult.message}
+              {craftResult.message}
             </motion.div>
           )}
         </AnimatePresence>

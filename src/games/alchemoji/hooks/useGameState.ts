@@ -36,6 +36,7 @@ const createInitialState = (config: GameConfig): GameState => ({
     recipesDiscovered: 0,
     playTime: 0,
   },
+  lastCraftResult: null,
   lastSaved: Date.now(),
   lastTick: Date.now(),
 });
@@ -214,26 +215,67 @@ function createGameReducer(config: GameConfig) {
       }
 
       case 'TRY_CRAFT': {
-        const recipe = findRecipeByInputs(action.elementIds, recipes);
-        if (!recipe) return state;
-
-        if (state.resources.energy < recipe.energyCost) return state;
-
+        // Count inputs needed
         const inputCounts: Record<string, number> = {};
         action.elementIds.forEach((id) => {
           inputCounts[id] = (inputCounts[id] || 0) + 1;
         });
 
+        // Check if we have enough items (but always consume them)
         for (const [elementId, needed] of Object.entries(inputCounts)) {
-          if ((state.inventory[elementId] || 0) < needed) return state;
+          if ((state.inventory[elementId] || 0) < needed) {
+            return {
+              ...state,
+              lastCraftResult: {
+                success: false,
+                isNewDiscovery: false,
+                message: 'Not enough items!',
+                timestamp: Date.now(),
+              },
+            };
+          }
         }
 
+        // Always consume items
         const newInventory = { ...state.inventory };
         for (const [elementId, needed] of Object.entries(inputCounts)) {
           newInventory[elementId] -= needed;
           if (newInventory[elementId] <= 0) delete newInventory[elementId];
         }
 
+        // Find recipe
+        const recipe = findRecipeByInputs(action.elementIds, recipes);
+
+        // Failed craft - no recipe found, but items are still consumed
+        if (!recipe) {
+          return {
+            ...state,
+            inventory: newInventory,
+            lastCraftResult: {
+              success: false,
+              isNewDiscovery: false,
+              message: 'The elements fizzle... Nothing happens!',
+              timestamp: Date.now(),
+            },
+          };
+        }
+
+        // Check energy
+        if (state.resources.energy < recipe.energyCost) {
+          return {
+            ...state,
+            inventory: newInventory,
+            lastCraftResult: {
+              success: false,
+              isNewDiscovery: false,
+              message: `Need ${recipe.energyCost} energy!`,
+              timestamp: Date.now(),
+            },
+          };
+        }
+
+        // Successful craft!
+        const outputElement = getElement(recipe.output.elementId);
         newInventory[recipe.output.elementId] =
           (newInventory[recipe.output.elementId] || 0) + recipe.output.amount;
 
@@ -250,6 +292,20 @@ function createGameReducer(config: GameConfig) {
           },
           inventory: newInventory,
           discoveredRecipes: newDiscovered,
+          lastCraftResult: {
+            success: true,
+            isNewDiscovery,
+            outputElement: outputElement ? {
+              id: outputElement.id,
+              name: outputElement.name,
+              emoji: outputElement.emoji,
+              tier: outputElement.tier,
+            } : undefined,
+            message: isNewDiscovery
+              ? `New Discovery: ${outputElement?.emoji} ${outputElement?.name}!`
+              : `Created ${outputElement?.emoji} ${outputElement?.name}!`,
+            timestamp: Date.now(),
+          },
           stats: {
             ...state.stats,
             totalElementsCrafted: state.stats.totalElementsCrafted + recipe.output.amount,
@@ -396,6 +452,13 @@ function createGameReducer(config: GameConfig) {
         return createInitialState(config);
       }
 
+      case 'CLEAR_CRAFT_RESULT': {
+        return {
+          ...state,
+          lastCraftResult: null,
+        };
+      }
+
       default:
         return state;
     }
@@ -484,6 +547,10 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'RESET_GAME' });
   }, []);
 
+  const clearCraftResult = useCallback(() => {
+    dispatch({ type: 'CLEAR_CRAFT_RESULT' });
+  }, []);
+
   return {
     state,
     produce,
@@ -494,6 +561,7 @@ export function useGameState(config: GameConfig) {
     unlockGenerator,
     toggleAuto,
     resetGame,
+    clearCraftResult,
     config,
   };
 }
