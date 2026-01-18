@@ -82,21 +82,6 @@ export const generators: Generator[] = [
     unlocked: false,
   },
   {
-    id: 'geyser',
-    name: 'Geyser',
-    emoji: '💦',
-    description: 'Hot water and steam source',
-    tier: 2,
-    produces: [
-      { elementId: 'water', baseAmount: 2 },
-      { elementId: 'steam', baseAmount: 1 },
-    ],
-    baseEnergyCost: 5,
-    baseCooldown: 4,
-    unlockCost: 500,
-    unlocked: false,
-  },
-  {
     id: 'tornado',
     name: 'Tornado Chamber',
     emoji: '🌪️',
@@ -104,7 +89,6 @@ export const generators: Generator[] = [
     tier: 2,
     produces: [
       { elementId: 'air', baseAmount: 3 },
-      { elementId: 'dust', baseAmount: 1 },
     ],
     baseEnergyCost: 5,
     baseCooldown: 4,
