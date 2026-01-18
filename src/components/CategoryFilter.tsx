@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Zap, Brain, Puzzle, Heart, Compass, Users, Gamepad, LayoutGrid } from 'lucide-react';
+import { Zap, Brain, Puzzle, Heart, Compass, Users, Gamepad, LayoutGrid, Clock } from 'lucide-react';
 import { categoryInfo } from '../types/game';
 
 interface CategoryFilterProps {
@@ -16,6 +16,7 @@ const categoryIcons: Record<string, React.ComponentType<{ className?: string }>>
   adventure: Compass,
   casual: Heart,
   multiplayer: Users,
+  idle: Clock,
 };
 
 export function CategoryFilter({ selected, onChange }: CategoryFilterProps) {

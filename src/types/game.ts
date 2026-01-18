@@ -5,7 +5,8 @@ export type GameCategory =
   | 'strategy'
   | 'adventure'
   | 'casual'
-  | 'multiplayer';
+  | 'multiplayer'
+  | 'idle';
 
 export interface Game {
   id: string;
@@ -19,6 +20,7 @@ export interface Game {
   featured: boolean;
   createdAt: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  playUrl?: string; // URL to play the game (for playable games)
 }
 
 export interface LeaderboardEntry {
@@ -45,4 +47,5 @@ export const categoryInfo: Record<GameCategory, { label: string; color: string; 
   adventure: { label: 'Adventure', color: 'bg-purple-500', icon: 'Compass' },
   casual: { label: 'Casual', color: 'bg-pink-500', icon: 'Heart' },
   multiplayer: { label: 'Multiplayer', color: 'bg-orange-500', icon: 'Users' },
+  idle: { label: 'Idle', color: 'bg-teal-500', icon: 'Clock' },
 };
