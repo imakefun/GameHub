@@ -13,6 +13,7 @@ import {
   Heart,
   Compass,
   Gamepad,
+  Clock,
 } from 'lucide-react';
 import { Leaderboard } from '../components/Leaderboard';
 import { GameCard } from '../components/GameCard';
@@ -27,6 +28,7 @@ const categoryIcons: Record<string, React.ComponentType<{ className?: string }>>
   adventure: Compass,
   casual: Heart,
   multiplayer: Users,
+  idle: Clock,
 };
 
 export function GameDetailPage() {
@@ -163,14 +165,28 @@ export function GameDetailPage() {
               </div>
 
               {/* Play Button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold text-lg shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-shadow"
-              >
-                <Play className="w-6 h-6 fill-current" />
-                Play Now
-              </motion.button>
+              {game.playUrl ? (
+                <Link to={game.playUrl}>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold text-lg shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-shadow"
+                  >
+                    <Play className="w-6 h-6 fill-current" />
+                    Play Now
+                  </motion.button>
+                </Link>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-surface-700 text-surface-400 font-semibold text-lg cursor-not-allowed"
+                  disabled
+                >
+                  <Play className="w-6 h-6" />
+                  Coming Soon
+                </motion.button>
+              )}
             </motion.div>
 
             {/* How to Play */}

@@ -157,6 +157,20 @@ export const games: Game[] = [
     createdAt: '2024-03-05',
     difficulty: 'medium',
   },
+  {
+    id: 'alchemoji',
+    title: 'Alchemoji',
+    description: 'An emoji crafting idle game! Manage generators, discover recipes, and forge new elements. Combine fire, water, earth, and air to create legendary creatures and celestial objects.',
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&h=300&fit=crop',
+    category: 'idle',
+    tags: ['crafting', 'idle', 'discovery', 'emoji'],
+    playCount: 0,
+    rating: 5.0,
+    featured: true,
+    createdAt: '2025-01-18',
+    difficulty: 'easy',
+    playUrl: '/play/alchemoji',
+  },
 ];
 
 export const leaderboards: Record<string, LeaderboardEntry[]> = {

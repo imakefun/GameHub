@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Star, Play, Users, Zap, Brain, Puzzle, Heart, Compass, Gamepad } from 'lucide-react';
+import { Star, Play, Users, Zap, Brain, Puzzle, Heart, Compass, Gamepad, Clock } from 'lucide-react';
 import type { Game } from '../types/game';
 import { categoryInfo } from '../types/game';
 
@@ -17,6 +17,7 @@ const categoryIcons: Record<string, React.ComponentType<{ className?: string }>>
   adventure: Compass,
   casual: Heart,
   multiplayer: Users,
+  idle: Clock,
 };
 
 export function GameCard({ game, featured = false }: GameCardProps) {
