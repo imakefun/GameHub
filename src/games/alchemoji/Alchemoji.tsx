@@ -9,6 +9,7 @@ import { GeneratorPanel } from './components/GeneratorPanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { RecipeBook } from './components/RecipeBook';
 import { MarketPanel } from './components/MarketPanel';
+import { DiscoveryPopup } from './components/DiscoveryPopup';
 
 type Tab = 'craft' | 'generators' | 'recipes' | 'market';
 
@@ -25,6 +26,7 @@ function AlchemojiGame() {
     unlockGenerator,
     toggleAuto,
     resetGame,
+    clearCraftResult,
     config,
   } = useGameState({ elements, recipes, generators, settings });
 
@@ -162,9 +164,8 @@ function AlchemojiGame() {
             {activeTab === 'craft' && (
               <InventoryPanel
                 inventory={state.inventory}
-                resources={state.resources}
                 elements={config.elements}
-                recipes={config.recipes}
+                craftResult={state.lastCraftResult}
                 onTryCraft={tryCraft}
               />
             )}
@@ -305,6 +306,12 @@ function AlchemojiGame() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Discovery Popup */}
+      <DiscoveryPopup
+        craftResult={state.lastCraftResult}
+        onClose={clearCraftResult}
+      />
     </div>
   );
 }

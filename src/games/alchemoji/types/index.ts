@@ -73,6 +73,20 @@ export interface MarketPrices {
   };
 }
 
+// Craft result for UI feedback
+export interface CraftResult {
+  success: boolean;
+  isNewDiscovery: boolean;
+  outputElement?: {
+    id: string;
+    name: string;
+    emoji: string;
+    tier: ElementTier;
+  };
+  message: string;
+  timestamp: number;
+}
+
 // Full game state
 export interface GameState {
   resources: Resources;
@@ -81,6 +95,7 @@ export interface GameState {
   discoveredRecipes: string[]; // Recipe IDs
   marketPrices: MarketPrices;
   stats: GameStats;
+  lastCraftResult: CraftResult | null;
   lastSaved: number;
   lastTick: number;
 }
@@ -106,4 +121,5 @@ export type GameAction =
   | { type: 'UNLOCK_GENERATOR'; generatorId: string }
   | { type: 'TOGGLE_AUTO'; generatorId: string }
   | { type: 'LOAD_GAME'; state: GameState }
-  | { type: 'RESET_GAME' };
+  | { type: 'RESET_GAME' }
+  | { type: 'CLEAR_CRAFT_RESULT' };
