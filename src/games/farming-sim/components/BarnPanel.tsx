@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import type { AnimalPen, Animal, Resources } from '../types';
+import type { AnimalPen, Animal, Resources, Inventory, Product } from '../types';
 
 interface BarnPanelProps {
   pens: AnimalPen[];
   animals: Animal[];
+  products: Product[];
   resources: Resources;
+  inventory: Inventory;
+  playerLevel: number;
   onBuyAnimal: (penId: string, animalId: string) => void;
   onCollect: (penId: string) => void;
   onFeed: (penId: string) => void;
@@ -13,7 +16,10 @@ interface BarnPanelProps {
 export function BarnPanel({
   pens,
   animals,
+  products,
   resources,
+  inventory,
+  playerLevel,
   onBuyAnimal,
   onCollect,
   onFeed,
@@ -22,8 +28,14 @@ export function BarnPanel({
 
   const getProductionProgress = (pen: AnimalPen, animal: Animal | undefined) => {
     if (!pen.lastProducedAt || !animal) return 0;
+    if (!pen.isFed && animal.feedType !== 'none') return 0;
     const elapsed = (Date.now() - pen.lastProducedAt) / 1000;
     return Math.min(100, (elapsed / animal.productionTime) * 100);
+  };
+
+  const getFeedInfo = (feedType: string) => {
+    const product = products.find(p => p.id === feedType);
+    return product ? { name: product.name, emoji: product.emoji } : { name: feedType, emoji: '🌾' };
   };
 
   return (
@@ -36,6 +48,25 @@ export function BarnPanel({
         {pens.map((pen, index) => {
           const animal = animals.find(a => a.id === pen.animalId);
           const progress = getProductionProgress(pen, animal);
+          const feedInfo = animal ? getFeedInfo(animal.feedType) : null;
+          const hasFeed = animal && animal.feedType !== 'none'
+            ? (inventory[animal.feedType] || 0) >= animal.feedAmount
+            : true;
+
+          if (!pen.unlocked) {
+            return (
+              <div
+                key={pen.id}
+                className="p-3 rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+              >
+                <div className="text-xs text-gray-500 mb-1">Pen #{index + 1}</div>
+                <div className="flex flex-col items-center justify-center h-20">
+                  <span className="text-3xl text-gray-600">🔒</span>
+                  <span className="text-xs text-gray-500">Locked</span>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div
@@ -45,7 +76,9 @@ export function BarnPanel({
                 ${pen.animalId
                   ? pen.isReady
                     ? 'bg-yellow-600 animate-pulse'
-                    : 'bg-red-700'
+                    : !pen.isFed && animal?.feedType !== 'none'
+                      ? 'bg-orange-700'
+                      : 'bg-red-700'
                   : 'bg-red-800 border-2 border-dashed border-red-600 cursor-pointer hover:bg-red-700'
                 }
               `}
@@ -62,7 +95,15 @@ export function BarnPanel({
                   <span className="text-4xl mb-1">{animal.emoji}</span>
                   <span className="text-sm text-white font-medium">{animal.name}</span>
 
-                  {!pen.isReady && (
+                  {/* Feed status indicator */}
+                  {animal.feedType !== 'none' && (
+                    <div className={`text-xs mt-1 px-2 py-0.5 rounded ${pen.isFed ? 'bg-green-600' : 'bg-orange-600'}`}>
+                      {pen.isFed ? 'Fed' : 'Hungry!'}
+                    </div>
+                  )}
+
+                  {/* Progress bar */}
+                  {pen.isFed && !pen.isReady && (
                     <div className="w-full mt-2">
                       <div className="h-2 bg-red-900 rounded-full overflow-hidden">
                         <div
@@ -84,23 +125,25 @@ export function BarnPanel({
                       >
                         Collect!
                       </button>
-                    ) : (
+                    ) : !pen.isFed && animal.feedType !== 'none' ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onFeed(pen.id);
                         }}
-                        disabled={resources.energy < animal.feedCost}
+                        disabled={!hasFeed}
                         className={`
-                          px-2 py-1 rounded text-xs
-                          ${resources.energy >= animal.feedCost
+                          px-2 py-1 rounded text-xs flex items-center gap-1
+                          ${hasFeed
                             ? 'bg-green-600 hover:bg-green-500 text-white'
                             : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                           }
                         `}
                       >
-                        Feed ⚡{animal.feedCost}
+                        Feed {feedInfo?.emoji} x{animal.feedAmount}
                       </button>
+                    ) : (
+                      <span className="text-xs text-red-300">Producing...</span>
                     )}
                   </div>
                 </div>
@@ -119,30 +162,45 @@ export function BarnPanel({
       {selectedPen && (
         <div className="mt-4 p-3 bg-red-900/50 rounded-lg">
           <h3 className="text-sm font-bold text-red-200 mb-2">Buy Animal:</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
             {animals.map(animal => {
               const canAfford = resources.money >= animal.purchaseCost;
+              const isUnlocked = animal.unlockLevel <= playerLevel;
+              const feedInfo = getFeedInfo(animal.feedType);
+
               return (
                 <button
                   key={animal.id}
                   onClick={() => {
-                    if (canAfford) {
+                    if (canAfford && isUnlocked) {
                       onBuyAnimal(selectedPen, animal.id);
                       setSelectedPen(null);
                     }
                   }}
-                  disabled={!canAfford}
+                  disabled={!canAfford || !isUnlocked}
                   className={`
-                    p-2 rounded-lg text-center transition-all
-                    ${canAfford
-                      ? 'bg-green-700 hover:bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    p-2 rounded-lg text-center transition-all relative
+                    ${!isUnlocked
+                      ? 'bg-gray-800 text-gray-500'
+                      : canAfford
+                        ? 'bg-green-700 hover:bg-green-600 text-white'
+                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     }
                   `}
                 >
-                  <span className="text-2xl block">{animal.emoji}</span>
+                  {!isUnlocked && (
+                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                      Lv.{animal.unlockLevel}
+                    </div>
+                  )}
+                  <span className="text-2xl block">{isUnlocked ? animal.emoji : '🔒'}</span>
                   <span className="text-xs block">{animal.name}</span>
                   <span className="text-xs block text-amber-300">${animal.purchaseCost}</span>
+                  {isUnlocked && animal.feedType !== 'none' && (
+                    <span className="text-xs block text-red-300">
+                      Needs: {feedInfo.emoji}
+                    </span>
+                  )}
                 </button>
               );
             })}

@@ -5,6 +5,7 @@ interface OrchardPanelProps {
   orchards: Orchard[];
   trees: Tree[];
   resources: Resources;
+  playerLevel: number;
   onPlantTree: (orchardId: string, treeId: string) => void;
   onHarvest: (orchardId: string) => void;
 }
@@ -13,6 +14,7 @@ export function OrchardPanel({
   orchards,
   trees,
   resources,
+  playerLevel,
   onPlantTree,
   onHarvest,
 }: OrchardPanelProps) {
@@ -42,6 +44,21 @@ export function OrchardPanel({
           const tree = trees.find(t => t.id === orchard.treeId);
           const growthProgress = getGrowthProgress(orchard, tree);
           const harvestProgress = getHarvestProgress(orchard, tree);
+
+          if (!orchard.unlocked) {
+            return (
+              <div
+                key={orchard.id}
+                className="p-3 rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+              >
+                <div className="text-xs text-gray-500 mb-1">Slot #{index + 1}</div>
+                <div className="flex flex-col items-center justify-center h-20">
+                  <span className="text-3xl text-gray-600">🔒</span>
+                  <span className="text-xs text-gray-500">Locked</span>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div
@@ -117,25 +134,33 @@ export function OrchardPanel({
           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
             {trees.map(tree => {
               const canAfford = resources.money >= tree.saplingCost;
+              const isUnlocked = tree.unlockLevel <= playerLevel;
               return (
                 <button
                   key={tree.id}
                   onClick={() => {
-                    if (canAfford) {
+                    if (canAfford && isUnlocked) {
                       onPlantTree(selectedOrchard, tree.id);
                       setSelectedOrchard(null);
                     }
                   }}
-                  disabled={!canAfford}
+                  disabled={!canAfford || !isUnlocked}
                   className={`
-                    p-2 rounded-lg text-center transition-all
-                    ${canAfford
-                      ? 'bg-green-700 hover:bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    p-2 rounded-lg text-center transition-all relative
+                    ${!isUnlocked
+                      ? 'bg-gray-800 text-gray-500'
+                      : canAfford
+                        ? 'bg-green-700 hover:bg-green-600 text-white'
+                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     }
                   `}
                 >
-                  <span className="text-xl block">{tree.emoji} {tree.fruitEmoji}</span>
+                  {!isUnlocked && (
+                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                      Lv.{tree.unlockLevel}
+                    </div>
+                  )}
+                  <span className="text-xl block">{isUnlocked ? `${tree.emoji} ${tree.fruitEmoji}` : '🔒'}</span>
                   <span className="text-xs block">{tree.name}</span>
                   <span className="text-xs block text-amber-300">${tree.saplingCost}</span>
                 </button>

@@ -6,6 +6,7 @@ interface FieldsPanelProps {
   crops: Crop[];
   resources: Resources;
   inventory: Inventory;
+  playerLevel: number;
   onPlant: (fieldId: string, cropId: string) => void;
   onHarvest: (fieldId: string) => void;
 }
@@ -15,6 +16,7 @@ export function FieldsPanel({
   crops,
   resources,
   inventory: _inventory,
+  playerLevel,
   onPlant,
   onHarvest,
 }: FieldsPanelProps) {
@@ -36,6 +38,23 @@ export function FieldsPanel({
         {fields.map((field, index) => {
           const crop = crops.find(c => c.id === field.cropId);
           const progress = getGrowthProgress(field, crop);
+
+          if (!field.unlocked) {
+            return (
+              <div
+                key={field.id}
+                className="relative aspect-square rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+              >
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl text-gray-600">🔒</span>
+                  <span className="text-xs text-gray-500">Locked</span>
+                </div>
+                <div className="absolute top-1 left-1 text-xs text-gray-500">
+                  #{index + 1}
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div
@@ -95,25 +114,33 @@ export function FieldsPanel({
           <div className="grid grid-cols-3 gap-2">
             {crops.map(crop => {
               const canAfford = resources.money >= crop.seedCost;
+              const isUnlocked = crop.unlockLevel <= playerLevel;
               return (
                 <button
                   key={crop.id}
                   onClick={() => {
-                    if (canAfford) {
+                    if (canAfford && isUnlocked) {
                       onPlant(selectedField, crop.id);
                       setSelectedField(null);
                     }
                   }}
-                  disabled={!canAfford}
+                  disabled={!canAfford || !isUnlocked}
                   className={`
-                    p-2 rounded-lg text-center transition-all
-                    ${canAfford
-                      ? 'bg-green-700 hover:bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    p-2 rounded-lg text-center transition-all relative
+                    ${!isUnlocked
+                      ? 'bg-gray-800 text-gray-500'
+                      : canAfford
+                        ? 'bg-green-700 hover:bg-green-600 text-white'
+                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     }
                   `}
                 >
-                  <span className="text-xl block">{crop.emoji}</span>
+                  {!isUnlocked && (
+                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                      Lv.{crop.unlockLevel}
+                    </div>
+                  )}
+                  <span className="text-xl block">{isUnlocked ? crop.emoji : '🔒'}</span>
                   <span className="text-xs block">{crop.name}</span>
                   <span className="text-xs block text-amber-300">${crop.seedCost}</span>
                 </button>

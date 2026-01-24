@@ -7,6 +7,7 @@ interface FactoryPanelProps {
   products: Product[];
   resources: Resources;
   inventory: Inventory;
+  playerLevel: number;
   onBuyMachine: (slotId: string, machineId: string) => void;
   onStartProcessing: (slotId: string, recipeIndex: number) => void;
   onCollect: (slotId: string) => void;
@@ -18,6 +19,7 @@ export function FactoryPanel({
   products,
   resources,
   inventory,
+  playerLevel,
   onBuyMachine,
   onStartProcessing,
   onCollect,
@@ -62,6 +64,21 @@ export function FactoryPanel({
         {machineSlots.map((slot, index) => {
           const machine = machines.find(m => m.id === slot.machineId);
           const progress = getProcessingProgress(slot, machine);
+
+          if (!slot.unlocked) {
+            return (
+              <div
+                key={slot.id}
+                className="p-3 rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+              >
+                <div className="text-xs text-gray-500 mb-1">Slot #{index + 1}</div>
+                <div className="flex flex-col items-center justify-center h-16">
+                  <span className="text-3xl text-gray-600">🔒</span>
+                  <span className="text-xs text-gray-500">Locked</span>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div
@@ -144,25 +161,33 @@ export function FactoryPanel({
           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
             {machines.map(machine => {
               const canAfford = resources.money >= machine.purchaseCost;
+              const isUnlocked = machine.unlockLevel <= playerLevel;
               return (
                 <button
                   key={machine.id}
                   onClick={() => {
-                    if (canAfford) {
+                    if (canAfford && isUnlocked) {
                       onBuyMachine(selectedSlot, machine.id);
                       setSelectedSlot(null);
                     }
                   }}
-                  disabled={!canAfford}
+                  disabled={!canAfford || !isUnlocked}
                   className={`
-                    p-2 rounded-lg text-center transition-all
-                    ${canAfford
-                      ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    p-2 rounded-lg text-center transition-all relative
+                    ${!isUnlocked
+                      ? 'bg-gray-800 text-gray-500'
+                      : canAfford
+                        ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     }
                   `}
                 >
-                  <span className="text-xl block">{machine.emoji}</span>
+                  {!isUnlocked && (
+                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                      Lv.{machine.unlockLevel}
+                    </div>
+                  )}
+                  <span className="text-xl block">{isUnlocked ? machine.emoji : '🔒'}</span>
                   <span className="text-xs block">{machine.name}</span>
                   <span className="text-xs block text-amber-300">${machine.purchaseCost}</span>
                 </button>
@@ -184,41 +209,49 @@ export function FactoryPanel({
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {machine.recipes.map((recipe, recipeIndex) => {
                 const canMake = canMakeRecipe(machine, recipeIndex);
+                const isRecipeUnlocked = recipe.unlockLevel <= playerLevel;
                 return (
                   <button
                     key={recipeIndex}
                     onClick={() => {
-                      if (canMake) {
+                      if (canMake && isRecipeUnlocked) {
                         onStartProcessing(selectedMachineForRecipe, recipeIndex);
                         setSelectedMachineForRecipe(null);
                       }
                     }}
-                    disabled={!canMake}
+                    disabled={!canMake || !isRecipeUnlocked}
                     className={`
-                      w-full p-2 rounded-lg text-left transition-all
-                      ${canMake
-                        ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      w-full p-2 rounded-lg text-left transition-all relative
+                      ${!isRecipeUnlocked
+                        ? 'bg-gray-800 text-gray-500'
+                        : canMake
+                          ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                       }
                     `}
                   >
+                    {!isRecipeUnlocked && (
+                      <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                        Lv.{recipe.unlockLevel}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
                         {recipe.inputs.map((input, i) => (
                           <span key={i} className="text-sm">
-                            {getProductEmoji(input.itemId)}×{input.amount}
+                            {isRecipeUnlocked ? getProductEmoji(input.itemId) : '?'}×{input.amount}
                             {i < recipe.inputs.length - 1 && ' +'}
                           </span>
                         ))}
                         <span className="mx-1">→</span>
                         <span className="text-sm">
-                          {getProductEmoji(recipe.output.itemId)}×{recipe.output.amount}
+                          {isRecipeUnlocked ? getProductEmoji(recipe.output.itemId) : '?'}×{recipe.output.amount}
                         </span>
                       </div>
                       <span className="text-xs text-slate-300">⚡{machine.energyCost}</span>
                     </div>
                     <div className="text-xs text-slate-300 mt-1">
-                      {getProductName(recipe.output.itemId)} ({recipe.processingTime}s)
+                      {isRecipeUnlocked ? getProductName(recipe.output.itemId) : '???'} ({recipe.processingTime}s)
                     </div>
                   </button>
                 );

@@ -9,38 +9,72 @@ import type {
   MachineSlot,
   Order,
   WanderingCustomer,
+  OrderDifficulty,
+  PlayerProgress,
 } from '../types';
-import { customerNames } from '../data';
+import { getXpForLevel, getLevelForXp } from '../types';
+import { customerNames, levels } from '../data';
 
-const STORAGE_KEY = 'farming-sim-save';
+const STORAGE_KEY = 'farming-sim-save-v2';
+
+// Get unlocked slot count based on level
+function getUnlockedSlots(level: number, slotType: 'fields' | 'pens' | 'orchards' | 'machineSlots'): number {
+  let count = 0;
+  for (const lvl of levels) {
+    if (lvl.level > level) break;
+    const key = `unlocks${slotType.charAt(0).toUpperCase() + slotType.slice(1)}` as keyof typeof lvl;
+    if (lvl[key]) {
+      count = lvl[key] as number;
+    }
+  }
+  return count;
+}
+
+// Calculate progress for current level
+function calculateProgress(totalXp: number): PlayerProgress {
+  const level = getLevelForXp(totalXp);
+  const currentLevelXp = getXpForLevel(level);
+  const nextLevelXp = getXpForLevel(level + 1);
+  return {
+    level,
+    xp: totalXp,
+    xpToNextLevel: nextLevelXp - currentLevelXp,
+  };
+}
 
 // Initialize game state
 function initializeState(config: GameConfig): GameState {
-  // Try to load saved state
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      // Update lastTick to current time to avoid huge time jumps
+      // Update lastTick to avoid huge time jumps
       return { ...parsed, lastTick: Date.now() };
     } catch {
       // Invalid save, start fresh
     }
   }
 
-  // Create initial slots
+  const now = Date.now();
+  const startingLevel = 1;
+
+  // Create slots with unlock status based on level
   const fields: Field[] = Array.from({ length: config.settings.maxFields }, (_, i) => ({
     id: `field-${i}`,
     cropId: null,
     plantedAt: null,
     isReady: false,
+    unlocked: i < getUnlockedSlots(startingLevel, 'fields'),
   }));
 
   const animalPens: AnimalPen[] = Array.from({ length: config.settings.maxAnimalPens }, (_, i) => ({
     id: `pen-${i}`,
     animalId: null,
     lastProducedAt: null,
+    lastFedAt: null,
+    isFed: false,
     isReady: false,
+    unlocked: i < getUnlockedSlots(startingLevel, 'pens'),
   }));
 
   const orchards: Orchard[] = Array.from({ length: config.settings.maxOrchards }, (_, i) => ({
@@ -50,6 +84,7 @@ function initializeState(config: GameConfig): GameState {
     lastHarvestedAt: null,
     isMature: false,
     isReady: false,
+    unlocked: i < getUnlockedSlots(startingLevel, 'orchards'),
   }));
 
   const machineSlots: MachineSlot[] = Array.from({ length: config.settings.maxMachineSlots }, (_, i) => ({
@@ -59,23 +94,33 @@ function initializeState(config: GameConfig): GameState {
     startedAt: null,
     isProcessing: false,
     isReady: false,
+    unlocked: i < getUnlockedSlots(startingLevel, 'machineSlots'),
   }));
+
+  // Generate initial orders
+  const initialOrders = generateAllOrders(config, startingLevel, now);
 
   return {
     resources: {
       money: config.settings.startingMoney,
       energy: config.settings.startingEnergy,
     },
+    progress: {
+      level: startingLevel,
+      xp: 0,
+      xpToNextLevel: getXpForLevel(2),
+    },
     inventory: {},
     fields,
     animalPens,
     orchards,
     machineSlots,
-    orders: [],
+    orders: initialOrders,
+    lastOrderRefresh: now,
     wanderingCustomers: [],
-    unlockedItems: ['wheat', 'carrot', 'chicken', 'apple_tree', 'mill', 'juicer'],
     stats: {
       totalMoneyEarned: 0,
+      totalXpEarned: 0,
       totalCropsHarvested: 0,
       totalAnimalsProduced: 0,
       totalFruitsHarvested: 0,
@@ -84,8 +129,191 @@ function initializeState(config: GameConfig): GameState {
       totalCustomersServed: 0,
       playTime: 0,
     },
-    lastTick: Date.now(),
+    lastTick: now,
   };
+}
+
+// Generate orders based on player level
+function generateAllOrders(config: GameConfig, level: number, now: number): Order[] {
+  const orders: Order[] = [];
+  for (let slot = 0; slot < config.settings.maxOrders; slot++) {
+    const order = generateOrder(config, level, now, slot);
+    if (order) orders.push(order);
+  }
+  return orders;
+}
+
+function generateOrder(config: GameConfig, level: number, now: number, slot: number): Order | null {
+  // Determine difficulty based on slot and level
+  let difficulty: OrderDifficulty;
+  if (level < 3) {
+    difficulty = 'easy';
+  } else if (level < 6) {
+    difficulty = slot === 0 ? 'easy' : slot === 1 ? 'medium' : 'easy';
+  } else if (level < 10) {
+    difficulty = slot === 0 ? 'easy' : slot === 1 ? 'medium' : 'hard';
+  } else {
+    difficulty = slot === 0 ? 'medium' : slot === 1 ? 'hard' : 'hard';
+  }
+
+  // Get available products based on level
+  const availableProducts = config.products.filter(p => {
+    // Check if this product can be obtained at current level
+    const crop = config.crops.find(c => c.id === p.id);
+    if (crop) return crop.unlockLevel <= level;
+
+    const tree = config.trees.find(t => t.id.replace('_tree', '').replace('_vine', '') === p.id);
+    if (tree) return tree.unlockLevel <= level;
+
+    const animal = config.animals.find(a => a.produces === p.id);
+    if (animal) return animal.unlockLevel <= level;
+
+    // For processed goods, check if the recipe is unlocked
+    for (const machine of config.machines) {
+      if (machine.unlockLevel > level) continue;
+      for (const recipe of machine.recipes) {
+        if (recipe.output.itemId === p.id && recipe.unlockLevel <= level) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  });
+
+  // Filter out feed items from orders
+  const orderableProducts = availableProducts.filter(p => p.category !== 'feed');
+
+  if (orderableProducts.length === 0) return null;
+
+  // Determine number of items based on difficulty
+  let numItems: number;
+  let amountMultiplier: number;
+  let timeLimit: number;
+
+  switch (difficulty) {
+    case 'easy':
+      numItems = 1;
+      amountMultiplier = 1;
+      timeLimit = 180; // 3 minutes
+      break;
+    case 'medium':
+      numItems = Math.random() < 0.5 ? 1 : 2;
+      amountMultiplier = 1.5;
+      timeLimit = 240; // 4 minutes
+      break;
+    case 'hard':
+      numItems = Math.floor(Math.random() * 2) + 2; // 2-3 items
+      amountMultiplier = 2;
+      timeLimit = 300; // 5 minutes
+      break;
+  }
+
+  const items: { itemId: string; amount: number }[] = [];
+  const usedIds = new Set<string>();
+  let totalValue = 0;
+
+  for (let i = 0; i < numItems; i++) {
+    const availableForSlot = orderableProducts.filter(p => !usedIds.has(p.id));
+    if (availableForSlot.length === 0) break;
+
+    const product = availableForSlot[Math.floor(Math.random() * availableForSlot.length)];
+    usedIds.add(product.id);
+
+    const baseAmount = Math.floor(Math.random() * 3) + 1;
+    const amount = Math.ceil(baseAmount * amountMultiplier);
+    items.push({ itemId: product.id, amount });
+    totalValue += product.baseValue * amount;
+  }
+
+  if (items.length === 0) return null;
+
+  const customer = customerNames[Math.floor(Math.random() * customerNames.length)];
+
+  // XP reward scales with difficulty
+  const xpMultiplier = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 1.5 : 2;
+
+  return {
+    id: `order-${now}-${slot}-${Math.random().toString(36).slice(2, 8)}`,
+    customerName: customer.name,
+    customerEmoji: customer.emoji,
+    items,
+    reward: Math.floor(totalValue * 1.5),
+    bonusReward: Math.floor(totalValue * 0.5),
+    xpReward: Math.floor(10 * xpMultiplier * items.length),
+    timeLimit,
+    createdAt: now,
+    difficulty,
+    slot,
+  };
+}
+
+function generateWanderingCustomer(config: GameConfig, state: GameState, now: number): WanderingCustomer | null {
+  const availableProducts = config.products.filter(p =>
+    (state.inventory[p.id] || 0) > 0 && p.category !== 'feed'
+  );
+
+  if (availableProducts.length === 0) return null;
+
+  const product = availableProducts[Math.floor(Math.random() * availableProducts.length)];
+  const amount = Math.min(
+    Math.floor(Math.random() * 3) + 1,
+    state.inventory[product.id] || 0
+  );
+
+  const customer = customerNames[Math.floor(Math.random() * customerNames.length)];
+
+  return {
+    id: `customer-${now}-${Math.random().toString(36).slice(2, 8)}`,
+    name: customer.name,
+    emoji: customer.emoji,
+    wantsItemId: product.id,
+    wantsAmount: amount,
+    offersPrice: Math.floor(product.baseValue * amount * 1.8),
+    xpReward: Math.floor(5 * amount),
+    expiresAt: now + config.settings.customerDuration * 1000,
+  };
+}
+
+// Add XP and handle level up
+function addXp(state: GameState, xpGained: number, _config: GameConfig): GameState {
+  const newTotalXp = state.progress.xp + xpGained;
+  const newLevel = getLevelForXp(newTotalXp);
+  const leveledUp = newLevel > state.progress.level;
+
+  let newState = {
+    ...state,
+    progress: calculateProgress(newTotalXp),
+    stats: {
+      ...state.stats,
+      totalXpEarned: state.stats.totalXpEarned + xpGained,
+    },
+  };
+
+  // If leveled up, unlock new slots
+  if (leveledUp) {
+    newState = {
+      ...newState,
+      fields: newState.fields.map((f, i) => ({
+        ...f,
+        unlocked: i < getUnlockedSlots(newLevel, 'fields'),
+      })),
+      animalPens: newState.animalPens.map((p, i) => ({
+        ...p,
+        unlocked: i < getUnlockedSlots(newLevel, 'pens'),
+      })),
+      orchards: newState.orchards.map((o, i) => ({
+        ...o,
+        unlocked: i < getUnlockedSlots(newLevel, 'orchards'),
+      })),
+      machineSlots: newState.machineSlots.map((s, i) => ({
+        ...s,
+        unlocked: i < getUnlockedSlots(newLevel, 'machineSlots'),
+      })),
+    };
+  }
+
+  return newState;
 }
 
 // Create the game reducer
@@ -94,7 +322,7 @@ function createGameReducer(config: GameConfig) {
     switch (action.type) {
       case 'TICK': {
         const now = action.now;
-        const delta = (now - state.lastTick) / 1000; // seconds
+        const delta = (now - state.lastTick) / 1000;
 
         let newState = { ...state, lastTick: now };
 
@@ -119,11 +347,23 @@ function createGameReducer(config: GameConfig) {
           return { ...field, isReady };
         });
 
-        // Update animal pens
+        // Update animal pens - only produce if fed
         newState.animalPens = newState.animalPens.map(pen => {
           if (!pen.animalId || !pen.lastProducedAt) return pen;
           const animal = config.animals.find(a => a.id === pen.animalId);
           if (!animal) return pen;
+
+          // Bees don't need feed
+          if (animal.feedType === 'none') {
+            const elapsed = (now - pen.lastProducedAt) / 1000;
+            const isReady = elapsed >= animal.productionTime;
+            return { ...pen, isReady, isFed: true };
+          }
+
+          // Other animals need to be fed
+          if (!pen.isFed) {
+            return { ...pen, isReady: false };
+          }
 
           const elapsed = (now - pen.lastProducedAt) / 1000;
           const isReady = elapsed >= animal.productionTime;
@@ -143,7 +383,7 @@ function createGameReducer(config: GameConfig) {
 
           const harvestElapsed = orchard.lastHarvestedAt
             ? (now - orchard.lastHarvestedAt) / 1000
-            : tree.harvestTime; // Ready for first harvest immediately when mature
+            : tree.harvestTime;
           const isReady = harvestElapsed >= tree.harvestTime;
 
           return { ...orchard, isMature, isReady };
@@ -168,20 +408,14 @@ function createGameReducer(config: GameConfig) {
           customer => now < customer.expiresAt
         );
 
-        // Remove expired orders (optional: could add expiry to orders)
-
-        // Spawn new order if needed
-        if (newState.orders.length < config.settings.maxOrders) {
-          const shouldSpawn = Math.random() < (delta / config.settings.orderSpawnInterval);
-          if (shouldSpawn) {
-            const newOrder = generateOrder(config, newState, now);
-            if (newOrder) {
-              newState.orders = [...newState.orders, newOrder];
-            }
-          }
+        // Check if orders need to refresh
+        const timeSinceRefresh = (now - newState.lastOrderRefresh) / 1000;
+        if (timeSinceRefresh >= config.settings.orderRefreshInterval) {
+          newState.orders = generateAllOrders(config, newState.progress.level, now);
+          newState.lastOrderRefresh = now;
         }
 
-        // Spawn wandering customer if needed
+        // Spawn wandering customer
         if (newState.wanderingCustomers.length < 2) {
           const shouldSpawn = Math.random() < (delta / config.settings.customerSpawnInterval);
           if (shouldSpawn) {
@@ -199,9 +433,10 @@ function createGameReducer(config: GameConfig) {
         const { fieldId, cropId } = action;
         const crop = config.crops.find(c => c.id === cropId);
         if (!crop) return state;
+        if (crop.unlockLevel > state.progress.level) return state;
 
         const field = state.fields.find(f => f.id === fieldId);
-        if (!field || field.cropId) return state;
+        if (!field || !field.unlocked || field.cropId) return state;
 
         if (state.resources.money < crop.seedCost) return state;
 
@@ -228,8 +463,7 @@ function createGameReducer(config: GameConfig) {
         if (!crop) return state;
 
         const currentAmount = state.inventory[crop.id] || 0;
-
-        return {
+        let newState = {
           ...state,
           inventory: {
             ...state.inventory,
@@ -245,15 +479,18 @@ function createGameReducer(config: GameConfig) {
             totalCropsHarvested: state.stats.totalCropsHarvested + crop.yieldAmount,
           },
         };
+
+        return addXp(newState, crop.xpReward, config);
       }
 
       case 'BUY_ANIMAL': {
         const { penId, animalId } = action;
         const animal = config.animals.find(a => a.id === animalId);
         if (!animal) return state;
+        if (animal.unlockLevel > state.progress.level) return state;
 
         const pen = state.animalPens.find(p => p.id === penId);
-        if (!pen || pen.animalId) return state;
+        if (!pen || !pen.unlocked || pen.animalId) return state;
 
         if (state.resources.money < animal.purchaseCost) return state;
 
@@ -265,7 +502,7 @@ function createGameReducer(config: GameConfig) {
           },
           animalPens: state.animalPens.map(p =>
             p.id === penId
-              ? { ...p, animalId, lastProducedAt: Date.now(), isReady: false }
+              ? { ...p, animalId, lastProducedAt: Date.now(), lastFedAt: null, isFed: animal.feedType === 'none', isReady: false }
               : p
           ),
         };
@@ -280,8 +517,7 @@ function createGameReducer(config: GameConfig) {
         if (!animal) return state;
 
         const currentAmount = state.inventory[animal.produces] || 0;
-
-        return {
+        let newState = {
           ...state,
           inventory: {
             ...state.inventory,
@@ -289,7 +525,7 @@ function createGameReducer(config: GameConfig) {
           },
           animalPens: state.animalPens.map(p =>
             p.id === penId
-              ? { ...p, lastProducedAt: Date.now(), isReady: false }
+              ? { ...p, lastProducedAt: Date.now(), isFed: animal.feedType === 'none', isReady: false }
               : p
           ),
           stats: {
@@ -297,28 +533,31 @@ function createGameReducer(config: GameConfig) {
             totalAnimalsProduced: state.stats.totalAnimalsProduced + 1,
           },
         };
+
+        return addXp(newState, animal.xpReward, config);
       }
 
       case 'FEED_ANIMAL': {
         const { penId } = action;
         const pen = state.animalPens.find(p => p.id === penId);
-        if (!pen || !pen.animalId) return state;
+        if (!pen || !pen.animalId || pen.isFed) return state;
 
         const animal = config.animals.find(a => a.id === pen.animalId);
-        if (!animal) return state;
+        if (!animal || animal.feedType === 'none') return state;
 
-        if (state.resources.energy < animal.feedCost) return state;
+        // Check if player has the required feed
+        const hasFeed = (state.inventory[animal.feedType] || 0) >= animal.feedAmount;
+        if (!hasFeed) return state;
 
-        // Feeding speeds up production by resetting timer with bonus
         return {
           ...state,
-          resources: {
-            ...state.resources,
-            energy: state.resources.energy - animal.feedCost,
+          inventory: {
+            ...state.inventory,
+            [animal.feedType]: (state.inventory[animal.feedType] || 0) - animal.feedAmount,
           },
           animalPens: state.animalPens.map(p =>
             p.id === penId
-              ? { ...p, lastProducedAt: Date.now() - (animal.productionTime * 500) } // 50% faster
+              ? { ...p, isFed: true, lastFedAt: Date.now() }
               : p
           ),
         };
@@ -328,9 +567,10 @@ function createGameReducer(config: GameConfig) {
         const { orchardId, treeId } = action;
         const tree = config.trees.find(t => t.id === treeId);
         if (!tree) return state;
+        if (tree.unlockLevel > state.progress.level) return state;
 
         const orchard = state.orchards.find(o => o.id === orchardId);
-        if (!orchard || orchard.treeId) return state;
+        if (!orchard || !orchard.unlocked || orchard.treeId) return state;
 
         if (state.resources.money < tree.saplingCost) return state;
 
@@ -356,11 +596,10 @@ function createGameReducer(config: GameConfig) {
         const tree = config.trees.find(t => t.id === orchard.treeId);
         if (!tree) return state;
 
-        // Get fruit id from tree id (apple_tree -> apple)
         const fruitId = tree.id.replace('_tree', '').replace('_vine', '');
         const currentAmount = state.inventory[fruitId] || 0;
 
-        return {
+        let newState = {
           ...state,
           inventory: {
             ...state.inventory,
@@ -376,15 +615,18 @@ function createGameReducer(config: GameConfig) {
             totalFruitsHarvested: state.stats.totalFruitsHarvested + tree.yieldAmount,
           },
         };
+
+        return addXp(newState, tree.xpReward, config);
       }
 
       case 'BUY_MACHINE': {
         const { slotId, machineId } = action;
         const machine = config.machines.find(m => m.id === machineId);
         if (!machine) return state;
+        if (machine.unlockLevel > state.progress.level) return state;
 
         const slot = state.machineSlots.find(s => s.id === slotId);
-        if (!slot || slot.machineId) return state;
+        if (!slot || !slot.unlocked || slot.machineId) return state;
 
         if (state.resources.money < machine.purchaseCost) return state;
 
@@ -412,17 +654,15 @@ function createGameReducer(config: GameConfig) {
 
         const recipe = machine.recipes[recipeIndex];
         if (!recipe) return state;
+        if (recipe.unlockLevel > state.progress.level) return state;
 
-        // Check energy
         if (state.resources.energy < machine.energyCost) return state;
 
-        // Check ingredients
         const hasIngredients = recipe.inputs.every(input =>
           (state.inventory[input.itemId] || 0) >= input.amount
         );
         if (!hasIngredients) return state;
 
-        // Consume ingredients
         const newInventory = { ...state.inventory };
         recipe.inputs.forEach(input => {
           newInventory[input.itemId] = (newInventory[input.itemId] || 0) - input.amount;
@@ -456,7 +696,7 @@ function createGameReducer(config: GameConfig) {
 
         const currentAmount = state.inventory[recipe.output.itemId] || 0;
 
-        return {
+        let newState = {
           ...state,
           inventory: {
             ...state.inventory,
@@ -472,6 +712,8 @@ function createGameReducer(config: GameConfig) {
             totalGoodsProcessed: state.stats.totalGoodsProcessed + recipe.output.amount,
           },
         };
+
+        return addXp(newState, recipe.xpReward, config);
       }
 
       case 'COMPLETE_ORDER': {
@@ -479,25 +721,22 @@ function createGameReducer(config: GameConfig) {
         const order = state.orders.find(o => o.id === orderId);
         if (!order) return state;
 
-        // Check if player has all items
         const hasItems = order.items.every(item =>
           (state.inventory[item.itemId] || 0) >= item.amount
         );
         if (!hasItems) return state;
 
-        // Consume items
         const newInventory = { ...state.inventory };
         order.items.forEach(item => {
           newInventory[item.itemId] = (newInventory[item.itemId] || 0) - item.amount;
         });
 
-        // Calculate reward (with bonus if completed quickly)
         const elapsed = (Date.now() - order.createdAt) / 1000;
         const reward = elapsed < order.timeLimit / 2
           ? order.reward + order.bonusReward
           : order.reward;
 
-        return {
+        let newState = {
           ...state,
           resources: {
             ...state.resources,
@@ -511,6 +750,8 @@ function createGameReducer(config: GameConfig) {
             totalOrdersCompleted: state.stats.totalOrdersCompleted + 1,
           },
         };
+
+        return addXp(newState, order.xpReward, config);
       }
 
       case 'DISMISS_ORDER': {
@@ -521,15 +762,23 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      case 'REFRESH_ORDERS': {
+        const now = Date.now();
+        return {
+          ...state,
+          orders: generateAllOrders(config, state.progress.level, now),
+          lastOrderRefresh: now,
+        };
+      }
+
       case 'SERVE_CUSTOMER': {
         const { customerId } = action;
         const customer = state.wanderingCustomers.find(c => c.id === customerId);
         if (!customer) return state;
 
-        // Check if player has the item
         if ((state.inventory[customer.wantsItemId] || 0) < customer.wantsAmount) return state;
 
-        return {
+        let newState = {
           ...state,
           resources: {
             ...state.resources,
@@ -546,6 +795,8 @@ function createGameReducer(config: GameConfig) {
             totalCustomersServed: state.stats.totalCustomersServed + 1,
           },
         };
+
+        return addXp(newState, customer.xpReward, config);
       }
 
       case 'SELL_ITEM': {
@@ -575,11 +826,6 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
-      case 'UNLOCK_SLOT': {
-        // For now, slots are pre-created but could be locked/unlocked
-        return state;
-      }
-
       case 'RESET_GAME': {
         localStorage.removeItem(STORAGE_KEY);
         return initializeState(config);
@@ -588,66 +834,6 @@ function createGameReducer(config: GameConfig) {
       default:
         return state;
     }
-  };
-}
-
-// Helper to generate random order
-function generateOrder(config: GameConfig, state: GameState, now: number): Order | null {
-  const availableProducts = config.products.filter(p =>
-    state.unlockedItems.includes(p.id) || (state.inventory[p.id] || 0) > 0
-  );
-
-  if (availableProducts.length === 0) return null;
-
-  const numItems = Math.floor(Math.random() * 2) + 1; // 1-2 items
-  const items: { itemId: string; amount: number }[] = [];
-  let totalValue = 0;
-
-  for (let i = 0; i < numItems; i++) {
-    const product = availableProducts[Math.floor(Math.random() * availableProducts.length)];
-    const amount = Math.floor(Math.random() * 3) + 1; // 1-3 of each
-    items.push({ itemId: product.id, amount });
-    totalValue += product.baseValue * amount;
-  }
-
-  const customer = customerNames[Math.floor(Math.random() * customerNames.length)];
-
-  return {
-    id: `order-${now}-${Math.random().toString(36).slice(2, 8)}`,
-    customerName: customer.name,
-    customerEmoji: customer.emoji,
-    items,
-    reward: Math.floor(totalValue * 1.5), // 50% profit
-    bonusReward: Math.floor(totalValue * 0.5), // Extra 50% for quick completion
-    timeLimit: 120, // 2 minutes
-    createdAt: now,
-  };
-}
-
-// Helper to generate wandering customer
-function generateWanderingCustomer(config: GameConfig, state: GameState, now: number): WanderingCustomer | null {
-  const availableProducts = config.products.filter(p =>
-    (state.inventory[p.id] || 0) > 0
-  );
-
-  if (availableProducts.length === 0) return null;
-
-  const product = availableProducts[Math.floor(Math.random() * availableProducts.length)];
-  const amount = Math.min(
-    Math.floor(Math.random() * 3) + 1,
-    state.inventory[product.id] || 0
-  );
-
-  const customer = customerNames[Math.floor(Math.random() * customerNames.length)];
-
-  return {
-    id: `customer-${now}-${Math.random().toString(36).slice(2, 8)}`,
-    name: customer.name,
-    emoji: customer.emoji,
-    wantsItemId: product.id,
-    wantsAmount: amount,
-    offersPrice: Math.floor(product.baseValue * amount * 1.8), // 80% premium
-    expiresAt: now + config.settings.customerDuration * 1000,
   };
 }
 
@@ -664,7 +850,7 @@ export function useGameState(config: GameConfig) {
   // Auto-save
   useEffect(() => {
     const now = Date.now();
-    if (now - lastSaveRef.current > 5000) { // Save every 5 seconds
+    if (now - lastSaveRef.current > 5000) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       lastSaveRef.current = now;
     }
@@ -735,6 +921,10 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'DISMISS_ORDER', orderId });
   }, []);
 
+  const refreshOrders = useCallback(() => {
+    dispatch({ type: 'REFRESH_ORDERS' });
+  }, []);
+
   const serveCustomer = useCallback((customerId: string) => {
     dispatch({ type: 'SERVE_CUSTOMER', customerId });
   }, []);
@@ -761,6 +951,7 @@ export function useGameState(config: GameConfig) {
     collectProcessed,
     completeOrder,
     dismissOrder,
+    refreshOrders,
     serveCustomer,
     sellItem,
     resetGame,

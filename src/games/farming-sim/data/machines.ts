@@ -1,7 +1,50 @@
 import type { Machine } from '../types';
 
 export const machines: Machine[] = [
-  // Tier 1 - Basic machines
+  // Tier 1 - Basic machines (Levels 1-3)
+  {
+    id: 'feed_mill',
+    name: 'Feed Mill',
+    emoji: '🌾',
+    description: 'Makes animal feed from crops',
+    recipes: [
+      {
+        id: 'chicken_feed',
+        inputs: [{ itemId: 'wheat', amount: 2 }],
+        output: { itemId: 'chicken_feed', amount: 2 },
+        processingTime: 10,
+        xpReward: 5,
+        unlockLevel: 1,
+      },
+      {
+        id: 'cattle_feed',
+        inputs: [
+          { itemId: 'wheat', amount: 2 },
+          { itemId: 'corn', amount: 1 },
+        ],
+        output: { itemId: 'cattle_feed', amount: 2 },
+        processingTime: 15,
+        xpReward: 8,
+        unlockLevel: 4,
+      },
+      {
+        id: 'premium_feed',
+        inputs: [
+          { itemId: 'corn', amount: 2 },
+          { itemId: 'potato', amount: 2 },
+          { itemId: 'carrot', amount: 2 },
+        ],
+        output: { itemId: 'premium_feed', amount: 2 },
+        processingTime: 20,
+        xpReward: 15,
+        unlockLevel: 9,
+      },
+    ],
+    energyCost: 5,
+    purchaseCost: 100,
+    unlockLevel: 1,
+    tier: 1,
+  },
   {
     id: 'mill',
     name: 'Flour Mill',
@@ -9,13 +52,17 @@ export const machines: Machine[] = [
     description: 'Grinds wheat into flour',
     recipes: [
       {
+        id: 'flour',
         inputs: [{ itemId: 'wheat', amount: 3 }],
         output: { itemId: 'flour', amount: 1 },
         processingTime: 15,
+        xpReward: 8,
+        unlockLevel: 2,
       },
     ],
     energyCost: 10,
     purchaseCost: 200,
+    unlockLevel: 2,
     tier: 1,
   },
   {
@@ -25,26 +72,36 @@ export const machines: Machine[] = [
     description: 'Makes fresh juice from fruits',
     recipes: [
       {
+        id: 'apple_juice',
         inputs: [{ itemId: 'apple', amount: 3 }],
         output: { itemId: 'apple_juice', amount: 1 },
         processingTime: 10,
+        xpReward: 10,
+        unlockLevel: 3,
       },
       {
+        id: 'orange_juice',
         inputs: [{ itemId: 'orange', amount: 3 }],
         output: { itemId: 'orange_juice', amount: 1 },
         processingTime: 10,
+        xpReward: 12,
+        unlockLevel: 4,
       },
       {
+        id: 'grape_juice',
         inputs: [{ itemId: 'grape', amount: 4 }],
         output: { itemId: 'grape_juice', amount: 1 },
         processingTime: 12,
+        xpReward: 20,
+        unlockLevel: 10,
       },
     ],
     energyCost: 8,
     purchaseCost: 150,
+    unlockLevel: 3,
     tier: 1,
   },
-  // Tier 2 - Intermediate machines
+  // Tier 2 - Intermediate machines (Levels 4-7)
   {
     id: 'oven',
     name: 'Bakery Oven',
@@ -52,29 +109,39 @@ export const machines: Machine[] = [
     description: 'Bakes bread and pastries',
     recipes: [
       {
+        id: 'bread',
         inputs: [{ itemId: 'flour', amount: 2 }],
         output: { itemId: 'bread', amount: 1 },
         processingTime: 20,
+        xpReward: 15,
+        unlockLevel: 4,
       },
       {
+        id: 'cake',
         inputs: [
           { itemId: 'flour', amount: 2 },
           { itemId: 'egg', amount: 2 },
         ],
         output: { itemId: 'cake', amount: 1 },
         processingTime: 30,
+        xpReward: 25,
+        unlockLevel: 5,
       },
       {
+        id: 'strawberry_pie',
         inputs: [
           { itemId: 'flour', amount: 1 },
           { itemId: 'strawberry', amount: 3 },
         ],
         output: { itemId: 'strawberry_pie', amount: 1 },
         processingTime: 25,
+        xpReward: 35,
+        unlockLevel: 8,
       },
     ],
     energyCost: 15,
     purchaseCost: 400,
+    unlockLevel: 4,
     tier: 2,
   },
   {
@@ -84,18 +151,25 @@ export const machines: Machine[] = [
     description: 'Makes cheese from milk',
     recipes: [
       {
+        id: 'cheese',
         inputs: [{ itemId: 'milk', amount: 2 }],
         output: { itemId: 'cheese', amount: 1 },
         processingTime: 25,
+        xpReward: 20,
+        unlockLevel: 5,
       },
       {
+        id: 'goat_cheese',
         inputs: [{ itemId: 'goat_milk', amount: 2 }],
         output: { itemId: 'goat_cheese', amount: 1 },
         processingTime: 25,
+        xpReward: 18,
+        unlockLevel: 6,
       },
     ],
     energyCost: 12,
     purchaseCost: 350,
+    unlockLevel: 5,
     tier: 2,
   },
   {
@@ -105,16 +179,20 @@ export const machines: Machine[] = [
     description: 'Weaves wool into cloth',
     recipes: [
       {
+        id: 'cloth',
         inputs: [{ itemId: 'wool', amount: 2 }],
         output: { itemId: 'cloth', amount: 1 },
         processingTime: 30,
+        xpReward: 22,
+        unlockLevel: 7,
       },
     ],
     energyCost: 10,
     purchaseCost: 300,
+    unlockLevel: 7,
     tier: 2,
   },
-  // Tier 3 - Premium machines
+  // Tier 3 - Premium machines (Levels 8+)
   {
     id: 'preserves_jar',
     name: 'Preserves Jar',
@@ -122,23 +200,33 @@ export const machines: Machine[] = [
     description: 'Makes jams and preserves',
     recipes: [
       {
+        id: 'strawberry_jam',
         inputs: [{ itemId: 'strawberry', amount: 4 }],
         output: { itemId: 'strawberry_jam', amount: 1 },
         processingTime: 35,
+        xpReward: 30,
+        unlockLevel: 8,
       },
       {
+        id: 'peach_preserves',
         inputs: [{ itemId: 'peach', amount: 4 }],
         output: { itemId: 'peach_preserves', amount: 1 },
         processingTime: 35,
+        xpReward: 28,
+        unlockLevel: 7,
       },
       {
+        id: 'cherry_jam',
         inputs: [{ itemId: 'cherry', amount: 5 }],
         output: { itemId: 'cherry_jam', amount: 1 },
         processingTime: 35,
+        xpReward: 32,
+        unlockLevel: 8,
       },
     ],
     energyCost: 15,
     purchaseCost: 500,
+    unlockLevel: 8,
     tier: 3,
   },
   {
@@ -148,18 +236,25 @@ export const machines: Machine[] = [
     description: 'Extracts oils and essences',
     recipes: [
       {
+        id: 'corn_oil',
         inputs: [{ itemId: 'corn', amount: 5 }],
         output: { itemId: 'corn_oil', amount: 1 },
         processingTime: 40,
+        xpReward: 25,
+        unlockLevel: 6,
       },
       {
+        id: 'truffle_oil',
         inputs: [{ itemId: 'truffle', amount: 1 }],
         output: { itemId: 'truffle_oil', amount: 1 },
         processingTime: 60,
+        xpReward: 50,
+        unlockLevel: 10,
       },
     ],
     energyCost: 20,
     purchaseCost: 600,
+    unlockLevel: 6,
     tier: 3,
   },
   {
@@ -169,26 +264,36 @@ export const machines: Machine[] = [
     description: 'Ferments beverages',
     recipes: [
       {
+        id: 'wine',
         inputs: [{ itemId: 'grape_juice', amount: 2 }],
         output: { itemId: 'wine', amount: 1 },
         processingTime: 90,
+        xpReward: 60,
+        unlockLevel: 12,
       },
       {
+        id: 'cider',
         inputs: [{ itemId: 'apple_juice', amount: 2 }],
         output: { itemId: 'cider', amount: 1 },
         processingTime: 70,
+        xpReward: 45,
+        unlockLevel: 10,
       },
       {
+        id: 'mead',
         inputs: [
           { itemId: 'honey', amount: 1 },
           { itemId: 'wheat', amount: 2 },
         ],
         output: { itemId: 'mead', amount: 1 },
         processingTime: 80,
+        xpReward: 55,
+        unlockLevel: 11,
       },
     ],
     energyCost: 25,
     purchaseCost: 800,
+    unlockLevel: 10,
     tier: 3,
   },
 ];
