@@ -31,7 +31,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   maxFields: 6,
   maxAnimalPens: 4,
   maxOrchards: 4,
-  maxMachineSlots: 4,
+  maxMachineSlots: 6,
   maxOrders: 3,
   orderRefreshInterval: 180,
   customerSpawnInterval: 45,

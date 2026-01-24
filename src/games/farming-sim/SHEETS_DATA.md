@@ -149,16 +149,16 @@ Copy each table below into the corresponding sheet tab. Select the table, copy (
 
 | level | xpRequired | unlocksFields | unlocksPens | unlocksOrchards | unlocksMachineSlots |
 |---|---|---|---|---|---|
-| 1 | 0 | 2 |  |  | 1 |
+| 1 | 0 | 2 |  |  | 3 |
 | 2 | 100 | 3 | 1 |  |  |
 | 3 | 250 |  |  | 1 |  |
-| 4 | 450 | 4 |  |  | 2 |
+| 4 | 450 | 4 |  |  | 4 |
 | 5 | 700 |  | 2 |  |  |
 | 6 | 1000 |  |  | 2 |  |
 | 7 | 1350 | 5 | 3 |  |  |
-| 8 | 1750 |  |  | 3 | 3 |
+| 8 | 1750 |  |  | 3 | 5 |
 | 9 | 2200 |  | 4 |  |  |
-| 10 | 2700 | 6 |  |  | 4 |
+| 10 | 2700 | 6 |  |  | 6 |
 | 11 | 3250 |  |  | 4 |  |
 | 12 | 3850 |  |  |  |  |
 | 13 | 4500 |  |  |  |  |
@@ -179,7 +179,7 @@ Copy each table below into the corresponding sheet tab. Select the table, copy (
 | maxFields | 6 |
 | maxAnimalPens | 4 |
 | maxOrchards | 4 |
-| maxMachineSlots | 4 |
+| maxMachineSlots | 6 |
 | maxOrders | 3 |
 | orderRefreshInterval | 180 |
 | customerSpawnInterval | 60 |
