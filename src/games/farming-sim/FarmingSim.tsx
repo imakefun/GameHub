@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, RotateCcw, HelpCircle, X } from 'lucide-react';
+import { ArrowLeft, RotateCcw, HelpCircle, X, Cloud, RefreshCw } from 'lucide-react';
 import { useGameState } from './hooks/useGameState';
 import {
   ResourceBar,
@@ -12,27 +12,9 @@ import {
   MarketPanel,
   InventoryPanel,
 } from './components';
-import {
-  crops,
-  animals,
-  trees,
-  machines,
-  products,
-  levels,
-  defaultSettings,
-} from './data';
+import { GameDataProvider, useGameData } from './context/GameDataContext';
 import type { GameConfig } from './types';
 import { getXpForLevel } from './types';
-
-const gameConfig: GameConfig = {
-  crops,
-  animals,
-  trees,
-  machines,
-  products,
-  levels,
-  settings: defaultSettings,
-};
 
 type Tab = 'fields' | 'barn' | 'orchard' | 'factory' | 'orders' | 'market' | 'inventory';
 
@@ -46,10 +28,36 @@ const tabs: { id: Tab; label: string; emoji: string }[] = [
   { id: 'inventory', label: 'Items', emoji: '🎒' },
 ];
 
-export function FarmingSim() {
+function FarmingSimContent() {
   const [activeTab, setActiveTab] = useState<Tab>('fields');
   const [showHelp, setShowHelp] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Get game data from context (with sheets fallback)
+  const {
+    crops,
+    animals,
+    trees,
+    machines,
+    products,
+    levels,
+    settings,
+    isLoading,
+    error,
+    isUsingSheets,
+    refresh,
+  } = useGameData();
+
+  // Build game config from context data
+  const gameConfig: GameConfig = {
+    crops,
+    animals,
+    trees,
+    machines,
+    products,
+    levels,
+    settings,
+  };
 
   const {
     state,
@@ -99,8 +107,28 @@ export function FarmingSim() {
   const xpNeededForLevel = nextLevelXp - currentLevelXp;
   const xpProgress = xpNeededForLevel > 0 ? (xpInCurrentLevel / xpNeededForLevel) * 100 : 100;
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-sky-400 via-sky-300 to-green-400 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-bounce">🌾</div>
+          <div className="text-white text-xl font-bold">Loading Farm Valley...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-400 via-sky-300 to-green-400">
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-amber-500 text-amber-900 px-4 py-2 text-sm text-center">
+          Using local data: {error}
+          <button onClick={refresh} className="ml-2 underline">Retry</button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-gradient-to-r from-green-800 to-green-700 shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-3">
@@ -115,6 +143,11 @@ export function FarmingSim() {
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                   <span>🌾</span> Farm Valley
+                  {isUsingSheets && (
+                    <span title="Using Google Sheets data">
+                      <Cloud className="w-4 h-4 text-green-300" />
+                    </span>
+                  )}
                 </h1>
                 <div className="text-xs text-green-200">
                   Time played: {formatTime(state.stats.playTime)}
@@ -127,6 +160,15 @@ export function FarmingSim() {
               <div className="bg-amber-500 text-amber-900 px-3 py-1 rounded-lg font-bold text-sm">
                 Lv.{state.progress.level}
               </div>
+              {isUsingSheets && (
+                <button
+                  onClick={refresh}
+                  className="p-2 rounded-lg bg-green-900/50 hover:bg-green-900 transition-colors"
+                  title="Refresh data from Google Sheets"
+                >
+                  <RefreshCw className="w-5 h-5 text-white" />
+                </button>
+              )}
               <button
                 onClick={() => setShowHelp(true)}
                 className="p-2 rounded-lg bg-green-900/50 hover:bg-green-900 transition-colors"
@@ -338,6 +380,14 @@ export function FarmingSim() {
                 <h3 className="font-bold mb-1">🏪 Market</h3>
                 <p>Wandering traders pay premium prices! Or quick-sell items at base value.</p>
               </section>
+              {isUsingSheets && (
+                <section className="bg-green-50 p-2 rounded">
+                  <h3 className="font-bold mb-1 flex items-center gap-1">
+                    <Cloud className="w-4 h-4" /> Google Sheets
+                  </h3>
+                  <p>Game data is being loaded from Google Sheets. Use the refresh button to reload data.</p>
+                </section>
+              )}
             </div>
           </div>
         </div>
@@ -371,6 +421,15 @@ export function FarmingSim() {
         </div>
       )}
     </div>
+  );
+}
+
+// Main export wraps content with provider
+export function FarmingSim() {
+  return (
+    <GameDataProvider>
+      <FarmingSimContent />
+    </GameDataProvider>
   );
 }
 
