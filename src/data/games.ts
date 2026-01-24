@@ -171,6 +171,20 @@ export const games: Game[] = [
     difficulty: 'easy',
     playUrl: '/play/alchemoji',
   },
+  {
+    id: 'farming-sim',
+    title: 'Farm Valley',
+    description: 'Build your dream farm! Plant crops, raise animals, grow fruit trees, and process goods. Complete orders for customers and trade with wandering merchants for premium prices.',
+    thumbnail: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400&h=300&fit=crop',
+    category: 'idle',
+    tags: ['farming', 'simulation', 'idle', 'crafting', 'management'],
+    playCount: 0,
+    rating: 5.0,
+    featured: true,
+    createdAt: '2025-01-24',
+    difficulty: 'easy',
+    playUrl: '/play/farming-sim',
+  },
 ];
 
 export const leaderboards: Record<string, LeaderboardEntry[]> = {

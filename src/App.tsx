@@ -5,6 +5,7 @@ import { GamesPage } from './pages/GamesPage';
 import { GameDetailPage } from './pages/GameDetailPage';
 import { LeaderboardsPage } from './pages/LeaderboardsPage';
 import { Alchemoji } from './games/alchemoji/Alchemoji';
+import { FarmingSim } from './games/farming-sim/FarmingSim';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         </Route>
         {/* Playable Games */}
         <Route path="/play/alchemoji" element={<Alchemoji />} />
+        <Route path="/play/farming-sim" element={<FarmingSim />} />
       </Routes>
     </HashRouter>
   );
