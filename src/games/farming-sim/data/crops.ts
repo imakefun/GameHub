@@ -1,7 +1,7 @@
 import type { Crop } from '../types';
 
 export const crops: Crop[] = [
-  // Tier 1 - Basic crops
+  // Tier 1 - Basic crops (Levels 1-3)
   {
     id: 'wheat',
     name: 'Wheat',
@@ -10,6 +10,8 @@ export const crops: Crop[] = [
     yieldAmount: 3,
     seedCost: 5,
     baseValue: 8,
+    xpReward: 5,
+    unlockLevel: 1,
     tier: 1,
   },
   {
@@ -20,6 +22,8 @@ export const crops: Crop[] = [
     yieldAmount: 4,
     seedCost: 8,
     baseValue: 10,
+    xpReward: 6,
+    unlockLevel: 1,
     tier: 1,
   },
   {
@@ -30,9 +34,11 @@ export const crops: Crop[] = [
     yieldAmount: 5,
     seedCost: 10,
     baseValue: 12,
+    xpReward: 8,
+    unlockLevel: 2,
     tier: 1,
   },
-  // Tier 2 - Intermediate crops
+  // Tier 2 - Intermediate crops (Levels 4-7)
   {
     id: 'corn',
     name: 'Corn',
@@ -41,6 +47,8 @@ export const crops: Crop[] = [
     yieldAmount: 4,
     seedCost: 20,
     baseValue: 18,
+    xpReward: 12,
+    unlockLevel: 4,
     tier: 2,
   },
   {
@@ -51,6 +59,8 @@ export const crops: Crop[] = [
     yieldAmount: 6,
     seedCost: 25,
     baseValue: 20,
+    xpReward: 15,
+    unlockLevel: 5,
     tier: 2,
   },
   {
@@ -61,9 +71,11 @@ export const crops: Crop[] = [
     yieldAmount: 2,
     seedCost: 30,
     baseValue: 35,
+    xpReward: 18,
+    unlockLevel: 6,
     tier: 2,
   },
-  // Tier 3 - Premium crops
+  // Tier 3 - Premium crops (Levels 8+)
   {
     id: 'strawberry',
     name: 'Strawberry',
@@ -72,6 +84,8 @@ export const crops: Crop[] = [
     yieldAmount: 8,
     seedCost: 50,
     baseValue: 25,
+    xpReward: 25,
+    unlockLevel: 8,
     tier: 3,
   },
   {
@@ -82,6 +96,8 @@ export const crops: Crop[] = [
     yieldAmount: 4,
     seedCost: 60,
     baseValue: 40,
+    xpReward: 30,
+    unlockLevel: 10,
     tier: 3,
   },
   {
@@ -92,6 +108,8 @@ export const crops: Crop[] = [
     yieldAmount: 5,
     seedCost: 75,
     baseValue: 45,
+    xpReward: 35,
+    unlockLevel: 12,
     tier: 3,
   },
 ];

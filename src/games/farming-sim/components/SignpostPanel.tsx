@@ -4,6 +4,8 @@ interface SignpostPanelProps {
   orders: Order[];
   products: Product[];
   inventory: Inventory;
+  lastRefresh: number;
+  refreshInterval: number;
   onComplete: (orderId: string) => void;
   onDismiss: (orderId: string) => void;
 }
@@ -12,6 +14,8 @@ export function SignpostPanel({
   orders,
   products,
   inventory,
+  lastRefresh,
+  refreshInterval,
   onComplete,
   onDismiss,
 }: SignpostPanelProps) {
@@ -43,11 +47,24 @@ export function SignpostPanel({
     return elapsed < order.timeLimit / 2;
   };
 
+  const getRefreshCountdown = () => {
+    const elapsed = (Date.now() - lastRefresh) / 1000;
+    const remaining = Math.max(0, refreshInterval - elapsed);
+    const mins = Math.floor(remaining / 60);
+    const secs = Math.floor(remaining % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="bg-gradient-to-b from-amber-700 to-amber-800 rounded-lg p-4 shadow-lg">
-      <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-        <span>🪧</span> Orders
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <span>🪧</span> Orders
+        </h2>
+        <div className="text-xs bg-amber-900 px-2 py-1 rounded text-amber-200">
+          New orders in: {getRefreshCountdown()}
+        </div>
+      </div>
 
       {orders.length === 0 ? (
         <div className="text-center py-8">

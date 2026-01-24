@@ -31,6 +31,11 @@ export const products: Product[] = [
   { id: 'coconut', name: 'Coconut', emoji: '🥥', baseValue: 60, category: 'fruit', tier: 3 },
   { id: 'mango', name: 'Mango', emoji: '🥭', baseValue: 50, category: 'fruit', tier: 3 },
 
+  // ============ Feed ============
+  { id: 'chicken_feed', name: 'Chicken Feed', emoji: '🐔', baseValue: 10, category: 'feed', tier: 1 },
+  { id: 'cattle_feed', name: 'Cattle Feed', emoji: '🐄', baseValue: 25, category: 'feed', tier: 2 },
+  { id: 'premium_feed', name: 'Premium Feed', emoji: '⭐', baseValue: 50, category: 'feed', tier: 3 },
+
   // ============ Processed Goods ============
   // From Mill
   { id: 'flour', name: 'Flour', emoji: '🌾', baseValue: 30, category: 'processed', tier: 1 },

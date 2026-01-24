@@ -1,16 +1,19 @@
 import type { Animal } from '../types';
 
 export const animals: Animal[] = [
-  // Tier 1 - Basic animals
+  // Tier 1 - Basic animals (Levels 2-3)
   {
     id: 'chicken',
     name: 'Chicken',
     emoji: '🐔',
     produces: 'egg',
     productionTime: 20,
-    feedCost: 5,
+    feedType: 'chicken_feed',
+    feedAmount: 1,
     purchaseCost: 50,
     baseValue: 15,
+    xpReward: 8,
+    unlockLevel: 2,
     tier: 1,
   },
   {
@@ -19,21 +22,27 @@ export const animals: Animal[] = [
     emoji: '🦆',
     produces: 'duck_egg',
     productionTime: 25,
-    feedCost: 6,
+    feedType: 'chicken_feed',
+    feedAmount: 1,
     purchaseCost: 75,
     baseValue: 20,
+    xpReward: 10,
+    unlockLevel: 3,
     tier: 1,
   },
-  // Tier 2 - Intermediate animals
+  // Tier 2 - Intermediate animals (Levels 5-7)
   {
     id: 'cow',
     name: 'Cow',
     emoji: '🐄',
     produces: 'milk',
     productionTime: 40,
-    feedCost: 10,
+    feedType: 'cattle_feed',
+    feedAmount: 2,
     purchaseCost: 200,
     baseValue: 30,
+    xpReward: 15,
+    unlockLevel: 5,
     tier: 2,
   },
   {
@@ -42,9 +51,12 @@ export const animals: Animal[] = [
     emoji: '🐐',
     produces: 'goat_milk',
     productionTime: 35,
-    feedCost: 8,
+    feedType: 'cattle_feed',
+    feedAmount: 1,
     purchaseCost: 150,
     baseValue: 25,
+    xpReward: 12,
+    unlockLevel: 6,
     tier: 2,
   },
   {
@@ -53,21 +65,27 @@ export const animals: Animal[] = [
     emoji: '🐑',
     produces: 'wool',
     productionTime: 60,
-    feedCost: 8,
+    feedType: 'cattle_feed',
+    feedAmount: 2,
     purchaseCost: 180,
     baseValue: 40,
+    xpReward: 18,
+    unlockLevel: 7,
     tier: 2,
   },
-  // Tier 3 - Premium animals
+  // Tier 3 - Premium animals (Levels 9+)
   {
     id: 'pig',
     name: 'Pig',
     emoji: '🐷',
     produces: 'truffle',
     productionTime: 90,
-    feedCost: 15,
+    feedType: 'premium_feed',
+    feedAmount: 2,
     purchaseCost: 400,
     baseValue: 80,
+    xpReward: 35,
+    unlockLevel: 9,
     tier: 3,
   },
   {
@@ -76,9 +94,12 @@ export const animals: Animal[] = [
     emoji: '🐝',
     produces: 'honey',
     productionTime: 50,
-    feedCost: 5,
+    feedType: 'none', // Bees don't need feed
+    feedAmount: 0,
     purchaseCost: 300,
     baseValue: 50,
+    xpReward: 25,
+    unlockLevel: 11,
     tier: 3,
   },
 ];

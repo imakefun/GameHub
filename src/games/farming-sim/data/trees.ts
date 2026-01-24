@@ -1,7 +1,7 @@
 import type { Tree } from '../types';
 
 export const trees: Tree[] = [
-  // Tier 1 - Basic trees
+  // Tier 1 - Basic trees (Levels 3-4)
   {
     id: 'apple_tree',
     name: 'Apple Tree',
@@ -12,6 +12,8 @@ export const trees: Tree[] = [
     yieldAmount: 3,
     saplingCost: 100,
     baseValue: 15,
+    xpReward: 10,
+    unlockLevel: 3,
     tier: 1,
   },
   {
@@ -24,9 +26,11 @@ export const trees: Tree[] = [
     yieldAmount: 4,
     saplingCost: 120,
     baseValue: 18,
+    xpReward: 12,
+    unlockLevel: 4,
     tier: 1,
   },
-  // Tier 2 - Intermediate trees
+  // Tier 2 - Intermediate trees (Levels 6-8)
   {
     id: 'lemon_tree',
     name: 'Lemon Tree',
@@ -37,6 +41,8 @@ export const trees: Tree[] = [
     yieldAmount: 4,
     saplingCost: 180,
     baseValue: 22,
+    xpReward: 15,
+    unlockLevel: 6,
     tier: 2,
   },
   {
@@ -49,6 +55,8 @@ export const trees: Tree[] = [
     yieldAmount: 3,
     saplingCost: 200,
     baseValue: 28,
+    xpReward: 18,
+    unlockLevel: 7,
     tier: 2,
   },
   {
@@ -61,9 +69,11 @@ export const trees: Tree[] = [
     yieldAmount: 5,
     saplingCost: 250,
     baseValue: 25,
+    xpReward: 20,
+    unlockLevel: 8,
     tier: 2,
   },
-  // Tier 3 - Premium trees
+  // Tier 3 - Premium trees (Levels 10+)
   {
     id: 'grape_vine',
     name: 'Grape Vine',
@@ -74,6 +84,8 @@ export const trees: Tree[] = [
     yieldAmount: 6,
     saplingCost: 350,
     baseValue: 30,
+    xpReward: 25,
+    unlockLevel: 10,
     tier: 3,
   },
   {
@@ -86,6 +98,8 @@ export const trees: Tree[] = [
     yieldAmount: 2,
     saplingCost: 500,
     baseValue: 60,
+    xpReward: 35,
+    unlockLevel: 13,
     tier: 3,
   },
   {
@@ -98,6 +112,8 @@ export const trees: Tree[] = [
     yieldAmount: 3,
     saplingCost: 450,
     baseValue: 50,
+    xpReward: 30,
+    unlockLevel: 11,
     tier: 3,
   },
 ];

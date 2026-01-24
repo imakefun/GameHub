@@ -6,6 +6,16 @@ export interface Resources {
   energy: number;
 }
 
+// ============ Leveling ============
+export interface LevelConfig {
+  level: number;
+  xpRequired: number; // Total XP needed to reach this level
+  unlocksFields?: number; // Number of fields unlocked at this level
+  unlocksPens?: number;
+  unlocksOrchards?: number;
+  unlocksMachineSlots?: number;
+}
+
 // ============ Crops ============
 export interface Crop {
   id: string;
@@ -15,6 +25,8 @@ export interface Crop {
   yieldAmount: number;
   seedCost: number;
   baseValue: number;
+  xpReward: number; // XP gained when harvesting
+  unlockLevel: number; // Level required to unlock
   tier: 1 | 2 | 3;
 }
 
@@ -23,6 +35,7 @@ export interface Field {
   cropId: string | null;
   plantedAt: number | null; // timestamp when planted
   isReady: boolean;
+  unlocked: boolean;
 }
 
 // ============ Animals ============
@@ -32,9 +45,12 @@ export interface Animal {
   emoji: string;
   produces: string; // product id
   productionTime: number; // seconds between productions
-  feedCost: number; // energy cost to feed
+  feedType: string; // feed item id required
+  feedAmount: number; // how much feed per production cycle
   purchaseCost: number;
   baseValue: number; // value of product
+  xpReward: number; // XP gained when collecting
+  unlockLevel: number;
   tier: 1 | 2 | 3;
 }
 
@@ -42,7 +58,10 @@ export interface AnimalPen {
   id: string;
   animalId: string | null;
   lastProducedAt: number | null;
+  lastFedAt: number | null;
+  isFed: boolean; // whether animal has been fed for this cycle
   isReady: boolean;
+  unlocked: boolean;
 }
 
 // ============ Trees ============
@@ -56,6 +75,8 @@ export interface Tree {
   yieldAmount: number;
   saplingCost: number;
   baseValue: number;
+  xpReward: number;
+  unlockLevel: number;
   tier: 1 | 2 | 3;
 }
 
@@ -66,13 +87,17 @@ export interface Orchard {
   lastHarvestedAt: number | null;
   isMature: boolean;
   isReady: boolean;
+  unlocked: boolean;
 }
 
 // ============ Machines ============
 export interface MachineRecipe {
+  id: string;
   inputs: { itemId: string; amount: number }[];
   output: { itemId: string; amount: number };
   processingTime: number; // seconds
+  xpReward: number;
+  unlockLevel: number; // Level required for this specific recipe
 }
 
 export interface Machine {
@@ -83,6 +108,7 @@ export interface Machine {
   recipes: MachineRecipe[];
   energyCost: number;
   purchaseCost: number;
+  unlockLevel: number;
   tier: 1 | 2 | 3;
 }
 
@@ -93,6 +119,7 @@ export interface MachineSlot {
   startedAt: number | null;
   isProcessing: boolean;
   isReady: boolean;
+  unlocked: boolean;
 }
 
 // ============ Products ============
@@ -101,7 +128,7 @@ export interface Product {
   name: string;
   emoji: string;
   baseValue: number;
-  category: 'crop' | 'animal' | 'fruit' | 'processed';
+  category: 'crop' | 'animal' | 'fruit' | 'processed' | 'feed';
   tier: 1 | 2 | 3;
 }
 
@@ -111,6 +138,8 @@ export interface OrderItem {
   amount: number;
 }
 
+export type OrderDifficulty = 'easy' | 'medium' | 'hard';
+
 export interface Order {
   id: string;
   customerName: string;
@@ -118,8 +147,11 @@ export interface Order {
   items: OrderItem[];
   reward: number;
   bonusReward: number; // for quick completion
+  xpReward: number;
   timeLimit: number; // seconds
   createdAt: number;
+  difficulty: OrderDifficulty;
+  slot: number; // Which order slot this occupies (0-2)
 }
 
 // ============ Wandering Customers ============
@@ -130,6 +162,7 @@ export interface WanderingCustomer {
   wantsItemId: string;
   wantsAmount: number;
   offersPrice: number; // premium price they'll pay
+  xpReward: number;
   expiresAt: number;
 }
 
@@ -140,6 +173,7 @@ export interface Inventory {
 
 export interface GameStats {
   totalMoneyEarned: number;
+  totalXpEarned: number;
   totalCropsHarvested: number;
   totalAnimalsProduced: number;
   totalFruitsHarvested: number;
@@ -149,16 +183,23 @@ export interface GameStats {
   playTime: number;
 }
 
+export interface PlayerProgress {
+  level: number;
+  xp: number;
+  xpToNextLevel: number;
+}
+
 export interface GameState {
   resources: Resources;
+  progress: PlayerProgress;
   inventory: Inventory;
   fields: Field[];
   animalPens: AnimalPen[];
   orchards: Orchard[];
   machineSlots: MachineSlot[];
   orders: Order[];
+  lastOrderRefresh: number; // timestamp of last order refresh
   wanderingCustomers: WanderingCustomer[];
-  unlockedItems: string[];
   stats: GameStats;
   lastTick: number;
 }
@@ -175,7 +216,7 @@ export interface GameSettings {
   maxOrchards: number;
   maxMachineSlots: number;
   maxOrders: number;
-  orderSpawnInterval: number; // seconds
+  orderRefreshInterval: number; // seconds between order refreshes
   customerSpawnInterval: number; // seconds
   customerDuration: number; // seconds before customer leaves
 }
@@ -186,6 +227,7 @@ export interface GameConfig {
   trees: Tree[];
   machines: Machine[];
   products: Product[];
+  levels: LevelConfig[];
   settings: GameSettings;
 }
 
@@ -204,7 +246,23 @@ export type GameAction =
   | { type: 'COLLECT_PROCESSED'; slotId: string }
   | { type: 'COMPLETE_ORDER'; orderId: string }
   | { type: 'DISMISS_ORDER'; orderId: string }
+  | { type: 'REFRESH_ORDERS' }
   | { type: 'SERVE_CUSTOMER'; customerId: string }
   | { type: 'SELL_ITEM'; itemId: string; amount: number }
-  | { type: 'UNLOCK_SLOT'; slotType: 'field' | 'pen' | 'orchard' | 'machine' }
   | { type: 'RESET_GAME' };
+
+// ============ Helpers ============
+export function getXpForLevel(level: number): number {
+  // XP curve: each level requires more XP
+  // Level 1: 0, Level 2: 100, Level 3: 250, Level 4: 450, etc.
+  if (level <= 1) return 0;
+  return Math.floor(50 * (level - 1) * level);
+}
+
+export function getLevelForXp(totalXp: number): number {
+  let level = 1;
+  while (getXpForLevel(level + 1) <= totalXp) {
+    level++;
+  }
+  return level;
+}

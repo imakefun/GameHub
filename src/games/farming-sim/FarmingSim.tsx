@@ -18,9 +18,11 @@ import {
   trees,
   machines,
   products,
+  levels,
   defaultSettings,
 } from './data';
 import type { GameConfig } from './types';
+import { getXpForLevel } from './types';
 
 const gameConfig: GameConfig = {
   crops,
@@ -28,6 +30,7 @@ const gameConfig: GameConfig = {
   trees,
   machines,
   products,
+  levels,
   settings: defaultSettings,
 };
 
@@ -62,6 +65,7 @@ export function FarmingSim() {
     collectProcessed,
     completeOrder,
     dismissOrder,
+    refreshOrders: _refreshOrders,
     serveCustomer,
     sellItem,
     resetGame,
@@ -70,6 +74,7 @@ export function FarmingSim() {
   // Count notifications for tabs
   const readyFields = state.fields.filter(f => f.isReady).length;
   const readyPens = state.animalPens.filter(p => p.isReady).length;
+  const hungryPens = state.animalPens.filter(p => p.animalId && !p.isFed).length;
   const readyOrchards = state.orchards.filter(o => o.isReady).length;
   const readyMachines = state.machineSlots.filter(s => s.isReady).length;
   const pendingOrders = state.orders.length;
@@ -78,7 +83,7 @@ export function FarmingSim() {
   const getNotificationCount = (tab: Tab): number => {
     switch (tab) {
       case 'fields': return readyFields;
-      case 'barn': return readyPens;
+      case 'barn': return readyPens + hungryPens;
       case 'orchard': return readyOrchards;
       case 'factory': return readyMachines;
       case 'orders': return pendingOrders;
@@ -86,6 +91,13 @@ export function FarmingSim() {
       default: return 0;
     }
   };
+
+  // XP progress calculation
+  const currentLevelXp = getXpForLevel(state.progress.level);
+  const nextLevelXp = getXpForLevel(state.progress.level + 1);
+  const xpInCurrentLevel = state.progress.xp - currentLevelXp;
+  const xpNeededForLevel = nextLevelXp - currentLevelXp;
+  const xpProgress = xpNeededForLevel > 0 ? (xpInCurrentLevel / xpNeededForLevel) * 100 : 100;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-400 via-sky-300 to-green-400">
@@ -111,6 +123,10 @@ export function FarmingSim() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Level Badge */}
+              <div className="bg-amber-500 text-amber-900 px-3 py-1 rounded-lg font-bold text-sm">
+                Lv.{state.progress.level}
+              </div>
               <button
                 onClick={() => setShowHelp(true)}
                 className="p-2 rounded-lg bg-green-900/50 hover:bg-green-900 transition-colors"
@@ -123,6 +139,20 @@ export function FarmingSim() {
               >
                 <RotateCcw className="w-5 h-5 text-white" />
               </button>
+            </div>
+          </div>
+
+          {/* XP Bar */}
+          <div className="mt-2">
+            <div className="flex justify-between text-xs text-green-200 mb-1">
+              <span>Level {state.progress.level}</span>
+              <span>{xpInCurrentLevel} / {xpNeededForLevel} XP</span>
+            </div>
+            <div className="h-2 bg-green-900 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-amber-400 transition-all duration-300"
+                style={{ width: `${xpProgress}%` }}
+              />
             </div>
           </div>
         </div>
@@ -171,6 +201,7 @@ export function FarmingSim() {
             crops={gameConfig.crops}
             resources={state.resources}
             inventory={state.inventory}
+            playerLevel={state.progress.level}
             onPlant={plantCrop}
             onHarvest={harvestCrop}
           />
@@ -180,7 +211,10 @@ export function FarmingSim() {
           <BarnPanel
             pens={state.animalPens}
             animals={gameConfig.animals}
+            products={gameConfig.products}
             resources={state.resources}
+            inventory={state.inventory}
+            playerLevel={state.progress.level}
             onBuyAnimal={buyAnimal}
             onCollect={collectProduct}
             onFeed={feedAnimal}
@@ -192,6 +226,7 @@ export function FarmingSim() {
             orchards={state.orchards}
             trees={gameConfig.trees}
             resources={state.resources}
+            playerLevel={state.progress.level}
             onPlantTree={plantTree}
             onHarvest={harvestFruit}
           />
@@ -204,6 +239,7 @@ export function FarmingSim() {
             products={gameConfig.products}
             resources={state.resources}
             inventory={state.inventory}
+            playerLevel={state.progress.level}
             onBuyMachine={buyMachine}
             onStartProcessing={startProcessing}
             onCollect={collectProcessed}
@@ -215,6 +251,8 @@ export function FarmingSim() {
             orders={state.orders}
             products={gameConfig.products}
             inventory={state.inventory}
+            lastRefresh={state.lastOrderRefresh}
+            refreshInterval={gameConfig.settings.orderRefreshInterval}
             onComplete={completeOrder}
             onDismiss={dismissOrder}
           />
@@ -242,20 +280,20 @@ export function FarmingSim() {
           <h3 className="text-sm font-bold text-white mb-2">📊 Farm Stats</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="bg-white/20 rounded p-2">
-              <div className="text-white/70">Money Earned</div>
-              <div className="text-white font-bold">${state.stats.totalMoneyEarned.toLocaleString()}</div>
+              <div className="text-white/70">Total XP</div>
+              <div className="text-white font-bold">{state.stats.totalXpEarned.toLocaleString()}</div>
             </div>
             <div className="bg-white/20 rounded p-2">
-              <div className="text-white/70">Crops Harvested</div>
-              <div className="text-white font-bold">{state.stats.totalCropsHarvested}</div>
+              <div className="text-white/70">Money Earned</div>
+              <div className="text-white font-bold">${state.stats.totalMoneyEarned.toLocaleString()}</div>
             </div>
             <div className="bg-white/20 rounded p-2">
               <div className="text-white/70">Orders Completed</div>
               <div className="text-white font-bold">{state.stats.totalOrdersCompleted}</div>
             </div>
             <div className="bg-white/20 rounded p-2">
-              <div className="text-white/70">Customers Served</div>
-              <div className="text-white font-bold">{state.stats.totalCustomersServed}</div>
+              <div className="text-white/70">Goods Processed</div>
+              <div className="text-white font-bold">{state.stats.totalGoodsProcessed}</div>
             </div>
           </div>
         </div>
@@ -273,12 +311,16 @@ export function FarmingSim() {
             </div>
             <div className="p-4 space-y-4 text-sm">
               <section>
+                <h3 className="font-bold mb-1">⭐ Leveling Up</h3>
+                <p>Earn XP by harvesting crops, collecting animal products, processing goods, and completing orders. Level up to unlock new items and slots!</p>
+              </section>
+              <section>
                 <h3 className="font-bold mb-1">🌱 Fields</h3>
-                <p>Plant seeds and wait for crops to grow. Tap ready crops to harvest them.</p>
+                <p>Plant seeds and wait for crops to grow. Tap ready crops to harvest them. New crops unlock as you level up.</p>
               </section>
               <section>
                 <h3 className="font-bold mb-1">🏠 Barn</h3>
-                <p>Buy animals to produce goods like eggs and milk. Feed them to speed up production!</p>
+                <p>Buy animals to produce goods. Animals need to be fed with the right feed (made in the Feed Mill) before they'll produce!</p>
               </section>
               <section>
                 <h3 className="font-bold mb-1">🌳 Orchard</h3>
@@ -286,19 +328,15 @@ export function FarmingSim() {
               </section>
               <section>
                 <h3 className="font-bold mb-1">🏭 Factory</h3>
-                <p>Buy machines to process raw materials into valuable goods.</p>
+                <p>Buy machines to process raw materials. Start with the Feed Mill to make animal feed!</p>
               </section>
               <section>
                 <h3 className="font-bold mb-1">🪧 Orders</h3>
-                <p>Complete customer orders for money. Quick completion earns bonus rewards!</p>
+                <p>Complete customer orders for money and XP. Orders refresh every few minutes. Higher levels get harder orders with better rewards!</p>
               </section>
               <section>
                 <h3 className="font-bold mb-1">🏪 Market</h3>
                 <p>Wandering traders pay premium prices! Or quick-sell items at base value.</p>
-              </section>
-              <section>
-                <h3 className="font-bold mb-1">⚡ Energy</h3>
-                <p>Energy regenerates over time and is used for machines and feeding animals.</p>
               </section>
             </div>
           </div>
