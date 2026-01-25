@@ -11,9 +11,32 @@ import type {
   WanderingCustomer,
   OrderDifficulty,
   PlayerProgress,
+  SlotType,
 } from '../types';
 import { getXpForLevel, getLevelForXp } from '../types';
-import { customerNames, levels } from '../data';
+import { customerNames, levels, premiumSlotCosts } from '../data';
+
+// Get max level-unlockable slots for each type
+const MAX_LEVEL_UNLOCKS = {
+  fields: 6,
+  pens: 4,
+  orchards: 4,
+  machineSlots: 6,
+};
+
+// Get premium slot cost (returns undefined if not a premium slot)
+function getPremiumSlotCost(slotType: SlotType, slotIndex: number): number | undefined {
+  const maxLevelUnlocks = slotType === 'field' ? MAX_LEVEL_UNLOCKS.fields
+    : slotType === 'pen' ? MAX_LEVEL_UNLOCKS.pens
+    : slotType === 'orchard' ? MAX_LEVEL_UNLOCKS.orchards
+    : MAX_LEVEL_UNLOCKS.machineSlots;
+
+  const premiumIndex = slotIndex - maxLevelUnlocks;
+  if (premiumIndex < 0 || premiumIndex >= premiumSlotCosts.length) {
+    return undefined;
+  }
+  return premiumSlotCosts[premiumIndex];
+}
 
 const STORAGE_KEY = 'farming-sim-save-v2';
 
@@ -290,25 +313,25 @@ function addXp(state: GameState, xpGained: number, _config: GameConfig): GameSta
     },
   };
 
-  // If leveled up, unlock new slots
+  // If leveled up, unlock new slots (but preserve purchased premium slots)
   if (leveledUp) {
     newState = {
       ...newState,
       fields: newState.fields.map((f, i) => ({
         ...f,
-        unlocked: i < getUnlockedSlots(newLevel, 'fields'),
+        unlocked: f.unlocked || i < getUnlockedSlots(newLevel, 'fields'),
       })),
       animalPens: newState.animalPens.map((p, i) => ({
         ...p,
-        unlocked: i < getUnlockedSlots(newLevel, 'pens'),
+        unlocked: p.unlocked || i < getUnlockedSlots(newLevel, 'pens'),
       })),
       orchards: newState.orchards.map((o, i) => ({
         ...o,
-        unlocked: i < getUnlockedSlots(newLevel, 'orchards'),
+        unlocked: o.unlocked || i < getUnlockedSlots(newLevel, 'orchards'),
       })),
       machineSlots: newState.machineSlots.map((s, i) => ({
         ...s,
-        unlocked: i < getUnlockedSlots(newLevel, 'machineSlots'),
+        unlocked: s.unlocked || i < getUnlockedSlots(newLevel, 'machineSlots'),
       })),
     };
   }
@@ -826,6 +849,73 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      case 'BUY_SLOT': {
+        const { slotType, slotIndex } = action;
+        const cost = getPremiumSlotCost(slotType, slotIndex);
+
+        // Not a valid premium slot
+        if (cost === undefined) return state;
+
+        // Can't afford
+        if (state.resources.money < cost) return state;
+
+        // Get the appropriate slots array and check if already unlocked
+        let slots: { unlocked: boolean }[];
+        switch (slotType) {
+          case 'field':
+            slots = state.fields;
+            break;
+          case 'pen':
+            slots = state.animalPens;
+            break;
+          case 'orchard':
+            slots = state.orchards;
+            break;
+          case 'machine':
+            slots = state.machineSlots;
+            break;
+        }
+
+        // Check if slot exists and is not already unlocked
+        if (slotIndex >= slots.length || slots[slotIndex].unlocked) {
+          return state;
+        }
+
+        // Deduct money and unlock the slot
+        const newState = {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: state.resources.money - cost,
+          },
+        };
+
+        switch (slotType) {
+          case 'field':
+            newState.fields = state.fields.map((f, i) =>
+              i === slotIndex ? { ...f, unlocked: true } : f
+            );
+            break;
+          case 'pen':
+            newState.animalPens = state.animalPens.map((p, i) =>
+              i === slotIndex ? { ...p, unlocked: true } : p
+            );
+            break;
+          case 'orchard':
+            newState.orchards = state.orchards.map((o, i) =>
+              i === slotIndex ? { ...o, unlocked: true } : o
+            );
+            break;
+          case 'machine':
+            newState.machineSlots = state.machineSlots.map((s, i) =>
+              i === slotIndex ? { ...s, unlocked: true } : s
+            );
+            break;
+        }
+
+        return newState;
+      }
+
       case 'RESET_GAME': {
         localStorage.removeItem(STORAGE_KEY);
         return initializeState(config);
@@ -933,6 +1023,10 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'SELL_ITEM', itemId, amount });
   }, []);
 
+  const buySlot = useCallback((slotType: SlotType, slotIndex: number) => {
+    dispatch({ type: 'BUY_SLOT', slotType, slotIndex });
+  }, []);
+
   const resetGame = useCallback(() => {
     dispatch({ type: 'RESET_GAME' });
   }, []);
@@ -954,6 +1048,10 @@ export function useGameState(config: GameConfig) {
     refreshOrders,
     serveCustomer,
     sellItem,
+    buySlot,
     resetGame,
   };
 }
+
+// Export helpers for UI components
+export { getPremiumSlotCost, MAX_LEVEL_UNLOCKS };

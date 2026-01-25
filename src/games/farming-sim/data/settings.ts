@@ -6,15 +6,18 @@ export const defaultSettings: GameSettings = {
   maxEnergy: 100,
   energyRegenRate: 0.5, // energy per second
   tickInterval: 100, // ms
-  maxFields: 6,
-  maxAnimalPens: 4,
-  maxOrchards: 4,
-  maxMachineSlots: 6,
+  maxFields: 10,
+  maxAnimalPens: 8,
+  maxOrchards: 8,
+  maxMachineSlots: 10,
   maxOrders: 3,
   orderRefreshInterval: 180, // orders refresh every 3 minutes
   customerSpawnInterval: 60, // wandering customer every 60 seconds
   customerDuration: 45, // customer stays for 45 seconds
 };
+
+// Premium slot costs (for slots beyond level-unlocked ones)
+export const premiumSlotCosts = [1000, 5000, 10000, 25000];
 
 // Level configuration - defines what unlocks at each level
 export const levels: LevelConfig[] = [

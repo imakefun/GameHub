@@ -231,6 +231,9 @@ export interface GameConfig {
   settings: GameSettings;
 }
 
+// ============ Slot Types ============
+export type SlotType = 'field' | 'pen' | 'orchard' | 'machine';
+
 // ============ Actions ============
 export type GameAction =
   | { type: 'TICK'; now: number }
@@ -249,6 +252,7 @@ export type GameAction =
   | { type: 'REFRESH_ORDERS' }
   | { type: 'SERVE_CUSTOMER'; customerId: string }
   | { type: 'SELL_ITEM'; itemId: string; amount: number }
+  | { type: 'BUY_SLOT'; slotType: SlotType; slotIndex: number }
   | { type: 'RESET_GAME' };
 
 // ============ Helpers ============
