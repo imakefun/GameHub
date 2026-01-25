@@ -28,6 +28,7 @@ export function OrchardPanel({
   const [selectedOrchard, setSelectedOrchard] = useState<string | null>(null);
   const [draggedOrchard, setDraggedOrchard] = useState<string | null>(null);
   const [dragOverOrchard, setDragOverOrchard] = useState<string | null>(null);
+  const [confirmSellOrchard, setConfirmSellOrchard] = useState<string | null>(null);
 
   const getGrowthProgress = (orchard: Orchard, tree: Tree | undefined) => {
     if (!orchard.plantedAt || !tree) return 0;
@@ -154,6 +155,18 @@ export function OrchardPanel({
 
               {orchard.treeId && tree ? (
                 <div className="flex flex-col items-center">
+                  {/* Sell button - top right */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmSellOrchard(orchard.id);
+                    }}
+                    className="absolute top-1 right-1 p-1 bg-red-800/80 hover:bg-red-700 text-red-200 rounded text-xs"
+                    title={`Sell for $${Math.floor(tree.saplingCost * 0.5)}`}
+                  >
+                    ✕
+                  </button>
+
                   <div className="relative">
                     <span className="text-4xl">{tree.emoji}</span>
                     {orchard.isReady && (
@@ -185,16 +198,6 @@ export function OrchardPanel({
                   ) : (
                     <span className="text-sm text-yellow-300 font-bold mt-1">Harvest!</span>
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSellTree(orchard.id);
-                    }}
-                    className="mt-2 px-2 py-1 bg-red-800 hover:bg-red-700 text-red-200 rounded text-xs"
-                    title={`Sell for $${Math.floor(tree.saplingCost * 0.5)}`}
-                  >
-                    Sell
-                  </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-20">
@@ -257,6 +260,43 @@ export function OrchardPanel({
           </div>
         </div>
       )}
+
+      {/* Sell Confirmation Modal */}
+      {confirmSellOrchard && (() => {
+        const orchard = orchards.find(o => o.id === confirmSellOrchard);
+        const tree = orchard ? trees.find(t => t.id === orchard.treeId) : null;
+        if (!tree) return null;
+        const sellPrice = Math.floor(tree.saplingCost * 0.5);
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setConfirmSellOrchard(null)}>
+            <div className="bg-gradient-to-b from-emerald-800 to-emerald-900 rounded-lg p-4 max-w-xs w-full text-center" onClick={e => e.stopPropagation()}>
+              <span className="text-5xl block mb-3">{tree.emoji}</span>
+              <h3 className="text-lg font-bold text-white mb-2">Sell {tree.name}?</h3>
+              <p className="text-emerald-200 text-sm mb-4">
+                You will receive <span className="text-amber-300 font-bold">${sellPrice}</span>
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setConfirmSellOrchard(null)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onSellTree(confirmSellOrchard);
+                    setConfirmSellOrchard(null);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold"
+                >
+                  Sell
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

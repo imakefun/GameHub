@@ -34,6 +34,7 @@ export function BarnPanel({
   const [selectedPen, setSelectedPen] = useState<string | null>(null);
   const [draggedPen, setDraggedPen] = useState<string | null>(null);
   const [dragOverPen, setDragOverPen] = useState<string | null>(null);
+  const [confirmSellPen, setConfirmSellPen] = useState<string | null>(null);
 
   const getProductionProgress = (pen: AnimalPen, animal: Animal | undefined) => {
     if (!pen.lastProducedAt || !animal) return 0;
@@ -162,6 +163,18 @@ export function BarnPanel({
 
               {pen.animalId && animal ? (
                 <div className="flex flex-col items-center">
+                  {/* Sell button - top right */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmSellPen(pen.id);
+                    }}
+                    className="absolute top-1 right-1 p-1 bg-red-800/80 hover:bg-red-700 text-red-200 rounded text-xs"
+                    title={`Sell for $${Math.floor(animal.purchaseCost * 0.5)}`}
+                  >
+                    ✕
+                  </button>
+
                   <span className="text-4xl mb-1">{animal.emoji}</span>
                   <span className="text-sm text-white font-medium">{animal.name}</span>
 
@@ -215,16 +228,6 @@ export function BarnPanel({
                     ) : (
                       <span className="text-xs text-red-300">Producing...</span>
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSellAnimal(pen.id);
-                      }}
-                      className="px-2 py-1 bg-red-800 hover:bg-red-700 text-red-200 rounded text-xs"
-                      title={`Sell for $${Math.floor(animal.purchaseCost * 0.5)}`}
-                    >
-                      Sell
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -292,6 +295,43 @@ export function BarnPanel({
           </div>
         </div>
       )}
+
+      {/* Sell Confirmation Modal */}
+      {confirmSellPen && (() => {
+        const pen = pens.find(p => p.id === confirmSellPen);
+        const animal = pen ? animals.find(a => a.id === pen.animalId) : null;
+        if (!animal) return null;
+        const sellPrice = Math.floor(animal.purchaseCost * 0.5);
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setConfirmSellPen(null)}>
+            <div className="bg-gradient-to-b from-red-800 to-red-900 rounded-lg p-4 max-w-xs w-full text-center" onClick={e => e.stopPropagation()}>
+              <span className="text-5xl block mb-3">{animal.emoji}</span>
+              <h3 className="text-lg font-bold text-white mb-2">Sell {animal.name}?</h3>
+              <p className="text-red-200 text-sm mb-4">
+                You will receive <span className="text-amber-300 font-bold">${sellPrice}</span>
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setConfirmSellPen(null)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onSellAnimal(confirmSellPen);
+                    setConfirmSellPen(null);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold"
+                >
+                  Sell
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -35,6 +35,7 @@ export function FactoryPanel({
   const [selectedMachineForRecipe, setSelectedMachineForRecipe] = useState<string | null>(null);
   const [draggedSlot, setDraggedSlot] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const [confirmSellSlot, setConfirmSellSlot] = useState<string | null>(null);
 
   const getProcessingProgress = (slot: MachineSlot, machine: Machine | undefined) => {
     if (!slot.startedAt || !machine || slot.currentRecipeIndex === null) return 0;
@@ -178,6 +179,20 @@ export function FactoryPanel({
 
               {slot.machineId && machine ? (
                 <div className="flex flex-col items-center">
+                  {/* Sell button - top right (only when not processing) */}
+                  {!slot.isProcessing && !slot.isReady && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmSellSlot(slot.id);
+                      }}
+                      className="absolute top-1 right-1 p-1 bg-red-800/80 hover:bg-red-700 text-red-200 rounded text-xs"
+                      title={`Sell for $${Math.floor(machine.purchaseCost * 0.5)}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+
                   <span className="text-3xl mb-1">{machine.emoji}</span>
                   <span className="text-sm text-white font-medium">{machine.name}</span>
 
@@ -210,19 +225,7 @@ export function FactoryPanel({
                   )}
 
                   {!slot.isProcessing && !slot.isReady && (
-                    <div className="flex gap-2 mt-1 flex-wrap justify-center">
-                      <span className="text-xs text-slate-400">Tap to use</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSellMachine(slot.id);
-                        }}
-                        className="px-2 py-0.5 bg-red-800 hover:bg-red-700 text-red-200 rounded text-xs"
-                        title={`Sell for $${Math.floor(machine.purchaseCost * 0.5)}`}
-                      >
-                        Sell
-                      </button>
-                    </div>
+                    <span className="text-xs text-slate-400 mt-1">Tap to use</span>
                   )}
                 </div>
               ) : (
@@ -347,6 +350,43 @@ export function FactoryPanel({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Sell Confirmation Modal */}
+      {confirmSellSlot && (() => {
+        const slot = machineSlots.find(s => s.id === confirmSellSlot);
+        const machine = slot ? machines.find(m => m.id === slot.machineId) : null;
+        if (!machine) return null;
+        const sellPrice = Math.floor(machine.purchaseCost * 0.5);
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setConfirmSellSlot(null)}>
+            <div className="bg-gradient-to-b from-slate-700 to-slate-800 rounded-lg p-4 max-w-xs w-full text-center" onClick={e => e.stopPropagation()}>
+              <span className="text-5xl block mb-3">{machine.emoji}</span>
+              <h3 className="text-lg font-bold text-white mb-2">Sell {machine.name}?</h3>
+              <p className="text-slate-300 text-sm mb-4">
+                You will receive <span className="text-amber-300 font-bold">${sellPrice}</span>
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setConfirmSellSlot(null)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onSellMachine(confirmSellSlot);
+                    setConfirmSellSlot(null);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold"
+                >
+                  Sell
+                </button>
               </div>
             </div>
           </div>
