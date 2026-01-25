@@ -45,9 +45,8 @@ function getRequiredLevelForSlot(slotType: SlotType, slotIndex: number): number 
     : slotType === 'orchard' ? 'unlocksOrchards'
     : 'unlocksMachineSlots';
 
-  // Find the level that unlocks this slot index
-  for (let i = levels.length - 1; i >= 0; i--) {
-    const lvl = levels[i];
+  // Find the first level that unlocks this slot index
+  for (const lvl of levels) {
     const unlocksCount = lvl[key as keyof typeof lvl] as number | undefined;
     if (unlocksCount !== undefined && slotIndex < unlocksCount) {
       return lvl.level;
