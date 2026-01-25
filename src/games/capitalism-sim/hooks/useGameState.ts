@@ -662,6 +662,280 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      // Dynamic management actions
+      case 'LOAD_DEBT': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        const debtAmount = action.amount;
+        const cashExtracted = debtAmount * 0.9; // 10% goes to fees/interest
+        const interestCost = debtAmount * 0.08; // 8% annual interest reduces profit
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          debt: company.currentMetrics.debt + debtAmount,
+          profit: company.currentMetrics.profit - interestCost,
+          morale: Math.max(0, company.currentMetrics.morale - Math.floor(debtAmount / company.currentMetrics.revenue * 10)),
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          debtLoaded: company.debtLoaded + debtAmount,
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        return {
+          ...state,
+          fund: {
+            ...state.fund,
+            capital: state.fund.capital + cashExtracted,
+          },
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+          stats: {
+            ...state.stats,
+            totalDebtLoaded: state.stats.totalDebtLoaded + debtAmount,
+          },
+        };
+      }
+
+      case 'TAKE_DIVIDEND': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        const dividendAmount = action.amount;
+        const moraleHit = Math.floor(dividendAmount / company.currentMetrics.assetValue * 20);
+        const brandHit = Math.floor(dividendAmount / company.currentMetrics.assetValue * 10);
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          assetValue: Math.max(0, company.currentMetrics.assetValue - dividendAmount * 0.5),
+          morale: Math.max(0, company.currentMetrics.morale - moraleHit),
+          brandValue: Math.max(0, company.currentMetrics.brandValue - brandHit),
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          dividendsExtracted: company.dividendsExtracted + dividendAmount,
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        const newsItem: NewsItem = {
+          id: `news-${Date.now()}`,
+          headline: generateNewsHeadline('profit', company.name),
+          timestamp: Date.now(),
+          category: 'profit',
+          companyId: company.id,
+        };
+
+        return {
+          ...state,
+          fund: {
+            ...state.fund,
+            capital: state.fund.capital + dividendAmount,
+          },
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+          stats: {
+            ...state.stats,
+            totalDividendsExtracted: state.stats.totalDividendsExtracted + dividendAmount,
+          },
+          newsHistory: [newsItem, ...state.newsHistory].slice(0, 50),
+        };
+      }
+
+      case 'REDUCE_WORKFORCE': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        const reductionPercent = action.percent / 100;
+        const employeesToCut = Math.floor(company.currentMetrics.employees * reductionPercent);
+        const salarySavings = employeesToCut * 50000; // Avg $50k salary
+        const severanceCost = employeesToCut * 10000; // $10k severance per employee
+
+        const moraleHit = Math.min(40, action.percent * 1.5);
+        const satisfactionHit = Math.min(25, action.percent * 0.8);
+        const brandHit = Math.min(15, action.percent * 0.5);
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          employees: company.currentMetrics.employees - employeesToCut,
+          profit: company.currentMetrics.profit + salarySavings - severanceCost,
+          morale: Math.max(0, company.currentMetrics.morale - moraleHit),
+          customerSatisfaction: Math.max(0, company.currentMetrics.customerSatisfaction - satisfactionHit),
+          brandValue: Math.max(0, company.currentMetrics.brandValue - brandHit),
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          employeesLaidOff: company.employeesLaidOff + employeesToCut,
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        const newsItems: NewsItem[] = [];
+        if (employeesToCut > 100) {
+          newsItems.push({
+            id: `news-${Date.now()}`,
+            headline: generateNewsHeadline('layoff', company.name),
+            timestamp: Date.now(),
+            category: 'layoff',
+            companyId: company.id,
+          });
+        }
+
+        return {
+          ...state,
+          fund: {
+            ...state.fund,
+            reputation: Math.max(0, state.fund.reputation - Math.floor(action.percent / 5)),
+          },
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+          stats: {
+            ...state.stats,
+            totalEmployeesLaidOff: state.stats.totalEmployeesLaidOff + employeesToCut,
+          },
+          newsHistory: [...newsItems, ...state.newsHistory].slice(0, 50),
+        };
+      }
+
+      case 'CUT_QUALITY': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        const qualityCutPercent = action.percent / 100;
+        const costSavings = company.currentMetrics.revenue * qualityCutPercent * 0.15;
+
+        const satisfactionHit = Math.min(30, action.percent * 1.2);
+        const brandHit = Math.min(20, action.percent * 0.8);
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          profit: company.currentMetrics.profit + costSavings,
+          customerSatisfaction: Math.max(0, company.currentMetrics.customerSatisfaction - satisfactionHit),
+          brandValue: Math.max(0, company.currentMetrics.brandValue - brandHit),
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        return {
+          ...state,
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+        };
+      }
+
+      case 'SELL_ASSETS': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        const salePercent = action.percent / 100;
+        const assetsToSell = company.currentMetrics.assetValue * salePercent;
+        const cashReceived = assetsToSell * 0.7; // Sell at 70% of book value
+
+        const brandHit = Math.min(20, action.percent * 0.5);
+        const revenueHit = company.currentMetrics.revenue * salePercent * 0.1;
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          assetValue: company.currentMetrics.assetValue - assetsToSell,
+          revenue: company.currentMetrics.revenue - revenueHit,
+          brandValue: Math.max(0, company.currentMetrics.brandValue - brandHit),
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          assetsStripped: [...company.assetsStripped, `${action.percent}% of assets`],
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        return {
+          ...state,
+          fund: {
+            ...state.fund,
+            capital: state.fund.capital + cashReceived,
+          },
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+          stats: {
+            ...state.stats,
+            totalAssetsStripped: state.stats.totalAssetsStripped + assetsToSell,
+          },
+        };
+      }
+
+      case 'EXTRACT_FEES': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        const feeAmount = action.amount;
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          profit: company.currentMetrics.profit - feeAmount,
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          managementFeesExtracted: company.managementFeesExtracted + feeAmount,
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        return {
+          ...state,
+          fund: {
+            ...state.fund,
+            capital: state.fund.capital + feeAmount,
+            managementFees: state.fund.managementFees + feeAmount,
+          },
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+          stats: {
+            ...state.stats,
+            totalFeesExtracted: state.stats.totalFeesExtracted + feeAmount,
+          },
+        };
+      }
+
+      case 'SALE_LEASEBACK': {
+        const company = state.portfolio.find((c) => c.id === action.companyId);
+        if (!company) return state;
+
+        // Sell 40% of assets (real estate) at 80% value, add ongoing rent cost
+        const realEstateValue = company.currentMetrics.assetValue * 0.4;
+        const cashReceived = realEstateValue * 0.8;
+        const annualRentCost = realEstateValue * 0.08; // 8% annual rent
+
+        const updatedMetrics: CompanyMetrics = {
+          ...company.currentMetrics,
+          assetValue: company.currentMetrics.assetValue - realEstateValue,
+          profit: company.currentMetrics.profit - annualRentCost,
+        };
+
+        const updatedCompany: PortfolioCompany = {
+          ...company,
+          currentMetrics: updatedMetrics,
+          assetsStripped: [...company.assetsStripped, 'Real estate (sale-leaseback)'],
+          status: calculateCompanyStatus(updatedMetrics, updatedMetrics.debt),
+        };
+
+        return {
+          ...state,
+          fund: {
+            ...state.fund,
+            capital: state.fund.capital + cashReceived,
+          },
+          portfolio: state.portfolio.map((c) => c.id === company.id ? updatedCompany : c),
+          stats: {
+            ...state.stats,
+            totalAssetsStripped: state.stats.totalAssetsStripped + realEstateValue,
+          },
+        };
+      }
+
       default:
         return state;
     }
@@ -760,6 +1034,40 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'REFRESH_TARGETS' });
   }, []);
 
+  // New dynamic management actions
+  const loadDebt = useCallback((companyId: string, amount: number) => {
+    dispatch({ type: 'LOAD_DEBT', companyId, amount });
+  }, []);
+
+  const takeDividend = useCallback((companyId: string, amount: number) => {
+    dispatch({ type: 'TAKE_DIVIDEND', companyId, amount });
+  }, []);
+
+  const reduceWorkforce = useCallback((companyId: string, percent: number) => {
+    dispatch({ type: 'REDUCE_WORKFORCE', companyId, percent });
+  }, []);
+
+  const cutQuality = useCallback((companyId: string, percent: number) => {
+    dispatch({ type: 'CUT_QUALITY', companyId, percent });
+  }, []);
+
+  const sellAssets = useCallback((companyId: string, percent: number) => {
+    dispatch({ type: 'SELL_ASSETS', companyId, percent });
+  }, []);
+
+  const extractFees = useCallback((companyId: string, amount: number) => {
+    dispatch({ type: 'EXTRACT_FEES', companyId, amount });
+  }, []);
+
+  const saleLeaseback = useCallback((companyId: string) => {
+    dispatch({ type: 'SALE_LEASEBACK', companyId });
+  }, []);
+
+  // Calculate max debt percent based on experience
+  const maxDebtPercent = state.stats.companiesAcquired >= 3
+    ? config.settings.maxDebtPercentExperienced
+    : config.settings.maxDebtPercentNewPlayer;
+
   return {
     state,
     makeOffer,
@@ -772,5 +1080,14 @@ export function useGameState(config: GameConfig) {
     completeTutorial,
     resetGame,
     refreshTargets,
+    // New management actions
+    loadDebt,
+    takeDividend,
+    reduceWorkforce,
+    cutQuality,
+    sellAssets,
+    extractFees,
+    saleLeaseback,
+    maxDebtPercent,
   };
 }

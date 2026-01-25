@@ -17,14 +17,13 @@ import {
   ResourceBar,
   PortfolioPanel,
   TargetsPanel,
-  StrategyPanel,
   EventModal,
   NewsTicker,
   StatsPanel,
 } from './components';
 import { tips } from './data/settings';
 
-type TabId = 'portfolio' | 'targets' | 'strategies' | 'stats';
+type TabId = 'portfolio' | 'targets' | 'stats';
 
 interface TabConfig {
   id: TabId;
@@ -35,7 +34,6 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   { id: 'portfolio', label: 'Portfolio', icon: <Briefcase className="w-5 h-5" /> },
   { id: 'targets', label: 'Acquisitions', icon: <Target className="w-5 h-5" /> },
-  { id: 'strategies', label: 'Playbook', icon: <BookOpen className="w-5 h-5" /> },
   { id: 'stats', label: 'Statistics', icon: <BarChart3 className="w-5 h-5" /> },
 ];
 
@@ -146,7 +144,37 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
 function GameContent() {
   const { companies, strategies, events, settings, isLoading, error, refresh } = useGameData();
   const gameState = useGameState({ companies, strategies, events, settings });
-  const { state, makeOffer, cancelDeal, executeStrategy, sellCompany, declareBankruptcy, handleEventChoice, dismissEvent, completeTutorial, resetGame, refreshTargets } = gameState;
+  const {
+    state,
+    makeOffer,
+    cancelDeal,
+    sellCompany,
+    declareBankruptcy,
+    handleEventChoice,
+    dismissEvent,
+    completeTutorial,
+    resetGame,
+    refreshTargets,
+    loadDebt,
+    takeDividend,
+    reduceWorkforce,
+    cutQuality,
+    sellAssets,
+    extractFees,
+    saleLeaseback,
+    maxDebtPercent,
+  } = gameState;
+
+  // Bundle management actions for the portfolio panel
+  const managementActions = {
+    loadDebt,
+    takeDividend,
+    reduceWorkforce,
+    cutQuality,
+    sellAssets,
+    extractFees,
+    saleLeaseback,
+  };
 
   const [activeTab, setActiveTab] = useState<TabId>('targets');
   const [showTutorial, setShowTutorial] = useState(!state.tutorialCompleted);
@@ -249,10 +277,9 @@ function GameContent() {
                   <h2 className="text-2xl font-bold mb-6">Portfolio Companies</h2>
                   <PortfolioPanel
                     portfolio={state.portfolio}
-                    strategies={strategies}
-                    onExecuteStrategy={executeStrategy}
                     onSellCompany={sellCompany}
                     onDeclareBankruptcy={declareBankruptcy}
+                    managementActions={managementActions}
                   />
                 </div>
               )}
@@ -264,19 +291,10 @@ function GameContent() {
                     targets={state.availableTargets}
                     pendingDeals={state.pendingDeals}
                     capital={state.fund.capital}
+                    maxDebtPercent={maxDebtPercent}
                     onMakeOffer={makeOffer}
                     onCancelDeal={cancelDeal}
                     onRefreshTargets={refreshTargets}
-                  />
-                </div>
-              )}
-
-              {activeTab === 'strategies' && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">The PE Playbook</h2>
-                  <StrategyPanel
-                    strategies={strategies}
-                    unlockedStrategies={state.unlockedStrategies}
                   />
                 </div>
               )}
