@@ -185,6 +185,20 @@ export const games: Game[] = [
     difficulty: 'easy',
     playUrl: '/play/farming-sim',
   },
+  {
+    id: 'capitalism-sim',
+    title: 'Late Stage Capitalism Simulator',
+    description: 'Run a private equity firm! Acquire struggling companies, load them with debt, lay off workers, extract management fees, and either sell for profit or let them collapse. A satirical take on modern finance.',
+    thumbnail: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=300&fit=crop',
+    category: 'strategy',
+    tags: ['simulation', 'strategy', 'satire', 'business', 'management'],
+    playCount: 0,
+    rating: 5.0,
+    featured: true,
+    createdAt: '2025-01-25',
+    difficulty: 'medium',
+    playUrl: '/play/capitalism-sim',
+  },
 ];
 
 export const leaderboards: Record<string, LeaderboardEntry[]> = {
