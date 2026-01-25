@@ -11,7 +11,7 @@ export const defaultSettings: GameSettings = {
   maxOrchards: 8,
   maxMachineSlots: 10,
   maxOrders: 3,
-  orderRefreshInterval: 180, // orders refresh every 3 minutes
+  orderRefreshInterval: 600, // orders refresh every 10 minutes
   customerSpawnInterval: 60, // wandering customer every 60 seconds
   customerDuration: 45, // customer stays for 45 seconds
 };
