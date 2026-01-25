@@ -26,36 +26,54 @@ const MAX_LEVEL_UNLOCKS = {
 
 // Storage constants
 const STORAGE_BASE_CAPACITY = 50;
-const STORAGE_PER_UPGRADE = 25;
 const STORAGE_MAX_LEVEL = 20;
+
+// Storage capacity per upgrade level (scales up through tiers)
+// Levels 1-5: +25, Levels 6-10: +50, Levels 11-15: +100, Levels 16-20: +200
+function getStoragePerUpgrade(level: number): number {
+  if (level <= 5) return 25;
+  if (level <= 10) return 50;
+  if (level <= 15) return 100;
+  return 200; // levels 16-20
+}
 
 // Storage upgrade costs - increasing costs for 20 tiers
 const STORAGE_UPGRADE_COSTS = [
-  500,      // Level 1: 75 capacity
-  1000,     // Level 2: 100 capacity
-  2000,     // Level 3: 125 capacity
-  3500,     // Level 4: 150 capacity
-  5000,     // Level 5: 175 capacity
-  7500,     // Level 6: 200 capacity
-  10000,    // Level 7: 225 capacity
-  15000,    // Level 8: 250 capacity
-  20000,    // Level 9: 275 capacity
-  30000,    // Level 10: 300 capacity
-  40000,    // Level 11: 325 capacity
-  55000,    // Level 12: 350 capacity
-  75000,    // Level 13: 375 capacity
-  100000,   // Level 14: 400 capacity
-  130000,   // Level 15: 425 capacity
-  175000,   // Level 16: 450 capacity
-  225000,   // Level 17: 475 capacity
-  300000,   // Level 18: 500 capacity
-  400000,   // Level 19: 525 capacity
-  500000,   // Level 20: 550 capacity
+  500,      // Level 1: +25 = 75 capacity
+  1000,     // Level 2: +25 = 100 capacity
+  2000,     // Level 3: +25 = 125 capacity
+  3500,     // Level 4: +25 = 150 capacity
+  5000,     // Level 5: +25 = 175 capacity
+  7500,     // Level 6: +50 = 225 capacity
+  10000,    // Level 7: +50 = 275 capacity
+  15000,    // Level 8: +50 = 325 capacity
+  20000,    // Level 9: +50 = 375 capacity
+  30000,    // Level 10: +50 = 425 capacity
+  40000,    // Level 11: +100 = 525 capacity
+  55000,    // Level 12: +100 = 625 capacity
+  75000,    // Level 13: +100 = 725 capacity
+  100000,   // Level 14: +100 = 825 capacity
+  130000,   // Level 15: +100 = 925 capacity
+  175000,   // Level 16: +200 = 1125 capacity
+  225000,   // Level 17: +200 = 1325 capacity
+  300000,   // Level 18: +200 = 1525 capacity
+  400000,   // Level 19: +200 = 1725 capacity
+  500000,   // Level 20: +200 = 1925 capacity
 ];
 
 // Get storage capacity for a given level
 function getStorageCapacity(storageLevel: number): number {
-  return STORAGE_BASE_CAPACITY + storageLevel * STORAGE_PER_UPGRADE;
+  let capacity = STORAGE_BASE_CAPACITY;
+  for (let i = 1; i <= storageLevel; i++) {
+    capacity += getStoragePerUpgrade(i);
+  }
+  return capacity;
+}
+
+// Get the next upgrade amount for display
+function getNextStorageUpgradeAmount(currentLevel: number): number {
+  if (currentLevel >= STORAGE_MAX_LEVEL) return 0;
+  return getStoragePerUpgrade(currentLevel + 1);
 }
 
 // Get cost to upgrade storage (undefined if max level)
@@ -1507,6 +1525,7 @@ export {
   MAX_LEVEL_UNLOCKS,
   getStorageCapacity,
   getStorageUpgradeCost,
+  getNextStorageUpgradeAmount,
   getTotalInventoryCount,
   STORAGE_MAX_LEVEL,
 };
