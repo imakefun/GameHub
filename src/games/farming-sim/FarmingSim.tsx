@@ -11,6 +11,7 @@ import {
   SignpostPanel,
   MarketPanel,
   InventoryPanel,
+  LevelUpPopup,
 } from './components';
 import { GameDataProvider, useGameData } from './context/GameDataContext';
 import type { GameConfig } from './types';
@@ -85,6 +86,7 @@ function FarmingSimContent() {
     swapAnimals,
     swapTrees,
     swapMachines,
+    dismissLevelUp,
   } = useGameState(gameConfig);
 
   // Count notifications for tabs
@@ -366,6 +368,15 @@ function FarmingSimContent() {
           </div>
         </div>
       </main>
+
+      {/* Level Up Popup */}
+      {state.pendingLevelUp && (
+        <LevelUpPopup
+          level={state.pendingLevelUp}
+          config={gameConfig}
+          onClose={dismissLevelUp}
+        />
+      )}
 
       {/* Help Modal */}
       {showHelp && (
