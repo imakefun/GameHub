@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { MachineSlot, Machine, Resources, Inventory, Product } from '../types';
+import type { MachineSlot, Machine, Resources, Inventory, Product, SlotType } from '../types';
+import { getPremiumSlotCost } from '../hooks/useGameState';
 
 interface FactoryPanelProps {
   machineSlots: MachineSlot[];
@@ -11,6 +12,7 @@ interface FactoryPanelProps {
   onBuyMachine: (slotId: string, machineId: string) => void;
   onStartProcessing: (slotId: string, recipeIndex: number) => void;
   onCollect: (slotId: string) => void;
+  onBuySlot: (slotType: SlotType, slotIndex: number) => void;
 }
 
 export function FactoryPanel({
@@ -23,6 +25,7 @@ export function FactoryPanel({
   onBuyMachine,
   onStartProcessing,
   onCollect,
+  onBuySlot,
 }: FactoryPanelProps) {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedMachineForRecipe, setSelectedMachineForRecipe] = useState<string | null>(null);
@@ -64,17 +67,47 @@ export function FactoryPanel({
         {machineSlots.map((slot, index) => {
           const machine = machines.find(m => m.id === slot.machineId);
           const progress = getProcessingProgress(slot, machine);
+          const premiumCost = getPremiumSlotCost('machine', index);
+          const isPremiumSlot = premiumCost !== undefined;
+          const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!slot.unlocked) {
             return (
               <div
                 key={slot.id}
-                className="p-3 rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+                className={`
+                  p-3 rounded-lg border-2
+                  ${isPremiumSlot
+                    ? 'bg-slate-800/50 border-slate-500 cursor-pointer hover:bg-slate-700/50'
+                    : 'bg-gray-800 border-gray-700 opacity-50'
+                  }
+                `}
+                onClick={() => {
+                  if (isPremiumSlot && canAffordSlot) {
+                    onBuySlot('machine', index);
+                  }
+                }}
               >
                 <div className="text-xs text-gray-500 mb-1">Slot #{index + 1}</div>
                 <div className="flex flex-col items-center justify-center h-16">
-                  <span className="text-3xl text-gray-600">🔒</span>
-                  <span className="text-xs text-gray-500">Locked</span>
+                  {isPremiumSlot ? (
+                    <>
+                      <span className="text-3xl">💰</span>
+                      <span className="text-xs text-slate-300 font-bold">
+                        ${premiumCost.toLocaleString()}
+                      </span>
+                      {canAffordSlot ? (
+                        <span className="text-xs text-green-400 mt-1">Click to buy</span>
+                      ) : (
+                        <span className="text-xs text-red-400 mt-1">Need more $</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-3xl text-gray-600">🔒</span>
+                      <span className="text-xs text-gray-500">Level up</span>
+                    </>
+                  )}
                 </div>
               </div>
             );

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Field, Crop, Resources, Inventory } from '../types';
+import type { Field, Crop, Resources, Inventory, SlotType } from '../types';
+import { getPremiumSlotCost } from '../hooks/useGameState';
 
 interface FieldsPanelProps {
   fields: Field[];
@@ -9,6 +10,7 @@ interface FieldsPanelProps {
   playerLevel: number;
   onPlant: (fieldId: string, cropId: string) => void;
   onHarvest: (fieldId: string) => void;
+  onBuySlot: (slotType: SlotType, slotIndex: number) => void;
 }
 
 export function FieldsPanel({
@@ -19,6 +21,7 @@ export function FieldsPanel({
   playerLevel,
   onPlant,
   onHarvest,
+  onBuySlot,
 }: FieldsPanelProps) {
   const [selectedField, setSelectedField] = useState<string | null>(null);
 
@@ -38,16 +41,46 @@ export function FieldsPanel({
         {fields.map((field, index) => {
           const crop = crops.find(c => c.id === field.cropId);
           const progress = getGrowthProgress(field, crop);
+          const premiumCost = getPremiumSlotCost('field', index);
+          const isPremiumSlot = premiumCost !== undefined;
+          const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!field.unlocked) {
             return (
               <div
                 key={field.id}
-                className="relative aspect-square rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+                className={`
+                  relative aspect-square rounded-lg border-2
+                  ${isPremiumSlot
+                    ? 'bg-amber-900/50 border-amber-600 cursor-pointer hover:bg-amber-800/50'
+                    : 'bg-gray-800 border-gray-700 opacity-50'
+                  }
+                `}
+                onClick={() => {
+                  if (isPremiumSlot && canAffordSlot) {
+                    onBuySlot('field', index);
+                  }
+                }}
               >
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl text-gray-600">🔒</span>
-                  <span className="text-xs text-gray-500">Locked</span>
+                  {isPremiumSlot ? (
+                    <>
+                      <span className="text-2xl">💰</span>
+                      <span className="text-xs text-amber-300 font-bold">
+                        ${premiumCost.toLocaleString()}
+                      </span>
+                      {canAffordSlot ? (
+                        <span className="text-xs text-green-400 mt-1">Click to buy</span>
+                      ) : (
+                        <span className="text-xs text-red-400 mt-1">Need more $</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl text-gray-600">🔒</span>
+                      <span className="text-xs text-gray-500">Level up</span>
+                    </>
+                  )}
                 </div>
                 <div className="absolute top-1 left-1 text-xs text-gray-500">
                   #{index + 1}

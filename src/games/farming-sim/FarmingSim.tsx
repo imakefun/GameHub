@@ -76,6 +76,7 @@ function FarmingSimContent() {
     refreshOrders: _refreshOrders,
     serveCustomer,
     sellItem,
+    buySlot,
     resetGame,
   } = useGameState(gameConfig);
 
@@ -246,6 +247,7 @@ function FarmingSimContent() {
             playerLevel={state.progress.level}
             onPlant={plantCrop}
             onHarvest={harvestCrop}
+            onBuySlot={buySlot}
           />
         )}
 
@@ -260,6 +262,7 @@ function FarmingSimContent() {
             onBuyAnimal={buyAnimal}
             onCollect={collectProduct}
             onFeed={feedAnimal}
+            onBuySlot={buySlot}
           />
         )}
 
@@ -271,6 +274,7 @@ function FarmingSimContent() {
             playerLevel={state.progress.level}
             onPlantTree={plantTree}
             onHarvest={harvestFruit}
+            onBuySlot={buySlot}
           />
         )}
 
@@ -285,6 +289,7 @@ function FarmingSimContent() {
             onBuyMachine={buyMachine}
             onStartProcessing={startProcessing}
             onCollect={collectProcessed}
+            onBuySlot={buySlot}
           />
         )}
 

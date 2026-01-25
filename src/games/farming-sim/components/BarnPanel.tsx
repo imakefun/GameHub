@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { AnimalPen, Animal, Resources, Inventory, Product } from '../types';
+import type { AnimalPen, Animal, Resources, Inventory, Product, SlotType } from '../types';
+import { getPremiumSlotCost } from '../hooks/useGameState';
 
 interface BarnPanelProps {
   pens: AnimalPen[];
@@ -11,6 +12,7 @@ interface BarnPanelProps {
   onBuyAnimal: (penId: string, animalId: string) => void;
   onCollect: (penId: string) => void;
   onFeed: (penId: string) => void;
+  onBuySlot: (slotType: SlotType, slotIndex: number) => void;
 }
 
 export function BarnPanel({
@@ -23,6 +25,7 @@ export function BarnPanel({
   onBuyAnimal,
   onCollect,
   onFeed,
+  onBuySlot,
 }: BarnPanelProps) {
   const [selectedPen, setSelectedPen] = useState<string | null>(null);
 
@@ -52,17 +55,47 @@ export function BarnPanel({
           const hasFeed = animal && animal.feedType !== 'none'
             ? (inventory[animal.feedType] || 0) >= animal.feedAmount
             : true;
+          const premiumCost = getPremiumSlotCost('pen', index);
+          const isPremiumSlot = premiumCost !== undefined;
+          const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!pen.unlocked) {
             return (
               <div
                 key={pen.id}
-                className="p-3 rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+                className={`
+                  p-3 rounded-lg border-2
+                  ${isPremiumSlot
+                    ? 'bg-red-900/50 border-red-600 cursor-pointer hover:bg-red-800/50'
+                    : 'bg-gray-800 border-gray-700 opacity-50'
+                  }
+                `}
+                onClick={() => {
+                  if (isPremiumSlot && canAffordSlot) {
+                    onBuySlot('pen', index);
+                  }
+                }}
               >
                 <div className="text-xs text-gray-500 mb-1">Pen #{index + 1}</div>
                 <div className="flex flex-col items-center justify-center h-20">
-                  <span className="text-3xl text-gray-600">🔒</span>
-                  <span className="text-xs text-gray-500">Locked</span>
+                  {isPremiumSlot ? (
+                    <>
+                      <span className="text-3xl">💰</span>
+                      <span className="text-xs text-red-300 font-bold">
+                        ${premiumCost.toLocaleString()}
+                      </span>
+                      {canAffordSlot ? (
+                        <span className="text-xs text-green-400 mt-1">Click to buy</span>
+                      ) : (
+                        <span className="text-xs text-red-400 mt-1">Need more $</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-3xl text-gray-600">🔒</span>
+                      <span className="text-xs text-gray-500">Level up</span>
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -166,7 +199,7 @@ export function BarnPanel({
             {animals.map(animal => {
               const canAfford = resources.money >= animal.purchaseCost;
               const isUnlocked = animal.unlockLevel <= playerLevel;
-              const feedInfo = getFeedInfo(animal.feedType);
+              const animalFeedInfo = getFeedInfo(animal.feedType);
 
               return (
                 <button
@@ -198,7 +231,7 @@ export function BarnPanel({
                   <span className="text-xs block text-amber-300">${animal.purchaseCost}</span>
                   {isUnlocked && animal.feedType !== 'none' && (
                     <span className="text-xs block text-red-300">
-                      Needs: {feedInfo.emoji}
+                      Needs: {animalFeedInfo.emoji}
                     </span>
                   )}
                 </button>

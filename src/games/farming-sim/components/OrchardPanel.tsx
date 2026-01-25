@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Orchard, Tree, Resources } from '../types';
+import type { Orchard, Tree, Resources, SlotType } from '../types';
+import { getPremiumSlotCost } from '../hooks/useGameState';
 
 interface OrchardPanelProps {
   orchards: Orchard[];
@@ -8,6 +9,7 @@ interface OrchardPanelProps {
   playerLevel: number;
   onPlantTree: (orchardId: string, treeId: string) => void;
   onHarvest: (orchardId: string) => void;
+  onBuySlot: (slotType: SlotType, slotIndex: number) => void;
 }
 
 export function OrchardPanel({
@@ -17,6 +19,7 @@ export function OrchardPanel({
   playerLevel,
   onPlantTree,
   onHarvest,
+  onBuySlot,
 }: OrchardPanelProps) {
   const [selectedOrchard, setSelectedOrchard] = useState<string | null>(null);
 
@@ -44,17 +47,47 @@ export function OrchardPanel({
           const tree = trees.find(t => t.id === orchard.treeId);
           const growthProgress = getGrowthProgress(orchard, tree);
           const harvestProgress = getHarvestProgress(orchard, tree);
+          const premiumCost = getPremiumSlotCost('orchard', index);
+          const isPremiumSlot = premiumCost !== undefined;
+          const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!orchard.unlocked) {
             return (
               <div
                 key={orchard.id}
-                className="p-3 rounded-lg bg-gray-800 border-2 border-gray-700 opacity-50"
+                className={`
+                  p-3 rounded-lg border-2
+                  ${isPremiumSlot
+                    ? 'bg-emerald-900/50 border-emerald-600 cursor-pointer hover:bg-emerald-800/50'
+                    : 'bg-gray-800 border-gray-700 opacity-50'
+                  }
+                `}
+                onClick={() => {
+                  if (isPremiumSlot && canAffordSlot) {
+                    onBuySlot('orchard', index);
+                  }
+                }}
               >
                 <div className="text-xs text-gray-500 mb-1">Slot #{index + 1}</div>
                 <div className="flex flex-col items-center justify-center h-20">
-                  <span className="text-3xl text-gray-600">🔒</span>
-                  <span className="text-xs text-gray-500">Locked</span>
+                  {isPremiumSlot ? (
+                    <>
+                      <span className="text-3xl">💰</span>
+                      <span className="text-xs text-emerald-300 font-bold">
+                        ${premiumCost.toLocaleString()}
+                      </span>
+                      {canAffordSlot ? (
+                        <span className="text-xs text-green-400 mt-1">Click to buy</span>
+                      ) : (
+                        <span className="text-xs text-red-400 mt-1">Need more $</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-3xl text-gray-600">🔒</span>
+                      <span className="text-xs text-gray-500">Level up</span>
+                    </>
+                  )}
                 </div>
               </div>
             );

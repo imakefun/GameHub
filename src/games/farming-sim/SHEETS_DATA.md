@@ -176,10 +176,10 @@ Copy each table below into the corresponding sheet tab. Select the table, copy (
 | maxEnergy | 100 |
 | energyRegenRate | 0.5 |
 | tickInterval | 100 |
-| maxFields | 6 |
-| maxAnimalPens | 4 |
-| maxOrchards | 4 |
-| maxMachineSlots | 6 |
+| maxFields | 10 |
+| maxAnimalPens | 8 |
+| maxOrchards | 8 |
+| maxMachineSlots | 10 |
 | maxOrders | 3 |
 | orderRefreshInterval | 180 |
 | customerSpawnInterval | 60 |
