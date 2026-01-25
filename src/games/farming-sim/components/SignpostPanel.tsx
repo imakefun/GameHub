@@ -33,7 +33,8 @@ export function SignpostPanel({
     );
   };
 
-  const getTimeRemaining = (order: Order) => {
+  // Individual timer for shipments only (they have hour-long cycles)
+  const getShipmentTimeRemaining = (order: Order) => {
     const elapsed = (Date.now() - order.createdAt) / 1000;
     const remaining = order.timeLimit - elapsed;
     if (remaining <= 0) return 'Expired';
@@ -42,9 +43,10 @@ export function SignpostPanel({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const isQuickCompletion = (order: Order) => {
-    const elapsed = (Date.now() - order.createdAt) / 1000;
-    return elapsed < order.timeLimit / 2;
+  // Quick completion bonus based on shared timer (first half of refresh period)
+  const isQuickCompletion = () => {
+    const elapsed = (Date.now() - lastRefresh) / 1000;
+    return elapsed < refreshInterval / 2;
   };
 
   const getRefreshCountdown = () => {
@@ -82,8 +84,7 @@ export function SignpostPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {orders.filter(o => o.isShipment).map(order => {
                   const canComplete = canCompleteOrder(order);
-                  const quick = isQuickCompletion(order);
-                  const timeRemaining = getTimeRemaining(order);
+                  const timeRemaining = getShipmentTimeRemaining(order);
 
                   return (
                     <div
@@ -133,12 +134,7 @@ export function SignpostPanel({
 
                       {/* Reward & Actions */}
                       <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-yellow-300 font-bold">${order.reward.toLocaleString()}</span>
-                          {quick && (
-                            <span className="text-green-300 ml-1">+${order.bonusReward.toLocaleString()}</span>
-                          )}
-                        </div>
+                        <span className="text-yellow-300 font-bold">${order.reward.toLocaleString()}</span>
 
                         <div className="flex gap-1">
                           <button
@@ -180,8 +176,7 @@ export function SignpostPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {orders.filter(o => !o.isShipment).map(order => {
                   const canComplete = canCompleteOrder(order);
-                  const quick = isQuickCompletion(order);
-                  const timeRemaining = getTimeRemaining(order);
+                  const quick = isQuickCompletion();
 
                   return (
                     <div
@@ -191,17 +186,10 @@ export function SignpostPanel({
                         ${canComplete ? 'bg-green-700' : 'bg-amber-900/50'}
                       `}
                     >
-                      {/* Customer & Timer Row */}
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1 min-w-0">
-                          <span className="text-base flex-shrink-0">{order.customerEmoji}</span>
-                          <span className="text-white font-medium text-xs">{order.customerName}</span>
-                        </div>
-                        <div className={`px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${
-                          timeRemaining === 'Expired' ? 'bg-red-600' : 'bg-amber-600'
-                        }`}>
-                          {timeRemaining}
-                        </div>
+                      {/* Customer Row */}
+                      <div className="flex items-center gap-1 mb-1">
+                        <span className="text-base flex-shrink-0">{order.customerEmoji}</span>
+                        <span className="text-white font-medium text-xs">{order.customerName}</span>
                       </div>
 
                       {/* Items requested */}
