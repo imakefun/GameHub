@@ -1,11 +1,26 @@
-import type { Inventory, Product } from '../types';
+import type { Inventory, Product, Resources } from '../types';
+import {
+  getStorageCapacity,
+  getStorageUpgradeCost,
+  getTotalInventoryCount,
+  STORAGE_MAX_LEVEL,
+} from '../hooks/useGameState';
 
 interface InventoryPanelProps {
   inventory: Inventory;
   products: Product[];
+  storageLevel: number;
+  resources: Resources;
+  onUpgradeStorage: () => void;
 }
 
-export function InventoryPanel({ inventory, products }: InventoryPanelProps) {
+export function InventoryPanel({
+  inventory,
+  products,
+  storageLevel,
+  resources,
+  onUpgradeStorage,
+}: InventoryPanelProps) {
   const getProductInfo = (productId: string) => {
     const product = products.find(p => p.id === productId);
     return {
@@ -49,11 +64,62 @@ export function InventoryPanel({ inventory, products }: InventoryPanelProps) {
 
   const totalValue = inventoryItems.reduce((sum, item) => sum + item.value * item.amount, 0);
 
+  // Storage calculations
+  const currentCount = getTotalInventoryCount(inventory);
+  const capacity = getStorageCapacity(storageLevel);
+  const upgradeCost = getStorageUpgradeCost(storageLevel);
+  const canUpgrade = upgradeCost !== undefined && resources.money >= upgradeCost;
+  const isMaxLevel = storageLevel >= STORAGE_MAX_LEVEL;
+  const isFull = currentCount >= capacity;
+  const storagePercent = Math.min((currentCount / capacity) * 100, 100);
+
   return (
     <div className="bg-gradient-to-b from-indigo-800 to-indigo-900 rounded-lg p-4 shadow-lg">
       <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
         <span>🎒</span> Inventory
       </h2>
+
+      {/* Storage Bar */}
+      <div className="mb-3">
+        <div className="flex justify-between items-center text-sm mb-1">
+          <span className="text-indigo-200">
+            Storage: <span className={isFull ? 'text-red-400 font-bold' : 'text-white font-medium'}>
+              {currentCount}/{capacity}
+            </span>
+          </span>
+          <span className="text-indigo-300 text-xs">Lv.{storageLevel}</span>
+        </div>
+        <div className="h-2 bg-indigo-950 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-300 ${
+              isFull ? 'bg-red-500' : storagePercent > 80 ? 'bg-amber-500' : 'bg-emerald-500'
+            }`}
+            style={{ width: `${storagePercent}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Upgrade Button */}
+      {!isMaxLevel && (
+        <button
+          onClick={onUpgradeStorage}
+          disabled={!canUpgrade}
+          className={`w-full mb-3 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+            canUpgrade
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              : 'bg-indigo-700/50 text-indigo-400 cursor-not-allowed'
+          }`}
+        >
+          <span>📦</span>
+          <span>Upgrade Storage (+25)</span>
+          <span className="text-yellow-300">${upgradeCost?.toLocaleString()}</span>
+        </button>
+      )}
+      {isMaxLevel && (
+        <div className="w-full mb-3 py-2 px-3 rounded-lg text-sm text-center bg-indigo-700/30 text-indigo-300">
+          📦 Storage Maxed Out!
+        </div>
+      )}
 
       <div className="text-sm text-indigo-200 mb-4">
         Total value: <span className="text-yellow-300 font-bold">${totalValue.toLocaleString()}</span>
