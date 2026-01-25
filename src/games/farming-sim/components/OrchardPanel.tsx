@@ -11,6 +11,7 @@ interface OrchardPanelProps {
   onSellTree: (orchardId: string) => void;
   onHarvest: (orchardId: string) => void;
   onBuySlot: (slotType: SlotType, slotIndex: number) => void;
+  onSwapTrees: (orchardId1: string, orchardId2: string) => void;
 }
 
 export function OrchardPanel({
@@ -22,8 +23,11 @@ export function OrchardPanel({
   onSellTree,
   onHarvest,
   onBuySlot,
+  onSwapTrees,
 }: OrchardPanelProps) {
   const [selectedOrchard, setSelectedOrchard] = useState<string | null>(null);
+  const [draggedOrchard, setDraggedOrchard] = useState<string | null>(null);
+  const [dragOverOrchard, setDragOverOrchard] = useState<string | null>(null);
 
   const getGrowthProgress = (orchard: Orchard, tree: Tree | undefined) => {
     if (!orchard.plantedAt || !tree) return 0;
@@ -101,12 +105,40 @@ export function OrchardPanel({
           return (
             <div
               key={orchard.id}
+              draggable={!!orchard.treeId}
+              onDragStart={(e) => {
+                if (orchard.treeId) {
+                  setDraggedOrchard(orchard.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                }
+              }}
+              onDragEnd={() => {
+                setDraggedOrchard(null);
+                setDragOverOrchard(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (draggedOrchard && draggedOrchard !== orchard.id && orchard.unlocked) {
+                  setDragOverOrchard(orchard.id);
+                }
+              }}
+              onDragLeave={() => setDragOverOrchard(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedOrchard && draggedOrchard !== orchard.id && orchard.unlocked) {
+                  onSwapTrees(draggedOrchard, orchard.id);
+                }
+                setDraggedOrchard(null);
+                setDragOverOrchard(null);
+              }}
               className={`
                 relative p-3 rounded-lg transition-all
+                ${dragOverOrchard === orchard.id ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-emerald-900' : ''}
+                ${draggedOrchard === orchard.id ? 'opacity-50' : ''}
                 ${orchard.treeId
                   ? orchard.isReady
-                    ? 'bg-yellow-600 animate-pulse cursor-pointer'
-                    : 'bg-emerald-700'
+                    ? 'bg-yellow-600 animate-pulse cursor-grab'
+                    : 'bg-emerald-700 cursor-grab'
                   : 'bg-emerald-800 border-2 border-dashed border-emerald-600 cursor-pointer hover:bg-emerald-700'
                 }
               `}

@@ -82,6 +82,9 @@ function FarmingSimContent() {
     buySlot,
     resetGame,
     upgradeStorage,
+    swapAnimals,
+    swapTrees,
+    swapMachines,
   } = useGameState(gameConfig);
 
   // Count notifications for tabs
@@ -273,6 +276,7 @@ function FarmingSimContent() {
             onCollect={collectProduct}
             onFeed={feedAnimal}
             onBuySlot={buySlot}
+            onSwapAnimals={swapAnimals}
           />
         )}
 
@@ -286,6 +290,7 @@ function FarmingSimContent() {
             onSellTree={sellTree}
             onHarvest={harvestFruit}
             onBuySlot={buySlot}
+            onSwapTrees={swapTrees}
           />
         )}
 
@@ -302,6 +307,7 @@ function FarmingSimContent() {
             onStartProcessing={startProcessing}
             onCollect={collectProcessed}
             onBuySlot={buySlot}
+            onSwapMachines={swapMachines}
           />
         )}
 
