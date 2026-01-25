@@ -237,6 +237,13 @@ function getMaxOrdersForLevel(config: GameConfig, level: number): number {
   return maxOrders;
 }
 
+// Get number of shipment slots based on level (unlocks at level 10)
+function getShipmentSlotsForLevel(level: number): number {
+  if (level < 10) return 0;
+  if (level < 12) return 1;
+  return 2; // 2 shipment slots at level 12+
+}
+
 // Generate orders based on player level
 function generateAllOrders(config: GameConfig, level: number, now: number): Order[] {
   const orders: Order[] = [];
@@ -245,7 +252,86 @@ function generateAllOrders(config: GameConfig, level: number, now: number): Orde
     const order = generateOrder(config, level, now, slot);
     if (order) orders.push(order);
   }
+
+  // Add shipments for level 10+
+  const numShipments = getShipmentSlotsForLevel(level);
+  for (let i = 0; i < numShipments; i++) {
+    const shipment = generateShipment(config, level, now, i);
+    if (shipment) orders.push(shipment);
+  }
+
   return orders;
+}
+
+// Generate a shipment order (large bulk order with hour-long timer)
+function generateShipment(config: GameConfig, level: number, now: number, shipmentSlot: number): Order | null {
+  // Get base products only (crops, fruits, animal products - NOT processed goods)
+  const baseProducts = config.products.filter(p => {
+    if (p.category === 'processed' || p.category === 'feed') return false;
+
+    // Check if unlocked
+    const crop = config.crops.find(c => c.id === p.id);
+    if (crop) return crop.unlockLevel <= level;
+
+    const tree = config.trees.find(t => t.id.replace('_tree', '').replace('_vine', '') === p.id);
+    if (tree) return tree.unlockLevel <= level;
+
+    const animal = config.animals.find(a => a.produces === p.id);
+    if (animal) return animal.unlockLevel <= level;
+
+    return false;
+  });
+
+  if (baseProducts.length === 0) return null;
+
+  // 1-2 items per shipment
+  const numItems = Math.random() < 0.6 ? 1 : 2;
+  const items: { itemId: string; amount: number }[] = [];
+  const usedIds = new Set<string>();
+  let totalValue = 0;
+
+  for (let i = 0; i < numItems; i++) {
+    const availableForSlot = baseProducts.filter(p => !usedIds.has(p.id));
+    if (availableForSlot.length === 0) break;
+
+    const product = availableForSlot[Math.floor(Math.random() * availableForSlot.length)];
+    usedIds.add(product.id);
+
+    // 10-20x the quantity of standard orders (base is 1-3, so 10-60)
+    const multiplier = 10 + Math.floor(Math.random() * 11); // 10-20
+    const baseAmount = Math.floor(Math.random() * 3) + 2; // 2-4 base
+    const amount = baseAmount * multiplier;
+    items.push({ itemId: product.id, amount });
+    totalValue += product.baseValue * amount;
+  }
+
+  if (items.length === 0) return null;
+
+  // Shipment customers (companies/merchants)
+  const shipmentCustomers = [
+    { name: 'Farm Co-op', emoji: '🚛' },
+    { name: 'Valley Exports', emoji: '📦' },
+    { name: 'Harbor Trading', emoji: '⚓' },
+    { name: 'Mountain Markets', emoji: '🏔️' },
+    { name: 'City Grocers', emoji: '🏙️' },
+    { name: 'Royal Pantry', emoji: '👑' },
+  ];
+  const customer = shipmentCustomers[Math.floor(Math.random() * shipmentCustomers.length)];
+
+  return {
+    id: `shipment-${now}-${shipmentSlot}-${Math.random().toString(36).slice(2, 8)}`,
+    customerName: customer.name,
+    customerEmoji: customer.emoji,
+    items,
+    reward: Math.floor(totalValue * 1.3), // Slightly lower margin than regular orders
+    bonusReward: Math.floor(totalValue * 0.3),
+    xpReward: Math.floor(50 * items.length), // Good XP for bulk orders
+    timeLimit: 3600, // 1 hour
+    createdAt: now,
+    difficulty: 'hard', // Shipments are always hard difficulty
+    slot: 100 + shipmentSlot, // Use high slot numbers for shipments
+    isShipment: true,
+  };
 }
 
 function generateOrder(config: GameConfig, level: number, now: number, slot: number): Order | null {
