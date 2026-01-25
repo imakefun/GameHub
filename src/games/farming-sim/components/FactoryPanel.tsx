@@ -204,108 +204,118 @@ export function FactoryPanel({
         })}
       </div>
 
-      {/* Machine Selection */}
+      {/* Machine Selection Modal */}
       {selectedSlot && (
-        <div className="mt-4 p-3 bg-slate-900/50 rounded-lg">
-          <h3 className="text-sm font-bold text-slate-200 mb-2">Buy Machine:</h3>
-          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-            {machines.map(machine => {
-              const canAfford = resources.money >= machine.purchaseCost;
-              const isUnlocked = machine.unlockLevel <= playerLevel;
-              return (
-                <button
-                  key={machine.id}
-                  onClick={() => {
-                    if (canAfford && isUnlocked) {
-                      onBuyMachine(selectedSlot, machine.id);
-                      setSelectedSlot(null);
-                    }
-                  }}
-                  disabled={!canAfford || !isUnlocked}
-                  className={`
-                    p-2 rounded-lg text-center transition-all relative
-                    ${!isUnlocked
-                      ? 'bg-gray-800 text-gray-500'
-                      : canAfford
-                        ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  {!isUnlocked && (
-                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
-                      Lv.{machine.unlockLevel}
-                    </div>
-                  )}
-                  <span className="text-xl block">{isUnlocked ? machine.emoji : '🔒'}</span>
-                  <span className="text-xs block">{machine.name}</span>
-                  <span className="text-xs block text-amber-300">${machine.purchaseCost}</span>
-                </button>
-              );
-            })}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedSlot(null)}>
+          <div className="bg-gradient-to-b from-slate-700 to-slate-800 rounded-lg p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-slate-200">Buy Machine</h3>
+              <button onClick={() => setSelectedSlot(null)} className="text-slate-300 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {machines.map(machine => {
+                const canAfford = resources.money >= machine.purchaseCost;
+                const isUnlocked = machine.unlockLevel <= playerLevel;
+                return (
+                  <button
+                    key={machine.id}
+                    onClick={() => {
+                      if (canAfford && isUnlocked) {
+                        onBuyMachine(selectedSlot, machine.id);
+                        setSelectedSlot(null);
+                      }
+                    }}
+                    disabled={!canAfford || !isUnlocked}
+                    className={`
+                      p-3 rounded-lg text-center transition-all relative
+                      ${!isUnlocked
+                        ? 'bg-gray-800 text-gray-500'
+                        : canAfford
+                          ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    {!isUnlocked && (
+                      <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                        Lv.{machine.unlockLevel}
+                      </div>
+                    )}
+                    <span className="text-2xl block">{isUnlocked ? machine.emoji : '🔒'}</span>
+                    <span className="text-sm block font-medium">{machine.name}</span>
+                    <span className="text-xs block text-amber-300">${machine.purchaseCost}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Recipe Selection */}
+      {/* Recipe Selection Modal */}
       {selectedMachineForRecipe && (() => {
         const slot = machineSlots.find(s => s.id === selectedMachineForRecipe);
         const machine = slot ? machines.find(m => m.id === slot.machineId) : null;
         if (!machine) return null;
 
         return (
-          <div className="mt-4 p-3 bg-slate-900/50 rounded-lg">
-            <h3 className="text-sm font-bold text-slate-200 mb-2">Select Recipe:</h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {machine.recipes.map((recipe, recipeIndex) => {
-                const canMake = canMakeRecipe(machine, recipeIndex);
-                const isRecipeUnlocked = recipe.unlockLevel <= playerLevel;
-                return (
-                  <button
-                    key={recipeIndex}
-                    onClick={() => {
-                      if (canMake && isRecipeUnlocked) {
-                        onStartProcessing(selectedMachineForRecipe, recipeIndex);
-                        setSelectedMachineForRecipe(null);
-                      }
-                    }}
-                    disabled={!canMake || !isRecipeUnlocked}
-                    className={`
-                      w-full p-2 rounded-lg text-left transition-all relative
-                      ${!isRecipeUnlocked
-                        ? 'bg-gray-800 text-gray-500'
-                        : canMake
-                          ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                      }
-                    `}
-                  >
-                    {!isRecipeUnlocked && (
-                      <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
-                        Lv.{recipe.unlockLevel}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        {recipe.inputs.map((input, i) => (
-                          <span key={i} className="text-sm">
-                            {isRecipeUnlocked ? getProductEmoji(input.itemId) : '?'}×{input.amount}
-                            {i < recipe.inputs.length - 1 && ' +'}
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedMachineForRecipe(null)}>
+            <div className="bg-gradient-to-b from-slate-700 to-slate-800 rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-bold text-slate-200">{machine.emoji} {machine.name}</h3>
+                <button onClick={() => setSelectedMachineForRecipe(null)} className="text-slate-300 hover:text-white text-xl">&times;</button>
+              </div>
+              <div className="space-y-2">
+                {machine.recipes.map((recipe, recipeIndex) => {
+                  const canMake = canMakeRecipe(machine, recipeIndex);
+                  const isRecipeUnlocked = recipe.unlockLevel <= playerLevel;
+                  return (
+                    <button
+                      key={recipeIndex}
+                      onClick={() => {
+                        if (canMake && isRecipeUnlocked) {
+                          onStartProcessing(selectedMachineForRecipe, recipeIndex);
+                          setSelectedMachineForRecipe(null);
+                        }
+                      }}
+                      disabled={!canMake || !isRecipeUnlocked}
+                      className={`
+                        w-full p-3 rounded-lg text-left transition-all relative
+                        ${!isRecipeUnlocked
+                          ? 'bg-gray-800 text-gray-500'
+                          : canMake
+                            ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                            : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      {!isRecipeUnlocked && (
+                        <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                          Lv.{recipe.unlockLevel}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {recipe.inputs.map((input, i) => (
+                            <span key={i} className="text-sm">
+                              {isRecipeUnlocked ? getProductEmoji(input.itemId) : '?'}×{input.amount}
+                              {i < recipe.inputs.length - 1 && ' +'}
+                            </span>
+                          ))}
+                          <span className="mx-1">→</span>
+                          <span className="text-sm">
+                            {isRecipeUnlocked ? getProductEmoji(recipe.output.itemId) : '?'}×{recipe.output.amount}
                           </span>
-                        ))}
-                        <span className="mx-1">→</span>
-                        <span className="text-sm">
-                          {isRecipeUnlocked ? getProductEmoji(recipe.output.itemId) : '?'}×{recipe.output.amount}
-                        </span>
+                        </div>
+                        <span className="text-xs text-slate-300">⚡{machine.energyCost}</span>
                       </div>
-                      <span className="text-xs text-slate-300">⚡{machine.energyCost}</span>
-                    </div>
-                    <div className="text-xs text-slate-300 mt-1">
-                      {isRecipeUnlocked ? getProductName(recipe.output.itemId) : '???'} ({recipe.processingTime}s)
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="text-xs text-slate-300 mt-1">
+                        {isRecipeUnlocked ? getProductName(recipe.output.itemId) : '???'} ({recipe.processingTime}s)
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         );

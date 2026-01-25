@@ -175,45 +175,53 @@ export function OrchardPanel({
         })}
       </div>
 
-      {/* Tree Selection */}
+      {/* Tree Selection Modal */}
       {selectedOrchard && (
-        <div className="mt-4 p-3 bg-emerald-900/50 rounded-lg">
-          <h3 className="text-sm font-bold text-emerald-200 mb-2">Plant Tree:</h3>
-          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-            {trees.map(tree => {
-              const canAfford = resources.money >= tree.saplingCost;
-              const isUnlocked = tree.unlockLevel <= playerLevel;
-              return (
-                <button
-                  key={tree.id}
-                  onClick={() => {
-                    if (canAfford && isUnlocked) {
-                      onPlantTree(selectedOrchard, tree.id);
-                      setSelectedOrchard(null);
-                    }
-                  }}
-                  disabled={!canAfford || !isUnlocked}
-                  className={`
-                    p-2 rounded-lg text-center transition-all relative
-                    ${!isUnlocked
-                      ? 'bg-gray-800 text-gray-500'
-                      : canAfford
-                        ? 'bg-green-700 hover:bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  {!isUnlocked && (
-                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
-                      Lv.{tree.unlockLevel}
-                    </div>
-                  )}
-                  <span className="text-xl block">{isUnlocked ? `${tree.emoji} ${tree.fruitEmoji}` : '🔒'}</span>
-                  <span className="text-xs block">{tree.name}</span>
-                  <span className="text-xs block text-amber-300">${tree.saplingCost}</span>
-                </button>
-              );
-            })}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedOrchard(null)}>
+          <div className="bg-gradient-to-b from-emerald-800 to-emerald-900 rounded-lg p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-emerald-200">Plant Tree</h3>
+              <button onClick={() => setSelectedOrchard(null)} className="text-emerald-300 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {trees.map(tree => {
+                const canAfford = resources.money >= tree.saplingCost;
+                const isUnlocked = tree.unlockLevel <= playerLevel;
+                return (
+                  <button
+                    key={tree.id}
+                    onClick={() => {
+                      if (canAfford && isUnlocked) {
+                        onPlantTree(selectedOrchard, tree.id);
+                        setSelectedOrchard(null);
+                      }
+                    }}
+                    disabled={!canAfford || !isUnlocked}
+                    className={`
+                      p-3 rounded-lg text-center transition-all relative
+                      ${!isUnlocked
+                        ? 'bg-gray-800 text-gray-500'
+                        : canAfford
+                          ? 'bg-green-700 hover:bg-green-600 text-white'
+                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    {!isUnlocked && (
+                      <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                        Lv.{tree.unlockLevel}
+                      </div>
+                    )}
+                    <span className="text-2xl block">{isUnlocked ? `${tree.emoji}` : '🔒'}</span>
+                    <span className="text-sm block font-medium">{tree.name}</span>
+                    <span className="text-xs block text-amber-300">${tree.saplingCost}</span>
+                    {isUnlocked && (
+                      <span className="text-xs block text-emerald-300">Yields: {tree.fruitEmoji}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

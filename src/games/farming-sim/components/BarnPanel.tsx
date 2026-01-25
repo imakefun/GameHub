@@ -206,52 +206,57 @@ export function BarnPanel({
         })}
       </div>
 
-      {/* Animal Selection */}
+      {/* Animal Selection Modal */}
       {selectedPen && (
-        <div className="mt-4 p-3 bg-red-900/50 rounded-lg">
-          <h3 className="text-sm font-bold text-red-200 mb-2">Buy Animal:</h3>
-          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-            {animals.map(animal => {
-              const canAfford = resources.money >= animal.purchaseCost;
-              const isUnlocked = animal.unlockLevel <= playerLevel;
-              const animalFeedInfo = getFeedInfo(animal.feedType);
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedPen(null)}>
+          <div className="bg-gradient-to-b from-red-800 to-red-900 rounded-lg p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-red-200">Buy Animal</h3>
+              <button onClick={() => setSelectedPen(null)} className="text-red-300 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {animals.map(animal => {
+                const canAfford = resources.money >= animal.purchaseCost;
+                const isUnlocked = animal.unlockLevel <= playerLevel;
+                const animalFeedInfo = getFeedInfo(animal.feedType);
 
-              return (
-                <button
-                  key={animal.id}
-                  onClick={() => {
-                    if (canAfford && isUnlocked) {
-                      onBuyAnimal(selectedPen, animal.id);
-                      setSelectedPen(null);
-                    }
-                  }}
-                  disabled={!canAfford || !isUnlocked}
-                  className={`
-                    p-2 rounded-lg text-center transition-all relative
-                    ${!isUnlocked
-                      ? 'bg-gray-800 text-gray-500'
-                      : canAfford
-                        ? 'bg-green-700 hover:bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  {!isUnlocked && (
-                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
-                      Lv.{animal.unlockLevel}
-                    </div>
-                  )}
-                  <span className="text-2xl block">{isUnlocked ? animal.emoji : '🔒'}</span>
-                  <span className="text-xs block">{animal.name}</span>
-                  <span className="text-xs block text-amber-300">${animal.purchaseCost}</span>
-                  {isUnlocked && animal.feedType !== 'none' && (
-                    <span className="text-xs block text-red-300">
-                      Needs: {animalFeedInfo.emoji}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={animal.id}
+                    onClick={() => {
+                      if (canAfford && isUnlocked) {
+                        onBuyAnimal(selectedPen, animal.id);
+                        setSelectedPen(null);
+                      }
+                    }}
+                    disabled={!canAfford || !isUnlocked}
+                    className={`
+                      p-3 rounded-lg text-center transition-all relative
+                      ${!isUnlocked
+                        ? 'bg-gray-800 text-gray-500'
+                        : canAfford
+                          ? 'bg-green-700 hover:bg-green-600 text-white'
+                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    {!isUnlocked && (
+                      <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                        Lv.{animal.unlockLevel}
+                      </div>
+                    )}
+                    <span className="text-2xl block">{isUnlocked ? animal.emoji : '🔒'}</span>
+                    <span className="text-sm block font-medium">{animal.name}</span>
+                    <span className="text-xs block text-amber-300">${animal.purchaseCost}</span>
+                    {isUnlocked && animal.feedType !== 'none' && (
+                      <span className="text-xs block text-red-300">
+                        Needs: {animalFeedInfo.emoji}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
