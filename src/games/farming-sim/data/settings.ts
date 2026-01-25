@@ -21,20 +21,20 @@ export const premiumSlotCosts = [1000, 5000, 10000, 25000];
 
 // Level configuration - defines what unlocks at each level
 export const levels: LevelConfig[] = [
-  { level: 1, xpRequired: 0, unlocksFields: 2 },
-  { level: 2, xpRequired: 100, unlocksFields: 3, unlocksPens: 1, unlocksMachineSlots: 3 },
+  { level: 1, xpRequired: 0, unlocksFields: 2, unlocksOrders: 3 },
+  { level: 2, xpRequired: 100, unlocksFields: 3, unlocksPens: 1, unlocksMachineSlots: 3, unlocksOrders: 4 },
   { level: 3, xpRequired: 250, unlocksOrchards: 1 },
-  { level: 4, xpRequired: 450, unlocksFields: 4, unlocksMachineSlots: 4 },
+  { level: 4, xpRequired: 450, unlocksFields: 4, unlocksMachineSlots: 4, unlocksOrders: 5 },
   { level: 5, xpRequired: 700, unlocksPens: 2 },
-  { level: 6, xpRequired: 1000, unlocksOrchards: 2 },
+  { level: 6, xpRequired: 1000, unlocksOrchards: 2, unlocksOrders: 6 },
   { level: 7, xpRequired: 1350, unlocksFields: 5, unlocksPens: 3 },
-  { level: 8, xpRequired: 1750, unlocksMachineSlots: 5, unlocksOrchards: 3 },
+  { level: 8, xpRequired: 1750, unlocksMachineSlots: 5, unlocksOrchards: 3, unlocksOrders: 7 },
   { level: 9, xpRequired: 2200, unlocksPens: 4 },
-  { level: 10, xpRequired: 2700, unlocksFields: 6, unlocksMachineSlots: 6 },
+  { level: 10, xpRequired: 2700, unlocksFields: 6, unlocksMachineSlots: 6, unlocksOrders: 8 },
   { level: 11, xpRequired: 3250, unlocksOrchards: 4 },
-  { level: 12, xpRequired: 3850 },
+  { level: 12, xpRequired: 3850, unlocksOrders: 10 },
   { level: 13, xpRequired: 4500 },
-  { level: 14, xpRequired: 5200 },
+  { level: 14, xpRequired: 5200, unlocksOrders: 12 },
   { level: 15, xpRequired: 6000 },
 ];
 

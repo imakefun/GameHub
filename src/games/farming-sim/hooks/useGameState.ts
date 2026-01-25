@@ -226,10 +226,22 @@ function initializeState(config: GameConfig): GameState {
   };
 }
 
+// Get max orders based on player level (scales from 3 to 12)
+function getMaxOrdersForLevel(config: GameConfig, level: number): number {
+  let maxOrders = 3; // Base value
+  for (const lvl of config.levels) {
+    if (lvl.level <= level && lvl.unlocksOrders !== undefined) {
+      maxOrders = lvl.unlocksOrders;
+    }
+  }
+  return maxOrders;
+}
+
 // Generate orders based on player level
 function generateAllOrders(config: GameConfig, level: number, now: number): Order[] {
   const orders: Order[] = [];
-  for (let slot = 0; slot < config.settings.maxOrders; slot++) {
+  const maxOrders = getMaxOrdersForLevel(config, level);
+  for (let slot = 0; slot < maxOrders; slot++) {
     const order = generateOrder(config, level, now, slot);
     if (order) orders.push(order);
   }
@@ -238,15 +250,19 @@ function generateAllOrders(config: GameConfig, level: number, now: number): Orde
 
 function generateOrder(config: GameConfig, level: number, now: number, slot: number): Order | null {
   // Determine difficulty based on slot and level
+  // Distribute difficulties across slots: ~40% easy, ~35% medium, ~25% hard
   let difficulty: OrderDifficulty;
   if (level < 3) {
     difficulty = 'easy';
   } else if (level < 6) {
-    difficulty = slot === 0 ? 'easy' : slot === 1 ? 'medium' : 'easy';
+    // Low level: mostly easy with some medium
+    difficulty = slot % 3 === 0 ? 'easy' : slot % 3 === 1 ? 'medium' : 'easy';
   } else if (level < 10) {
-    difficulty = slot === 0 ? 'easy' : slot === 1 ? 'medium' : 'hard';
+    // Mid level: mix of all
+    difficulty = slot % 3 === 0 ? 'easy' : slot % 3 === 1 ? 'medium' : 'hard';
   } else {
-    difficulty = slot === 0 ? 'medium' : slot === 1 ? 'hard' : 'hard';
+    // High level: harder mix
+    difficulty = slot % 4 === 0 ? 'easy' : slot % 4 <= 2 ? 'medium' : 'hard';
   }
 
   // Get available products based on level

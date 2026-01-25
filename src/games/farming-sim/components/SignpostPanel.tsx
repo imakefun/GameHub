@@ -67,13 +67,12 @@ export function SignpostPanel({
       </div>
 
       {orders.length === 0 ? (
-        <div className="text-center py-8">
-          <span className="text-4xl block mb-2">📭</span>
-          <span className="text-amber-200">No orders yet...</span>
-          <div className="text-xs text-amber-300 mt-1">New orders appear periodically</div>
+        <div className="text-center py-6">
+          <span className="text-3xl block mb-2">📭</span>
+          <span className="text-amber-200 text-sm">No orders yet...</span>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {orders.map(order => {
             const canComplete = canCompleteOrder(order);
             const quick = isQuickCompletion(order);
@@ -83,25 +82,25 @@ export function SignpostPanel({
               <div
                 key={order.id}
                 className={`
-                  p-3 rounded-lg
+                  p-2 rounded-lg text-xs
                   ${canComplete ? 'bg-green-700' : 'bg-amber-900/50'}
                 `}
               >
-                {/* Customer */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{order.customerEmoji}</span>
-                    <span className="text-white font-medium">{order.customerName}</span>
+                {/* Customer & Timer Row */}
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-base">{order.customerEmoji}</span>
+                    <span className="text-white font-medium truncate max-w-[80px]">{order.customerName}</span>
                   </div>
-                  <div className={`text-xs px-2 py-1 rounded ${
+                  <div className={`px-1.5 py-0.5 rounded text-xs ${
                     timeRemaining === 'Expired' ? 'bg-red-600' : 'bg-amber-600'
                   }`}>
-                    ⏱️ {timeRemaining}
+                    {timeRemaining}
                   </div>
                 </div>
 
                 {/* Items requested */}
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div className="flex flex-wrap gap-1 mb-1">
                   {order.items.map((item, i) => {
                     const info = getProductInfo(item.itemId);
                     const have = inventory[item.itemId] || 0;
@@ -111,31 +110,30 @@ export function SignpostPanel({
                       <div
                         key={i}
                         className={`
-                          px-2 py-1 rounded text-sm
+                          px-1.5 py-0.5 rounded text-xs
                           ${hasEnough ? 'bg-green-600 text-white' : 'bg-red-600/50 text-red-200'}
                         `}
+                        title={`${info.name} (have ${have})`}
                       >
-                        {info.emoji} {item.amount} {info.name}
-                        <span className="text-xs ml-1">({have})</span>
+                        {info.emoji}{item.amount}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Reward */}
+                {/* Reward & Actions */}
                 <div className="flex items-center justify-between">
-                  <div className="text-sm">
-                    <span className="text-amber-200">Reward: </span>
+                  <div>
                     <span className="text-yellow-300 font-bold">${order.reward}</span>
                     {quick && (
-                      <span className="text-green-300 ml-1">+${order.bonusReward} bonus!</span>
+                      <span className="text-green-300 ml-1">+${order.bonusReward}</span>
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-1">
                     <button
                       onClick={() => onDismiss(order.id)}
-                      className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs"
+                      className="px-1.5 py-0.5 bg-red-600 hover:bg-red-500 text-white rounded text-xs"
                     >
                       ✕
                     </button>
@@ -143,14 +141,14 @@ export function SignpostPanel({
                       onClick={() => onComplete(order.id)}
                       disabled={!canComplete}
                       className={`
-                        px-3 py-1 rounded text-sm font-bold
+                        px-2 py-0.5 rounded text-xs font-bold
                         ${canComplete
                           ? 'bg-green-500 hover:bg-green-400 text-white'
                           : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                         }
                       `}
                     >
-                      Complete
+                      ✓
                     </button>
                   </div>
                 </div>
