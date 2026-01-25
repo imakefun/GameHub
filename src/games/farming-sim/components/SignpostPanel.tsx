@@ -89,16 +89,28 @@ export function SignpostPanel({
                   return (
                     <div
                       key={order.id}
+                      onClick={() => canComplete && onComplete(order.id)}
                       className={`
-                        p-2 rounded-lg text-xs border-2
+                        relative p-2 rounded-lg text-xs border-2 transition-all
                         ${canComplete
-                          ? 'bg-green-700 border-green-500'
+                          ? 'bg-green-700 border-green-500 cursor-pointer hover:bg-green-600 hover:scale-[1.02]'
                           : 'bg-blue-900/50 border-blue-600'
                         }
                       `}
                     >
+                      {/* Dismiss button - top right */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDismiss(order.id);
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-500 text-white rounded text-xs leading-none"
+                      >
+                        ✕
+                      </button>
+
                       {/* Customer & Timer Row */}
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-1 pr-6">
                         <div className="flex items-center gap-1 min-w-0">
                           <span className="text-base flex-shrink-0">{order.customerEmoji}</span>
                           <span className="text-white font-medium text-xs">{order.customerName}</span>
@@ -132,31 +144,12 @@ export function SignpostPanel({
                         })}
                       </div>
 
-                      {/* Reward & Actions */}
+                      {/* Reward */}
                       <div className="flex items-center justify-between">
                         <span className="text-yellow-300 font-bold">${order.reward.toLocaleString()}</span>
-
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => onDismiss(order.id)}
-                            className="px-1.5 py-0.5 bg-red-600 hover:bg-red-500 text-white rounded text-xs"
-                          >
-                            ✕
-                          </button>
-                          <button
-                            onClick={() => onComplete(order.id)}
-                            disabled={!canComplete}
-                            className={`
-                              px-2 py-0.5 rounded text-xs font-bold
-                              ${canComplete
-                                ? 'bg-green-500 hover:bg-green-400 text-white'
-                                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              }
-                            `}
-                          >
-                            ✓
-                          </button>
-                        </div>
+                        {canComplete && (
+                          <span className="text-green-200 text-xs">Tap to deliver</span>
+                        )}
                       </div>
                     </div>
                   );
@@ -181,13 +174,28 @@ export function SignpostPanel({
                   return (
                     <div
                       key={order.id}
+                      onClick={() => canComplete && onComplete(order.id)}
                       className={`
-                        p-2 rounded-lg text-xs
-                        ${canComplete ? 'bg-green-700' : 'bg-amber-900/50'}
+                        relative p-2 rounded-lg text-xs transition-all
+                        ${canComplete
+                          ? 'bg-green-700 cursor-pointer hover:bg-green-600 hover:scale-[1.02]'
+                          : 'bg-amber-900/50'
+                        }
                       `}
                     >
+                      {/* Dismiss button - top right */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDismiss(order.id);
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-500 text-white rounded text-xs leading-none"
+                      >
+                        ✕
+                      </button>
+
                       {/* Customer Row */}
-                      <div className="flex items-center gap-1 mb-1">
+                      <div className="flex items-center gap-1 mb-1 pr-6">
                         <span className="text-base flex-shrink-0">{order.customerEmoji}</span>
                         <span className="text-white font-medium text-xs">{order.customerName}</span>
                       </div>
@@ -214,7 +222,7 @@ export function SignpostPanel({
                         })}
                       </div>
 
-                      {/* Reward & Actions */}
+                      {/* Reward */}
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-yellow-300 font-bold">${order.reward}</span>
@@ -222,28 +230,9 @@ export function SignpostPanel({
                             <span className="text-green-300 ml-1">+${order.bonusReward}</span>
                           )}
                         </div>
-
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => onDismiss(order.id)}
-                            className="px-1.5 py-0.5 bg-red-600 hover:bg-red-500 text-white rounded text-xs"
-                          >
-                            ✕
-                          </button>
-                          <button
-                            onClick={() => onComplete(order.id)}
-                            disabled={!canComplete}
-                            className={`
-                              px-2 py-0.5 rounded text-xs font-bold
-                              ${canComplete
-                                ? 'bg-green-500 hover:bg-green-400 text-white'
-                                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              }
-                            `}
-                          >
-                            ✓
-                          </button>
-                        </div>
+                        {canComplete && (
+                          <span className="text-green-200 text-xs">Tap to deliver</span>
+                        )}
                       </div>
                     </div>
                   );
