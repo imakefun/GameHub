@@ -244,14 +244,56 @@ function getShipmentSlotsForLevel(level: number): number {
   return 2; // 2 shipment slots at level 12+
 }
 
-// Generate orders based on player level
-function generateAllOrders(config: GameConfig, level: number, now: number): Order[] {
+// Generate only regular orders (not shipments)
+function generateRegularOrders(config: GameConfig, level: number, now: number): Order[] {
   const orders: Order[] = [];
   const maxOrders = getMaxOrdersForLevel(config, level);
   for (let slot = 0; slot < maxOrders; slot++) {
     const order = generateOrder(config, level, now, slot);
     if (order) orders.push(order);
   }
+  return orders;
+}
+
+// Refresh orders while preserving existing shipments
+function refreshOrders(config: GameConfig, level: number, now: number, existingOrders: Order[]): Order[] {
+  // Generate new regular orders
+  const newOrders = generateRegularOrders(config, level, now);
+
+  // Keep existing non-expired shipments
+  const existingShipments = existingOrders.filter(o => {
+    if (!o.isShipment) return false;
+    const elapsed = (now - o.createdAt) / 1000;
+    return elapsed < o.timeLimit; // Keep if not expired
+  });
+
+  // Check how many shipment slots we should have
+  const maxShipments = getShipmentSlotsForLevel(level);
+  const shipmentsToAdd = maxShipments - existingShipments.length;
+
+  // Generate new shipments only for empty slots
+  const newShipments: Order[] = [];
+  if (shipmentsToAdd > 0) {
+    const usedSlots = new Set(existingShipments.map(s => s.slot));
+    let addedCount = 0;
+    for (let i = 0; i < maxShipments && addedCount < shipmentsToAdd; i++) {
+      const slotNum = 100 + i;
+      if (!usedSlots.has(slotNum)) {
+        const shipment = generateShipment(config, level, now, i);
+        if (shipment) {
+          newShipments.push(shipment);
+          addedCount++;
+        }
+      }
+    }
+  }
+
+  return [...newOrders, ...existingShipments, ...newShipments];
+}
+
+// Generate all orders including shipments (for initial load)
+function generateAllOrders(config: GameConfig, level: number, now: number): Order[] {
+  const orders = generateRegularOrders(config, level, now);
 
   // Add shipments for level 10+
   const numShipments = getShipmentSlotsForLevel(level);
@@ -603,10 +645,10 @@ function createGameReducer(config: GameConfig) {
           customer => now < customer.expiresAt
         );
 
-        // Check if orders need to refresh
+        // Check if orders need to refresh (preserves existing shipments)
         const timeSinceRefresh = (now - newState.lastOrderRefresh) / 1000;
         if (timeSinceRefresh >= config.settings.orderRefreshInterval) {
-          newState.orders = generateAllOrders(config, newState.progress.level, now);
+          newState.orders = refreshOrders(config, newState.progress.level, now, newState.orders);
           newState.lastOrderRefresh = now;
         }
 
@@ -1047,7 +1089,7 @@ function createGameReducer(config: GameConfig) {
         const now = Date.now();
         return {
           ...state,
-          orders: generateAllOrders(config, state.progress.level, now),
+          orders: refreshOrders(config, state.progress.level, now, state.orders),
           lastOrderRefresh: now,
         };
       }
