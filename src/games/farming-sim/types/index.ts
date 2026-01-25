@@ -240,11 +240,14 @@ export type GameAction =
   | { type: 'PLANT_CROP'; fieldId: string; cropId: string }
   | { type: 'HARVEST_CROP'; fieldId: string }
   | { type: 'BUY_ANIMAL'; penId: string; animalId: string }
+  | { type: 'SELL_ANIMAL'; penId: string }
   | { type: 'COLLECT_PRODUCT'; penId: string }
   | { type: 'FEED_ANIMAL'; penId: string }
   | { type: 'PLANT_TREE'; orchardId: string; treeId: string }
+  | { type: 'SELL_TREE'; orchardId: string }
   | { type: 'HARVEST_FRUIT'; orchardId: string }
   | { type: 'BUY_MACHINE'; slotId: string; machineId: string }
+  | { type: 'SELL_MACHINE'; slotId: string }
   | { type: 'START_PROCESSING'; slotId: string; recipeIndex: number }
   | { type: 'COLLECT_PROCESSED'; slotId: string }
   | { type: 'COMPLETE_ORDER'; orderId: string }

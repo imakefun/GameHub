@@ -38,6 +38,24 @@ function getPremiumSlotCost(slotType: SlotType, slotIndex: number): number | und
   return premiumSlotCosts[premiumIndex];
 }
 
+// Get required level to unlock a specific slot
+function getRequiredLevelForSlot(slotType: SlotType, slotIndex: number): number | undefined {
+  const key = slotType === 'field' ? 'unlocksFields'
+    : slotType === 'pen' ? 'unlocksPens'
+    : slotType === 'orchard' ? 'unlocksOrchards'
+    : 'unlocksMachineSlots';
+
+  // Find the level that unlocks this slot index
+  for (let i = levels.length - 1; i >= 0; i--) {
+    const lvl = levels[i];
+    const unlocksCount = lvl[key as keyof typeof lvl] as number | undefined;
+    if (unlocksCount !== undefined && slotIndex < unlocksCount) {
+      return lvl.level;
+    }
+  }
+  return undefined; // Premium slot
+}
+
 const STORAGE_KEY = 'farming-sim-save-v2';
 
 // Get unlocked slot count based on level
@@ -667,6 +685,80 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      case 'SELL_MACHINE': {
+        const { slotId } = action;
+        const slot = state.machineSlots.find(s => s.id === slotId);
+        if (!slot || !slot.machineId) return state;
+        // Can't sell while processing
+        if (slot.isProcessing) return state;
+
+        const machine = config.machines.find(m => m.id === slot.machineId);
+        if (!machine) return state;
+
+        const refund = Math.floor(machine.purchaseCost * 0.5);
+
+        return {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: state.resources.money + refund,
+          },
+          machineSlots: state.machineSlots.map(s =>
+            s.id === slotId
+              ? { ...s, machineId: null, currentRecipeIndex: null, startedAt: null, isProcessing: false, isReady: false }
+              : s
+          ),
+        };
+      }
+
+      case 'SELL_ANIMAL': {
+        const { penId } = action;
+        const pen = state.animalPens.find(p => p.id === penId);
+        if (!pen || !pen.animalId) return state;
+
+        const animal = config.animals.find(a => a.id === pen.animalId);
+        if (!animal) return state;
+
+        const refund = Math.floor(animal.purchaseCost * 0.5);
+
+        return {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: state.resources.money + refund,
+          },
+          animalPens: state.animalPens.map(p =>
+            p.id === penId
+              ? { ...p, animalId: null, lastProducedAt: null, lastFedAt: null, isFed: false, isReady: false }
+              : p
+          ),
+        };
+      }
+
+      case 'SELL_TREE': {
+        const { orchardId } = action;
+        const orchard = state.orchards.find(o => o.id === orchardId);
+        if (!orchard || !orchard.treeId) return state;
+
+        const tree = config.trees.find(t => t.id === orchard.treeId);
+        if (!tree) return state;
+
+        const refund = Math.floor(tree.saplingCost * 0.5);
+
+        return {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: state.resources.money + refund,
+          },
+          orchards: state.orchards.map(o =>
+            o.id === orchardId
+              ? { ...o, treeId: null, plantedAt: null, lastHarvestedAt: null, isMature: false, isReady: false }
+              : o
+          ),
+        };
+      }
+
       case 'START_PROCESSING': {
         const { slotId, recipeIndex } = action;
         const slot = state.machineSlots.find(s => s.id === slotId);
@@ -995,6 +1087,18 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'BUY_MACHINE', slotId, machineId });
   }, []);
 
+  const sellMachine = useCallback((slotId: string) => {
+    dispatch({ type: 'SELL_MACHINE', slotId });
+  }, []);
+
+  const sellAnimal = useCallback((penId: string) => {
+    dispatch({ type: 'SELL_ANIMAL', penId });
+  }, []);
+
+  const sellTree = useCallback((orchardId: string) => {
+    dispatch({ type: 'SELL_TREE', orchardId });
+  }, []);
+
   const startProcessing = useCallback((slotId: string, recipeIndex: number) => {
     dispatch({ type: 'START_PROCESSING', slotId, recipeIndex });
   }, []);
@@ -1036,11 +1140,14 @@ export function useGameState(config: GameConfig) {
     plantCrop,
     harvestCrop,
     buyAnimal,
+    sellAnimal,
     collectProduct,
     feedAnimal,
     plantTree,
+    sellTree,
     harvestFruit,
     buyMachine,
+    sellMachine,
     startProcessing,
     collectProcessed,
     completeOrder,
@@ -1054,4 +1161,4 @@ export function useGameState(config: GameConfig) {
 }
 
 // Export helpers for UI components
-export { getPremiumSlotCost, MAX_LEVEL_UNLOCKS };
+export { getPremiumSlotCost, getRequiredLevelForSlot, MAX_LEVEL_UNLOCKS };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { MachineSlot, Machine, Resources, Inventory, Product, SlotType } from '../types';
-import { getPremiumSlotCost } from '../hooks/useGameState';
+import { getPremiumSlotCost, getRequiredLevelForSlot } from '../hooks/useGameState';
 
 interface FactoryPanelProps {
   machineSlots: MachineSlot[];
@@ -10,6 +10,7 @@ interface FactoryPanelProps {
   inventory: Inventory;
   playerLevel: number;
   onBuyMachine: (slotId: string, machineId: string) => void;
+  onSellMachine: (slotId: string) => void;
   onStartProcessing: (slotId: string, recipeIndex: number) => void;
   onCollect: (slotId: string) => void;
   onBuySlot: (slotType: SlotType, slotIndex: number) => void;
@@ -23,6 +24,7 @@ export function FactoryPanel({
   inventory,
   playerLevel,
   onBuyMachine,
+  onSellMachine,
   onStartProcessing,
   onCollect,
   onBuySlot,
@@ -72,6 +74,7 @@ export function FactoryPanel({
           const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!slot.unlocked) {
+            const requiredLevel = getRequiredLevelForSlot('machine', index);
             return (
               <div
                 key={slot.id}
@@ -105,7 +108,9 @@ export function FactoryPanel({
                   ) : (
                     <>
                       <span className="text-3xl text-gray-600">🔒</span>
-                      <span className="text-xs text-gray-500">Level up</span>
+                      {requiredLevel && (
+                        <span className="text-xs text-gray-500">Lv.{requiredLevel}</span>
+                      )}
                     </>
                   )}
                 </div>
@@ -173,7 +178,19 @@ export function FactoryPanel({
                   )}
 
                   {!slot.isProcessing && !slot.isReady && (
-                    <span className="text-xs text-slate-400 mt-1">Tap to use</span>
+                    <div className="flex gap-2 mt-1 flex-wrap justify-center">
+                      <span className="text-xs text-slate-400">Tap to use</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSellMachine(slot.id);
+                        }}
+                        className="px-2 py-0.5 bg-red-800 hover:bg-red-700 text-red-200 rounded text-xs"
+                        title={`Sell for $${Math.floor(machine.purchaseCost * 0.5)}`}
+                      >
+                        Sell
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Orchard, Tree, Resources, SlotType } from '../types';
-import { getPremiumSlotCost } from '../hooks/useGameState';
+import { getPremiumSlotCost, getRequiredLevelForSlot } from '../hooks/useGameState';
 
 interface OrchardPanelProps {
   orchards: Orchard[];
@@ -8,6 +8,7 @@ interface OrchardPanelProps {
   resources: Resources;
   playerLevel: number;
   onPlantTree: (orchardId: string, treeId: string) => void;
+  onSellTree: (orchardId: string) => void;
   onHarvest: (orchardId: string) => void;
   onBuySlot: (slotType: SlotType, slotIndex: number) => void;
 }
@@ -18,6 +19,7 @@ export function OrchardPanel({
   resources,
   playerLevel,
   onPlantTree,
+  onSellTree,
   onHarvest,
   onBuySlot,
 }: OrchardPanelProps) {
@@ -52,6 +54,7 @@ export function OrchardPanel({
           const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!orchard.unlocked) {
+            const requiredLevel = getRequiredLevelForSlot('orchard', index);
             return (
               <div
                 key={orchard.id}
@@ -85,7 +88,9 @@ export function OrchardPanel({
                   ) : (
                     <>
                       <span className="text-3xl text-gray-600">🔒</span>
-                      <span className="text-xs text-gray-500">Level up</span>
+                      {requiredLevel && (
+                        <span className="text-xs text-gray-500">Lv.{requiredLevel}</span>
+                      )}
                     </>
                   )}
                 </div>
@@ -148,6 +153,16 @@ export function OrchardPanel({
                   ) : (
                     <span className="text-sm text-yellow-300 font-bold mt-1">Harvest!</span>
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSellTree(orchard.id);
+                    }}
+                    className="mt-2 px-2 py-1 bg-red-800 hover:bg-red-700 text-red-200 rounded text-xs"
+                    title={`Sell for $${Math.floor(tree.saplingCost * 0.5)}`}
+                  >
+                    Sell
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-20">

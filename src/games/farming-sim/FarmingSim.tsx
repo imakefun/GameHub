@@ -64,11 +64,14 @@ function FarmingSimContent() {
     plantCrop,
     harvestCrop,
     buyAnimal,
+    sellAnimal,
     collectProduct,
     feedAnimal,
     plantTree,
+    sellTree,
     harvestFruit,
     buyMachine,
+    sellMachine,
     startProcessing,
     collectProcessed,
     completeOrder,
@@ -208,7 +211,7 @@ function FarmingSimContent() {
 
       {/* Tab Navigation */}
       <div className="max-w-4xl mx-auto px-4 mb-3">
-        <div className="flex gap-1 overflow-x-auto pb-2">
+        <div className="flex gap-1 overflow-x-auto pb-2 pt-2 px-1">
           {tabs.map(tab => {
             const notifCount = getNotificationCount(tab.id);
             return (
@@ -260,6 +263,7 @@ function FarmingSimContent() {
             inventory={state.inventory}
             playerLevel={state.progress.level}
             onBuyAnimal={buyAnimal}
+            onSellAnimal={sellAnimal}
             onCollect={collectProduct}
             onFeed={feedAnimal}
             onBuySlot={buySlot}
@@ -273,6 +277,7 @@ function FarmingSimContent() {
             resources={state.resources}
             playerLevel={state.progress.level}
             onPlantTree={plantTree}
+            onSellTree={sellTree}
             onHarvest={harvestFruit}
             onBuySlot={buySlot}
           />
@@ -287,6 +292,7 @@ function FarmingSimContent() {
             inventory={state.inventory}
             playerLevel={state.progress.level}
             onBuyMachine={buyMachine}
+            onSellMachine={sellMachine}
             onStartProcessing={startProcessing}
             onCollect={collectProcessed}
             onBuySlot={buySlot}
