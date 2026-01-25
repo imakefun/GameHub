@@ -1,22 +1,39 @@
-import type { Resources } from '../types';
+import type { Resources, Inventory } from '../types';
+import { getStorageCapacity, getTotalInventoryCount } from '../hooks/useGameState';
 
 interface ResourceBarProps {
   resources: Resources;
   maxEnergy: number;
+  storageLevel: number;
+  inventory: Inventory;
 }
 
-export function ResourceBar({ resources, maxEnergy }: ResourceBarProps) {
+export function ResourceBar({ resources, maxEnergy, storageLevel, inventory }: ResourceBarProps) {
   const energyPercent = (resources.energy / maxEnergy) * 100;
+  const currentStorage = getTotalInventoryCount(inventory);
+  const maxStorage = getStorageCapacity(storageLevel);
+  const storageFull = currentStorage >= maxStorage;
 
   return (
     <div className="bg-gradient-to-r from-amber-800 to-amber-700 p-3 rounded-lg shadow-lg">
-      <div className="flex items-center justify-between gap-6">
+      <div className="flex items-center justify-between gap-4">
         {/* Money */}
         <div className="flex items-center gap-2">
           <span className="text-2xl">💰</span>
           <div>
             <div className="text-xs text-amber-200 uppercase tracking-wide">Money</div>
             <div className="text-xl font-bold text-white">${resources.money.toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/* Storage */}
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">📦</span>
+          <div>
+            <div className="text-xs text-amber-200 uppercase tracking-wide">Storage</div>
+            <div className={`text-lg font-bold ${storageFull ? 'text-red-400' : 'text-white'}`}>
+              {currentStorage}/{maxStorage}
+            </div>
           </div>
         </div>
 

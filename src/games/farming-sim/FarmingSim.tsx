@@ -207,7 +207,12 @@ function FarmingSimContent() {
 
       {/* Resources */}
       <div className="max-w-4xl mx-auto px-4 py-3">
-        <ResourceBar resources={state.resources} maxEnergy={gameConfig.settings.maxEnergy} />
+        <ResourceBar
+          resources={state.resources}
+          maxEnergy={gameConfig.settings.maxEnergy}
+          storageLevel={state.storageLevel}
+          inventory={state.inventory}
+        />
       </div>
 
       {/* Tab Navigation */}
