@@ -129,45 +129,51 @@ export function FieldsPanel({
         })}
       </div>
 
-      {/* Crop Selection */}
+      {/* Crop Selection Modal */}
       {selectedField && (
-        <div className="mt-4 p-3 bg-amber-900/50 rounded-lg">
-          <h3 className="text-sm font-bold text-amber-200 mb-2">Select Seed:</h3>
-          <div className="grid grid-cols-3 gap-2">
-            {crops.map(crop => {
-              const canAfford = resources.money >= crop.seedCost;
-              const isUnlocked = crop.unlockLevel <= playerLevel;
-              return (
-                <button
-                  key={crop.id}
-                  onClick={() => {
-                    if (canAfford && isUnlocked) {
-                      onPlant(selectedField, crop.id);
-                      setSelectedField(null);
-                    }
-                  }}
-                  disabled={!canAfford || !isUnlocked}
-                  className={`
-                    p-2 rounded-lg text-center transition-all relative
-                    ${!isUnlocked
-                      ? 'bg-gray-800 text-gray-500'
-                      : canAfford
-                        ? 'bg-green-700 hover:bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  {!isUnlocked && (
-                    <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
-                      Lv.{crop.unlockLevel}
-                    </div>
-                  )}
-                  <span className="text-xl block">{isUnlocked ? crop.emoji : '🔒'}</span>
-                  <span className="text-xs block">{crop.name}</span>
-                  <span className="text-xs block text-amber-300">${crop.seedCost}</span>
-                </button>
-              );
-            })}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedField(null)}>
+          <div className="bg-gradient-to-b from-amber-800 to-amber-900 rounded-lg p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-amber-200">Select Seed</h3>
+              <button onClick={() => setSelectedField(null)} className="text-amber-300 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {crops.map(crop => {
+                const canAfford = resources.money >= crop.seedCost;
+                const isUnlocked = crop.unlockLevel <= playerLevel;
+                return (
+                  <button
+                    key={crop.id}
+                    onClick={() => {
+                      if (canAfford && isUnlocked) {
+                        onPlant(selectedField, crop.id);
+                        setSelectedField(null);
+                      }
+                    }}
+                    disabled={!canAfford || !isUnlocked}
+                    className={`
+                      p-3 rounded-lg text-center transition-all relative
+                      ${!isUnlocked
+                        ? 'bg-gray-800 text-gray-500'
+                        : canAfford
+                          ? 'bg-green-700 hover:bg-green-600 text-white'
+                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    {!isUnlocked && (
+                      <div className="absolute top-1 right-1 text-xs bg-gray-700 px-1 rounded">
+                        Lv.{crop.unlockLevel}
+                      </div>
+                    )}
+                    <span className="text-2xl block">{isUnlocked ? crop.emoji : '🔒'}</span>
+                    <span className="text-sm block font-medium">{crop.name}</span>
+                    <span className="text-xs block text-amber-300">${crop.seedCost}</span>
+                    <span className="text-xs block text-amber-400">{crop.growthTime}s</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
