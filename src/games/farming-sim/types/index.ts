@@ -14,6 +14,7 @@ export interface LevelConfig {
   unlocksPens?: number;
   unlocksOrchards?: number;
   unlocksMachineSlots?: number;
+  unlocksOrders?: number; // Max orders at this level
 }
 
 // ============ Crops ============
