@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Star, X, Unlock, Wheat, Tractor, TreeDeciduous, Factory } from 'lucide-react';
-import type { Crop, Animal, Tree, Machine, LevelConfig, GameConfig } from '../types';
+import type { GameConfig } from '../types';
 
 interface LevelUpPopupProps {
   level: number;
