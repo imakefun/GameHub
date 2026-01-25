@@ -24,6 +24,58 @@ const MAX_LEVEL_UNLOCKS = {
   machineSlots: 6,
 };
 
+// Storage constants
+const STORAGE_BASE_CAPACITY = 50;
+const STORAGE_PER_UPGRADE = 25;
+const STORAGE_MAX_LEVEL = 20;
+
+// Storage upgrade costs - increasing costs for 20 tiers
+const STORAGE_UPGRADE_COSTS = [
+  500,      // Level 1: 75 capacity
+  1000,     // Level 2: 100 capacity
+  2000,     // Level 3: 125 capacity
+  3500,     // Level 4: 150 capacity
+  5000,     // Level 5: 175 capacity
+  7500,     // Level 6: 200 capacity
+  10000,    // Level 7: 225 capacity
+  15000,    // Level 8: 250 capacity
+  20000,    // Level 9: 275 capacity
+  30000,    // Level 10: 300 capacity
+  40000,    // Level 11: 325 capacity
+  55000,    // Level 12: 350 capacity
+  75000,    // Level 13: 375 capacity
+  100000,   // Level 14: 400 capacity
+  130000,   // Level 15: 425 capacity
+  175000,   // Level 16: 450 capacity
+  225000,   // Level 17: 475 capacity
+  300000,   // Level 18: 500 capacity
+  400000,   // Level 19: 525 capacity
+  500000,   // Level 20: 550 capacity
+];
+
+// Get storage capacity for a given level
+function getStorageCapacity(storageLevel: number): number {
+  return STORAGE_BASE_CAPACITY + storageLevel * STORAGE_PER_UPGRADE;
+}
+
+// Get cost to upgrade storage (undefined if max level)
+function getStorageUpgradeCost(currentLevel: number): number | undefined {
+  if (currentLevel >= STORAGE_MAX_LEVEL) return undefined;
+  return STORAGE_UPGRADE_COSTS[currentLevel];
+}
+
+// Get total items in inventory
+function getTotalInventoryCount(inventory: { [key: string]: number }): number {
+  return Object.values(inventory).reduce((sum, count) => sum + count, 0);
+}
+
+// Check if there's room to add items to inventory
+function hasStorageSpace(inventory: { [key: string]: number }, storageLevel: number, amountToAdd: number): boolean {
+  const currentCount = getTotalInventoryCount(inventory);
+  const capacity = getStorageCapacity(storageLevel);
+  return currentCount + amountToAdd <= capacity;
+}
+
 // Get premium slot cost (returns undefined if not a premium slot)
 function getPremiumSlotCost(slotType: SlotType, slotIndex: number): number | undefined {
   const maxLevelUnlocks = slotType === 'field' ? MAX_LEVEL_UNLOCKS.fields
@@ -151,6 +203,7 @@ function initializeState(config: GameConfig): GameState {
       xpToNextLevel: getXpForLevel(2),
     },
     inventory: {},
+    storageLevel: 0,
     fields,
     animalPens,
     orchards,
@@ -502,6 +555,9 @@ function createGameReducer(config: GameConfig) {
         const crop = config.crops.find(c => c.id === field.cropId);
         if (!crop) return state;
 
+        // Check storage capacity
+        if (!hasStorageSpace(state.inventory, state.storageLevel, crop.yieldAmount)) return state;
+
         const currentAmount = state.inventory[crop.id] || 0;
         let newState = {
           ...state,
@@ -555,6 +611,9 @@ function createGameReducer(config: GameConfig) {
 
         const animal = config.animals.find(a => a.id === pen.animalId);
         if (!animal) return state;
+
+        // Check storage capacity
+        if (!hasStorageSpace(state.inventory, state.storageLevel, 1)) return state;
 
         const currentAmount = state.inventory[animal.produces] || 0;
         let newState = {
@@ -635,6 +694,9 @@ function createGameReducer(config: GameConfig) {
 
         const tree = config.trees.find(t => t.id === orchard.treeId);
         if (!tree) return state;
+
+        // Check storage capacity
+        if (!hasStorageSpace(state.inventory, state.storageLevel, tree.yieldAmount)) return state;
 
         const fruitId = tree.id.replace('_tree', '').replace('_vine', '');
         const currentAmount = state.inventory[fruitId] || 0;
@@ -807,6 +869,9 @@ function createGameReducer(config: GameConfig) {
 
         const recipe = machine.recipes[slot.currentRecipeIndex];
         if (!recipe) return state;
+
+        // Check storage capacity
+        if (!hasStorageSpace(state.inventory, state.storageLevel, recipe.output.amount)) return state;
 
         const currentAmount = state.inventory[recipe.output.itemId] || 0;
 
@@ -1007,6 +1072,21 @@ function createGameReducer(config: GameConfig) {
         return newState;
       }
 
+      case 'UPGRADE_STORAGE': {
+        const cost = getStorageUpgradeCost(state.storageLevel);
+        if (cost === undefined) return state; // Max level reached
+        if (state.resources.money < cost) return state;
+
+        return {
+          ...state,
+          resources: {
+            ...state.resources,
+            money: state.resources.money - cost,
+          },
+          storageLevel: state.storageLevel + 1,
+        };
+      }
+
       case 'RESET_GAME': {
         localStorage.removeItem(STORAGE_KEY);
         return initializeState(config);
@@ -1134,6 +1214,10 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'RESET_GAME' });
   }, []);
 
+  const upgradeStorage = useCallback(() => {
+    dispatch({ type: 'UPGRADE_STORAGE' });
+  }, []);
+
   return {
     state,
     plantCrop,
@@ -1156,8 +1240,17 @@ export function useGameState(config: GameConfig) {
     sellItem,
     buySlot,
     resetGame,
+    upgradeStorage,
   };
 }
 
 // Export helpers for UI components
-export { getPremiumSlotCost, getRequiredLevelForSlot, MAX_LEVEL_UNLOCKS };
+export {
+  getPremiumSlotCost,
+  getRequiredLevelForSlot,
+  MAX_LEVEL_UNLOCKS,
+  getStorageCapacity,
+  getStorageUpgradeCost,
+  getTotalInventoryCount,
+  STORAGE_MAX_LEVEL,
+};

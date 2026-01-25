@@ -81,6 +81,7 @@ function FarmingSimContent() {
     sellItem,
     buySlot,
     resetGame,
+    upgradeStorage,
   } = useGameState(gameConfig);
 
   // Count notifications for tabs
@@ -325,6 +326,9 @@ function FarmingSimContent() {
           <InventoryPanel
             inventory={state.inventory}
             products={gameConfig.products}
+            storageLevel={state.storageLevel}
+            resources={state.resources}
+            onUpgradeStorage={upgradeStorage}
           />
         )}
 

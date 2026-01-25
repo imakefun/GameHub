@@ -193,6 +193,7 @@ export interface GameState {
   resources: Resources;
   progress: PlayerProgress;
   inventory: Inventory;
+  storageLevel: number; // 0 = base (50 items), each level adds 25 capacity
   fields: Field[];
   animalPens: AnimalPen[];
   orchards: Orchard[];
@@ -256,6 +257,7 @@ export type GameAction =
   | { type: 'SERVE_CUSTOMER'; customerId: string }
   | { type: 'SELL_ITEM'; itemId: string; amount: number }
   | { type: 'BUY_SLOT'; slotType: SlotType; slotIndex: number }
+  | { type: 'UPGRADE_STORAGE' }
   | { type: 'RESET_GAME' };
 
 // ============ Helpers ============
