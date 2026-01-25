@@ -9,6 +9,7 @@ interface TargetsPanelProps {
   targets: TargetCompany[];
   pendingDeals: AcquisitionDeal[];
   capital: number;
+  maxDebtPercent: number;
   onMakeOffer: (companyId: string, offer: number, debtPct: number) => void;
   onCancelDeal: (dealIndex: number) => void;
   onRefreshTargets: () => void;
@@ -30,13 +31,14 @@ function formatMoney(amount: number): string {
 interface TargetCardProps {
   target: TargetCompany;
   capital: number;
+  maxDebtPercent: number;
   onMakeOffer: (offer: number, debtPct: number) => void;
 }
 
-function TargetCard({ target, capital, onMakeOffer }: TargetCardProps) {
+function TargetCard({ target, capital, maxDebtPercent, onMakeOffer }: TargetCardProps) {
   const [showOffer, setShowOffer] = useState(false);
   const [offerAmount, setOfferAmount] = useState(target.basePrice);
-  const [debtPercent, setDebtPercent] = useState(60);
+  const [debtPercent, setDebtPercent] = useState(Math.min(50, maxDebtPercent));
 
   const equityNeeded = offerAmount * (1 - debtPercent / 100);
   const canAfford = equityNeeded <= capital;
@@ -158,12 +160,17 @@ function TargetCard({ target, capital, onMakeOffer }: TargetCardProps) {
 
                 {/* Debt Financing */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Debt Financing (LBO)</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Debt Financing (LBO)
+                    {maxDebtPercent < 85 && (
+                      <span className="text-xs text-yellow-400 ml-2">(Limited to {maxDebtPercent}% for new funds)</span>
+                    )}
+                  </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="range"
                       min={0}
-                      max={90}
+                      max={maxDebtPercent}
                       step={5}
                       value={debtPercent}
                       onChange={(e) => setDebtPercent(Number(e.target.value))}
@@ -240,6 +247,7 @@ export function TargetsPanel({
   targets,
   pendingDeals,
   capital,
+  maxDebtPercent,
   onMakeOffer,
   onCancelDeal,
   onRefreshTargets,
@@ -331,6 +339,7 @@ export function TargetsPanel({
               key={target.id}
               target={target}
               capital={capital}
+              maxDebtPercent={maxDebtPercent}
               onMakeOffer={(offer, debtPct) => onMakeOffer(target.id, offer, debtPct)}
             />
           ))}

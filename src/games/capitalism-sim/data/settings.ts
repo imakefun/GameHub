@@ -9,8 +9,95 @@ export const defaultSettings: GameSettings = {
   baseManagementFeeRate: 0.02, // 2% management fee on AUM
   maxPortfolioSize: 10, // Max companies you can own
   bankruptcyThreshold: 3, // Debt-to-revenue ratio triggers bankruptcy
-  initialTargetCount: 6, // Number of acquisition targets shown initially
+  initialTargetCount: 8, // Number of acquisition targets shown initially (ensure 5+ choices)
+  maxDebtPercentNewPlayer: 50, // New players can only use up to 50% debt financing
+  maxDebtPercentExperienced: 85, // Experienced players (3+ deals) can use up to 85%
 };
+
+// Management actions available to players (only when managing owned companies)
+export const managementActions = [
+  {
+    id: 'load-debt',
+    name: 'Refinance with Debt',
+    description: 'Take on additional debt to extract cash from the company. Higher amounts increase financial risk.',
+    icon: '💳',
+    category: 'debt' as const,
+    isAdjustable: true,
+    minPercent: 5, // Min 5% of revenue as new debt
+    maxPercent: 50, // Max 50% of revenue as new debt
+    riskThresholds: { low: 15, medium: 30, high: 45 },
+    cooldownMonths: 6,
+  },
+  {
+    id: 'take-dividend',
+    name: 'Special Dividend',
+    description: 'Pay yourself a dividend from company cash reserves. Reduces available capital for operations.',
+    icon: '💰',
+    category: 'extraction' as const,
+    isAdjustable: true,
+    minPercent: 10, // Min 10% of cash/assets
+    maxPercent: 80, // Max 80% of cash/assets
+    riskThresholds: { low: 25, medium: 50, high: 70 },
+    cooldownMonths: 12,
+  },
+  {
+    id: 'reduce-workforce',
+    name: 'Workforce Reduction',
+    description: 'Reduce headcount to cut costs. Larger cuts save more but hurt morale and operations.',
+    icon: '👥',
+    category: 'workforce' as const,
+    isAdjustable: true,
+    minPercent: 5, // Min 5% of workforce
+    maxPercent: 40, // Max 40% of workforce at once
+    riskThresholds: { low: 10, medium: 20, high: 35 },
+    cooldownMonths: 6,
+  },
+  {
+    id: 'cut-quality',
+    name: 'Cost Optimization',
+    description: 'Reduce product/service quality to improve margins. Affects customer satisfaction over time.',
+    icon: '📉',
+    category: 'operations' as const,
+    isAdjustable: true,
+    minPercent: 5, // Min 5% quality reduction
+    maxPercent: 30, // Max 30% quality reduction
+    riskThresholds: { low: 10, medium: 20, high: 25 },
+    cooldownMonths: 3,
+  },
+  {
+    id: 'sell-assets',
+    name: 'Asset Liquidation',
+    description: 'Sell company assets for immediate cash. May include real estate, equipment, or IP.',
+    icon: '🏢',
+    category: 'extraction' as const,
+    isAdjustable: true,
+    minPercent: 10, // Min 10% of assets
+    maxPercent: 60, // Max 60% of assets
+    riskThresholds: { low: 20, medium: 40, high: 55 },
+    cooldownMonths: 12,
+  },
+  {
+    id: 'extract-fees',
+    name: 'Management Fees',
+    description: 'Charge consulting and management fees to the portfolio company.',
+    icon: '📋',
+    category: 'extraction' as const,
+    isAdjustable: true,
+    minPercent: 1, // Min 1% of revenue
+    maxPercent: 5, // Max 5% of revenue
+    riskThresholds: { low: 2, medium: 3, high: 4 },
+    cooldownMonths: 12,
+  },
+  {
+    id: 'sale-leaseback',
+    name: 'Sale-Leaseback',
+    description: 'Sell real estate and lease it back. One-time cash extraction with ongoing rent costs.',
+    icon: '🔑',
+    category: 'extraction' as const,
+    isAdjustable: false,
+    cooldownMonths: 0, // One-time action
+  },
+];
 
 // Headlines for the news ticker
 export const genericHeadlines = [

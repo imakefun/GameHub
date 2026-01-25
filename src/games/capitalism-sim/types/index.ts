@@ -188,6 +188,40 @@ export interface GameSettings {
   maxPortfolioSize: number;
   bankruptcyThreshold: number; // Debt-to-revenue ratio
   initialTargetCount: number;
+  // Debt restrictions based on experience
+  maxDebtPercentNewPlayer: number; // Max LBO debt % for new players (0-2 acquisitions)
+  maxDebtPercentExperienced: number; // Max LBO debt % for experienced players (3+ acquisitions)
+}
+
+// Management action types - dynamic actions with adjustable values
+export interface ManagementAction {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'debt' | 'workforce' | 'operations' | 'extraction';
+  // Whether this action uses a slider (true) or is one-time (false)
+  isAdjustable: boolean;
+  // For adjustable actions: min/max as percentage of relevant metric
+  minPercent?: number;
+  maxPercent?: number;
+  // Risk levels for different amounts (low/medium/high thresholds as percentages)
+  riskThresholds?: { low: number; medium: number; high: number };
+  // Cooldown in months (0 = can do anytime)
+  cooldownMonths: number;
+}
+
+// Result of executing a management action
+export interface ActionResult {
+  capitalGained: number;
+  employeesAffected: number;
+  debtAdded: number;
+  moraleChange: number;
+  brandValueChange: number;
+  customerSatisfactionChange: number;
+  profitChange: number;
+  reputationChange: number;
+  riskLevel: 'low' | 'medium' | 'high';
 }
 
 // All actions the game can handle
@@ -206,4 +240,12 @@ export type GameAction =
   | { type: 'DISMISS_EVENT' }
   | { type: 'COMPLETE_TUTORIAL' }
   | { type: 'ADD_NEWS'; headline: string; category: NewsItem['category']; companyId?: string }
-  | { type: 'REFRESH_TARGETS' };
+  | { type: 'REFRESH_TARGETS' }
+  // New dynamic management actions
+  | { type: 'LOAD_DEBT'; companyId: string; amount: number }
+  | { type: 'TAKE_DIVIDEND'; companyId: string; amount: number }
+  | { type: 'REDUCE_WORKFORCE'; companyId: string; percent: number }
+  | { type: 'CUT_QUALITY'; companyId: string; percent: number }
+  | { type: 'SELL_ASSETS'; companyId: string; percent: number }
+  | { type: 'EXTRACT_FEES'; companyId: string; amount: number }
+  | { type: 'SALE_LEASEBACK'; companyId: string };
