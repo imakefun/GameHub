@@ -88,11 +88,11 @@ export function SignpostPanel({
               >
                 {/* Customer & Timer Row */}
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-base">{order.customerEmoji}</span>
-                    <span className="text-white font-medium truncate max-w-[80px]">{order.customerName}</span>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-base flex-shrink-0">{order.customerEmoji}</span>
+                    <span className="text-white font-medium text-xs">{order.customerName}</span>
                   </div>
-                  <div className={`px-1.5 py-0.5 rounded text-xs ${
+                  <div className={`px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${
                     timeRemaining === 'Expired' ? 'bg-red-600' : 'bg-amber-600'
                   }`}>
                     {timeRemaining}

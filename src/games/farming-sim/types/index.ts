@@ -259,6 +259,9 @@ export type GameAction =
   | { type: 'SELL_ITEM'; itemId: string; amount: number }
   | { type: 'BUY_SLOT'; slotType: SlotType; slotIndex: number }
   | { type: 'UPGRADE_STORAGE' }
+  | { type: 'SWAP_ANIMALS'; penId1: string; penId2: string }
+  | { type: 'SWAP_TREES'; orchardId1: string; orchardId2: string }
+  | { type: 'SWAP_MACHINES'; slotId1: string; slotId2: string }
   | { type: 'RESET_GAME' };
 
 // ============ Helpers ============

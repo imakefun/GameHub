@@ -304,17 +304,17 @@ function generateOrder(config: GameConfig, level: number, now: number, slot: num
     case 'easy':
       numItems = 1;
       amountMultiplier = 1;
-      timeLimit = 180; // 3 minutes
+      timeLimit = 540; // 9 minutes
       break;
     case 'medium':
       numItems = Math.random() < 0.5 ? 1 : 2;
       amountMultiplier = 1.5;
-      timeLimit = 240; // 4 minutes
+      timeLimit = 720; // 12 minutes
       break;
     case 'hard':
       numItems = Math.floor(Math.random() * 2) + 2; // 2-3 items
       amountMultiplier = 2;
-      timeLimit = 300; // 5 minutes
+      timeLimit = 900; // 15 minutes
       break;
   }
 
@@ -1103,6 +1103,103 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      case 'SWAP_ANIMALS': {
+        const { penId1, penId2 } = action;
+        if (penId1 === penId2) return state;
+
+        const pen1 = state.animalPens.find(p => p.id === penId1);
+        const pen2 = state.animalPens.find(p => p.id === penId2);
+        if (!pen1 || !pen2) return state;
+        if (!pen1.unlocked || !pen2.unlocked) return state;
+
+        return {
+          ...state,
+          animalPens: state.animalPens.map(pen => {
+            if (pen.id === penId1) {
+              return { ...pen, animalId: pen2.animalId, lastProducedAt: pen2.lastProducedAt, isFed: pen2.isFed, isReady: pen2.isReady };
+            }
+            if (pen.id === penId2) {
+              return { ...pen, animalId: pen1.animalId, lastProducedAt: pen1.lastProducedAt, isFed: pen1.isFed, isReady: pen1.isReady };
+            }
+            return pen;
+          }),
+        };
+      }
+
+      case 'SWAP_TREES': {
+        const { orchardId1, orchardId2 } = action;
+        if (orchardId1 === orchardId2) return state;
+
+        const orchard1 = state.orchards.find(o => o.id === orchardId1);
+        const orchard2 = state.orchards.find(o => o.id === orchardId2);
+        if (!orchard1 || !orchard2) return state;
+        if (!orchard1.unlocked || !orchard2.unlocked) return state;
+
+        return {
+          ...state,
+          orchards: state.orchards.map(orchard => {
+            if (orchard.id === orchardId1) {
+              return {
+                ...orchard,
+                treeId: orchard2.treeId,
+                plantedAt: orchard2.plantedAt,
+                isMature: orchard2.isMature,
+                lastHarvestedAt: orchard2.lastHarvestedAt,
+                isReady: orchard2.isReady,
+              };
+            }
+            if (orchard.id === orchardId2) {
+              return {
+                ...orchard,
+                treeId: orchard1.treeId,
+                plantedAt: orchard1.plantedAt,
+                isMature: orchard1.isMature,
+                lastHarvestedAt: orchard1.lastHarvestedAt,
+                isReady: orchard1.isReady,
+              };
+            }
+            return orchard;
+          }),
+        };
+      }
+
+      case 'SWAP_MACHINES': {
+        const { slotId1, slotId2 } = action;
+        if (slotId1 === slotId2) return state;
+
+        const slot1 = state.machineSlots.find(s => s.id === slotId1);
+        const slot2 = state.machineSlots.find(s => s.id === slotId2);
+        if (!slot1 || !slot2) return state;
+        if (!slot1.unlocked || !slot2.unlocked) return state;
+
+        return {
+          ...state,
+          machineSlots: state.machineSlots.map(slot => {
+            if (slot.id === slotId1) {
+              return {
+                ...slot,
+                machineId: slot2.machineId,
+                currentRecipeIndex: slot2.currentRecipeIndex,
+                startedAt: slot2.startedAt,
+                isProcessing: slot2.isProcessing,
+                isReady: slot2.isReady,
+              };
+            }
+            if (slot.id === slotId2) {
+              return {
+                ...slot,
+                machineId: slot1.machineId,
+                currentRecipeIndex: slot1.currentRecipeIndex,
+                startedAt: slot1.startedAt,
+                isProcessing: slot1.isProcessing,
+                isReady: slot1.isReady,
+              };
+            }
+            return slot;
+          }),
+        };
+      }
+
       case 'RESET_GAME': {
         localStorage.removeItem(STORAGE_KEY);
         return initializeState(config);
@@ -1234,6 +1331,18 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'UPGRADE_STORAGE' });
   }, []);
 
+  const swapAnimals = useCallback((penId1: string, penId2: string) => {
+    dispatch({ type: 'SWAP_ANIMALS', penId1, penId2 });
+  }, []);
+
+  const swapTrees = useCallback((orchardId1: string, orchardId2: string) => {
+    dispatch({ type: 'SWAP_TREES', orchardId1, orchardId2 });
+  }, []);
+
+  const swapMachines = useCallback((slotId1: string, slotId2: string) => {
+    dispatch({ type: 'SWAP_MACHINES', slotId1, slotId2 });
+  }, []);
+
   return {
     state,
     plantCrop,
@@ -1257,6 +1366,9 @@ export function useGameState(config: GameConfig) {
     buySlot,
     resetGame,
     upgradeStorage,
+    swapAnimals,
+    swapTrees,
+    swapMachines,
   };
 }
 

@@ -14,6 +14,7 @@ interface FactoryPanelProps {
   onStartProcessing: (slotId: string, recipeIndex: number) => void;
   onCollect: (slotId: string) => void;
   onBuySlot: (slotType: SlotType, slotIndex: number) => void;
+  onSwapMachines: (slotId1: string, slotId2: string) => void;
 }
 
 export function FactoryPanel({
@@ -28,9 +29,12 @@ export function FactoryPanel({
   onStartProcessing,
   onCollect,
   onBuySlot,
+  onSwapMachines,
 }: FactoryPanelProps) {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedMachineForRecipe, setSelectedMachineForRecipe] = useState<string | null>(null);
+  const [draggedSlot, setDraggedSlot] = useState<string | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
 
   const getProcessingProgress = (slot: MachineSlot, machine: Machine | undefined) => {
     if (!slot.startedAt || !machine || slot.currentRecipeIndex === null) return 0;
@@ -121,14 +125,42 @@ export function FactoryPanel({
           return (
             <div
               key={slot.id}
+              draggable={!!slot.machineId && !slot.isProcessing}
+              onDragStart={(e) => {
+                if (slot.machineId && !slot.isProcessing) {
+                  setDraggedSlot(slot.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                }
+              }}
+              onDragEnd={() => {
+                setDraggedSlot(null);
+                setDragOverSlot(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (draggedSlot && draggedSlot !== slot.id && slot.unlocked) {
+                  setDragOverSlot(slot.id);
+                }
+              }}
+              onDragLeave={() => setDragOverSlot(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedSlot && draggedSlot !== slot.id && slot.unlocked) {
+                  onSwapMachines(draggedSlot, slot.id);
+                }
+                setDraggedSlot(null);
+                setDragOverSlot(null);
+              }}
               className={`
                 relative p-3 rounded-lg transition-all
+                ${dragOverSlot === slot.id ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-slate-800' : ''}
+                ${draggedSlot === slot.id ? 'opacity-50' : ''}
                 ${slot.machineId
                   ? slot.isReady
-                    ? 'bg-yellow-600 animate-pulse'
+                    ? 'bg-yellow-600 animate-pulse cursor-grab'
                     : slot.isProcessing
                       ? 'bg-slate-600'
-                      : 'bg-slate-600 cursor-pointer hover:bg-slate-500'
+                      : 'bg-slate-600 cursor-grab hover:bg-slate-500'
                   : 'bg-slate-700 border-2 border-dashed border-slate-500 cursor-pointer hover:bg-slate-600'
                 }
               `}

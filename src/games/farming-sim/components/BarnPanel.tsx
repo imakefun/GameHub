@@ -14,6 +14,7 @@ interface BarnPanelProps {
   onCollect: (penId: string) => void;
   onFeed: (penId: string) => void;
   onBuySlot: (slotType: SlotType, slotIndex: number) => void;
+  onSwapAnimals: (penId1: string, penId2: string) => void;
 }
 
 export function BarnPanel({
@@ -28,8 +29,11 @@ export function BarnPanel({
   onCollect,
   onFeed,
   onBuySlot,
+  onSwapAnimals,
 }: BarnPanelProps) {
   const [selectedPen, setSelectedPen] = useState<string | null>(null);
+  const [draggedPen, setDraggedPen] = useState<string | null>(null);
+  const [dragOverPen, setDragOverPen] = useState<string | null>(null);
 
   const getProductionProgress = (pen: AnimalPen, animal: Animal | undefined) => {
     if (!pen.lastProducedAt || !animal) return 0;
@@ -109,14 +113,42 @@ export function BarnPanel({
           return (
             <div
               key={pen.id}
+              draggable={!!pen.animalId}
+              onDragStart={(e) => {
+                if (pen.animalId) {
+                  setDraggedPen(pen.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                }
+              }}
+              onDragEnd={() => {
+                setDraggedPen(null);
+                setDragOverPen(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (draggedPen && draggedPen !== pen.id && pen.unlocked) {
+                  setDragOverPen(pen.id);
+                }
+              }}
+              onDragLeave={() => setDragOverPen(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedPen && draggedPen !== pen.id && pen.unlocked) {
+                  onSwapAnimals(draggedPen, pen.id);
+                }
+                setDraggedPen(null);
+                setDragOverPen(null);
+              }}
               className={`
                 relative p-3 rounded-lg transition-all
+                ${dragOverPen === pen.id ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-red-900' : ''}
+                ${draggedPen === pen.id ? 'opacity-50' : ''}
                 ${pen.animalId
                   ? pen.isReady
-                    ? 'bg-yellow-600 animate-pulse'
+                    ? 'bg-yellow-600 animate-pulse cursor-grab'
                     : !pen.isFed && animal?.feedType !== 'none'
-                      ? 'bg-orange-700'
-                      : 'bg-red-700'
+                      ? 'bg-orange-700 cursor-grab'
+                      : 'bg-red-700 cursor-grab'
                   : 'bg-red-800 border-2 border-dashed border-red-600 cursor-pointer hover:bg-red-700'
                 }
               `}
