@@ -354,46 +354,55 @@ function FarmingSimContent() {
 
       {/* Help Modal */}
       {showHelp && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-bold">🌾 How to Play</h2>
-              <button onClick={() => setShowHelp(false)}>
-                <X className="w-5 h-5" />
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          onClick={() => setShowHelp(false)}
+        >
+          <div
+            className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-4 border-b bg-green-700 flex items-center justify-between flex-shrink-0">
+              <h2 className="text-lg font-bold text-white">🌾 How to Play</h2>
+              <button
+                onClick={() => setShowHelp(false)}
+                className="p-1 rounded hover:bg-green-600 text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-4 space-y-4 text-sm">
+            <div className="p-4 space-y-4 text-sm text-gray-700 overflow-y-auto">
               <section>
-                <h3 className="font-bold mb-1">⭐ Leveling Up</h3>
+                <h3 className="font-bold mb-1 text-gray-900">⭐ Leveling Up</h3>
                 <p>Earn XP by harvesting crops, collecting animal products, processing goods, and completing orders. Level up to unlock new items and slots!</p>
               </section>
               <section>
-                <h3 className="font-bold mb-1">🌱 Fields</h3>
+                <h3 className="font-bold mb-1 text-gray-900">🌱 Fields</h3>
                 <p>Plant seeds and wait for crops to grow. Tap ready crops to harvest them. New crops unlock as you level up.</p>
               </section>
               <section>
-                <h3 className="font-bold mb-1">🏠 Barn</h3>
+                <h3 className="font-bold mb-1 text-gray-900">🏠 Barn</h3>
                 <p>Buy animals to produce goods. Animals need to be fed with the right feed (made in the Feed Mill) before they'll produce!</p>
               </section>
               <section>
-                <h3 className="font-bold mb-1">🌳 Orchard</h3>
+                <h3 className="font-bold mb-1 text-gray-900">🌳 Orchard</h3>
                 <p>Plant fruit trees. They take time to mature but produce fruit forever!</p>
               </section>
               <section>
-                <h3 className="font-bold mb-1">🏭 Factory</h3>
+                <h3 className="font-bold mb-1 text-gray-900">🏭 Factory</h3>
                 <p>Buy machines to process raw materials. Start with the Feed Mill to make animal feed!</p>
               </section>
               <section>
-                <h3 className="font-bold mb-1">🪧 Orders</h3>
+                <h3 className="font-bold mb-1 text-gray-900">🪧 Orders</h3>
                 <p>Complete customer orders for money and XP. Orders refresh every few minutes. Higher levels get harder orders with better rewards!</p>
               </section>
               <section>
-                <h3 className="font-bold mb-1">🏪 Market</h3>
+                <h3 className="font-bold mb-1 text-gray-900">🏪 Market</h3>
                 <p>Wandering traders pay premium prices! Or quick-sell items at base value.</p>
               </section>
               {isUsingSheets && (
                 <section className="bg-green-50 p-2 rounded">
-                  <h3 className="font-bold mb-1 flex items-center gap-1">
+                  <h3 className="font-bold mb-1 text-gray-900 flex items-center gap-1">
                     <Cloud className="w-4 h-4" /> Google Sheets
                   </h3>
                   <p>Game data is being loaded from Google Sheets. Use the refresh button to reload data.</p>
