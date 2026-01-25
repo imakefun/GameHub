@@ -153,6 +153,7 @@ export interface Order {
   createdAt: number;
   difficulty: OrderDifficulty;
   slot: number; // Which order slot this occupies (0-2)
+  isShipment?: boolean; // Large bulk orders with hour-long timers
 }
 
 // ============ Wandering Customers ============
