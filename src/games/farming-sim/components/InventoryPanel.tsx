@@ -2,6 +2,7 @@ import type { Inventory, Product, Resources } from '../types';
 import {
   getStorageCapacity,
   getStorageUpgradeCost,
+  getNextStorageUpgradeAmount,
   getTotalInventoryCount,
   STORAGE_MAX_LEVEL,
 } from '../hooks/useGameState';
@@ -68,6 +69,7 @@ export function InventoryPanel({
   const currentCount = getTotalInventoryCount(inventory);
   const capacity = getStorageCapacity(storageLevel);
   const upgradeCost = getStorageUpgradeCost(storageLevel);
+  const nextUpgradeAmount = getNextStorageUpgradeAmount(storageLevel);
   const canUpgrade = upgradeCost !== undefined && resources.money >= upgradeCost;
   const isMaxLevel = storageLevel >= STORAGE_MAX_LEVEL;
   const isFull = currentCount >= capacity;
@@ -111,7 +113,7 @@ export function InventoryPanel({
           }`}
         >
           <span>📦</span>
-          <span>Upgrade Storage (+25)</span>
+          <span>Upgrade Storage (+{nextUpgradeAmount})</span>
           <span className="text-yellow-300">${upgradeCost?.toLocaleString()}</span>
         </button>
       )}
