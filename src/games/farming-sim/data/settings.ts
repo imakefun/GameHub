@@ -21,8 +21,8 @@ export const premiumSlotCosts = [1000, 5000, 10000, 25000];
 
 // Level configuration - defines what unlocks at each level
 export const levels: LevelConfig[] = [
-  { level: 1, xpRequired: 0, unlocksFields: 2, unlocksMachineSlots: 3 },
-  { level: 2, xpRequired: 100, unlocksFields: 3, unlocksPens: 1 },
+  { level: 1, xpRequired: 0, unlocksFields: 2 },
+  { level: 2, xpRequired: 100, unlocksFields: 3, unlocksPens: 1, unlocksMachineSlots: 3 },
   { level: 3, xpRequired: 250, unlocksOrchards: 1 },
   { level: 4, xpRequired: 450, unlocksFields: 4, unlocksMachineSlots: 4 },
   { level: 5, xpRequired: 700, unlocksPens: 2 },

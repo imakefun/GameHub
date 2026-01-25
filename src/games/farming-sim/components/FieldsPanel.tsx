@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Field, Crop, Resources, Inventory, SlotType } from '../types';
-import { getPremiumSlotCost } from '../hooks/useGameState';
+import { getPremiumSlotCost, getRequiredLevelForSlot } from '../hooks/useGameState';
 
 interface FieldsPanelProps {
   fields: Field[];
@@ -37,7 +37,7 @@ export function FieldsPanel({
         <span>🌱</span> Fields
       </h2>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
         {fields.map((field, index) => {
           const crop = crops.find(c => c.id === field.cropId);
           const progress = getGrowthProgress(field, crop);
@@ -46,6 +46,7 @@ export function FieldsPanel({
           const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!field.unlocked) {
+            const requiredLevel = getRequiredLevelForSlot('field', index);
             return (
               <div
                 key={field.id}
@@ -65,25 +66,19 @@ export function FieldsPanel({
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   {isPremiumSlot ? (
                     <>
-                      <span className="text-2xl">💰</span>
-                      <span className="text-xs text-amber-300 font-bold">
+                      <span className="text-lg">💰</span>
+                      <span className="text-[10px] text-amber-300 font-bold">
                         ${premiumCost.toLocaleString()}
                       </span>
-                      {canAffordSlot ? (
-                        <span className="text-xs text-green-400 mt-1">Click to buy</span>
-                      ) : (
-                        <span className="text-xs text-red-400 mt-1">Need more $</span>
-                      )}
                     </>
                   ) : (
                     <>
-                      <span className="text-2xl text-gray-600">🔒</span>
-                      <span className="text-xs text-gray-500">Level up</span>
+                      <span className="text-lg text-gray-600">🔒</span>
+                      {requiredLevel && (
+                        <span className="text-[10px] text-gray-500">Lv.{requiredLevel}</span>
+                      )}
                     </>
                   )}
-                </div>
-                <div className="absolute top-1 left-1 text-xs text-gray-500">
-                  #{index + 1}
                 </div>
               </div>
             );
@@ -112,10 +107,10 @@ export function FieldsPanel({
             >
               {field.cropId && crop ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl">{crop.emoji}</span>
+                  <span className="text-xl md:text-2xl">{crop.emoji}</span>
                   {!field.isReady && (
-                    <div className="absolute bottom-1 left-1 right-1">
-                      <div className="h-1.5 bg-amber-900 rounded-full overflow-hidden">
+                    <div className="absolute bottom-0.5 left-0.5 right-0.5">
+                      <div className="h-1 bg-amber-900 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-green-400 transition-all"
                           style={{ width: `${progress}%` }}
@@ -123,18 +118,12 @@ export function FieldsPanel({
                       </div>
                     </div>
                   )}
-                  {field.isReady && (
-                    <span className="text-xs text-white font-bold mt-1">Ready!</span>
-                  )}
                 </div>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl text-amber-600">+</span>
+                  <span className="text-lg text-amber-600">+</span>
                 </div>
               )}
-              <div className="absolute top-1 left-1 text-xs text-amber-300">
-                #{index + 1}
-              </div>
             </div>
           );
         })}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AnimalPen, Animal, Resources, Inventory, Product, SlotType } from '../types';
-import { getPremiumSlotCost } from '../hooks/useGameState';
+import { getPremiumSlotCost, getRequiredLevelForSlot } from '../hooks/useGameState';
 
 interface BarnPanelProps {
   pens: AnimalPen[];
@@ -10,6 +10,7 @@ interface BarnPanelProps {
   inventory: Inventory;
   playerLevel: number;
   onBuyAnimal: (penId: string, animalId: string) => void;
+  onSellAnimal: (penId: string) => void;
   onCollect: (penId: string) => void;
   onFeed: (penId: string) => void;
   onBuySlot: (slotType: SlotType, slotIndex: number) => void;
@@ -23,6 +24,7 @@ export function BarnPanel({
   inventory,
   playerLevel,
   onBuyAnimal,
+  onSellAnimal,
   onCollect,
   onFeed,
   onBuySlot,
@@ -60,6 +62,7 @@ export function BarnPanel({
           const canAffordSlot = premiumCost !== undefined && resources.money >= premiumCost;
 
           if (!pen.unlocked) {
+            const requiredLevel = getRequiredLevelForSlot('pen', index);
             return (
               <div
                 key={pen.id}
@@ -93,7 +96,9 @@ export function BarnPanel({
                   ) : (
                     <>
                       <span className="text-3xl text-gray-600">🔒</span>
-                      <span className="text-xs text-gray-500">Level up</span>
+                      {requiredLevel && (
+                        <span className="text-xs text-gray-500">Lv.{requiredLevel}</span>
+                      )}
                     </>
                   )}
                 </div>
@@ -147,7 +152,7 @@ export function BarnPanel({
                     </div>
                   )}
 
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex gap-2 mt-2 flex-wrap justify-center">
                     {pen.isReady ? (
                       <button
                         onClick={(e) => {
@@ -178,6 +183,16 @@ export function BarnPanel({
                     ) : (
                       <span className="text-xs text-red-300">Producing...</span>
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSellAnimal(pen.id);
+                      }}
+                      className="px-2 py-1 bg-red-800 hover:bg-red-700 text-red-200 rounded text-xs"
+                      title={`Sell for $${Math.floor(animal.purchaseCost * 0.5)}`}
+                    >
+                      Sell
+                    </button>
                   </div>
                 </div>
               ) : (
