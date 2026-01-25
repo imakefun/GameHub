@@ -205,6 +205,7 @@ export interface GameState {
   wanderingCustomers: WanderingCustomer[];
   stats: GameStats;
   lastTick: number;
+  pendingLevelUp: number | null; // New level to show in level-up popup, null if none
 }
 
 // ============ Game Config ============
@@ -263,6 +264,7 @@ export type GameAction =
   | { type: 'SWAP_ANIMALS'; penId1: string; penId2: string }
   | { type: 'SWAP_TREES'; orchardId1: string; orchardId2: string }
   | { type: 'SWAP_MACHINES'; slotId1: string; slotId2: string }
+  | { type: 'DISMISS_LEVEL_UP' }
   | { type: 'RESET_GAME' };
 
 // ============ Helpers ============

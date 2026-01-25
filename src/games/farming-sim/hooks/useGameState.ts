@@ -159,7 +159,8 @@ function initializeState(config: GameConfig): GameState {
     try {
       const parsed = JSON.parse(saved);
       // Update lastTick to avoid huge time jumps
-      return { ...parsed, lastTick: Date.now() };
+      // Reset pendingLevelUp on load (don't show popup on reload)
+      return { ...parsed, lastTick: Date.now(), pendingLevelUp: null };
     } catch {
       // Invalid save, start fresh
     }
@@ -241,6 +242,7 @@ function initializeState(config: GameConfig): GameState {
       playTime: 0,
     },
     lastTick: now,
+    pendingLevelUp: null,
   };
 }
 
@@ -545,10 +547,11 @@ function addXp(state: GameState, xpGained: number, _config: GameConfig): GameSta
     },
   };
 
-  // If leveled up, unlock new slots (but preserve purchased premium slots)
+  // If leveled up, unlock new slots (but preserve purchased premium slots) and trigger popup
   if (leveledUp) {
     newState = {
       ...newState,
+      pendingLevelUp: newLevel, // Show level up popup
       fields: newState.fields.map((f, i) => ({
         ...f,
         unlocked: f.unlocked || i < getUnlockedSlots(newLevel, 'fields'),
@@ -1346,6 +1349,13 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      case 'DISMISS_LEVEL_UP': {
+        return {
+          ...state,
+          pendingLevelUp: null,
+        };
+      }
+
       case 'RESET_GAME': {
         localStorage.removeItem(STORAGE_KEY);
         return initializeState(config);
@@ -1489,6 +1499,10 @@ export function useGameState(config: GameConfig) {
     dispatch({ type: 'SWAP_MACHINES', slotId1, slotId2 });
   }, []);
 
+  const dismissLevelUp = useCallback(() => {
+    dispatch({ type: 'DISMISS_LEVEL_UP' });
+  }, []);
+
   return {
     state,
     plantCrop,
@@ -1515,6 +1529,7 @@ export function useGameState(config: GameConfig) {
     swapAnimals,
     swapTrees,
     swapMachines,
+    dismissLevelUp,
   };
 }
 
