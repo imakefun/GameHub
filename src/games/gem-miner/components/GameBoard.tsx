@@ -65,20 +65,20 @@ export function GameBoard({
   const dragRef = useRef<DragState | null>(null);
 
   // Dynamic spring parameters: heavy, weighted feel with minimal bounce.
-  // Damping ratio ~0.85-0.9 (near-critical) prevents floaty overshoot.
-  // Cascades progressively increase stiffness for faster settling.
+  // High stiffness compensates for heavy mass to keep movement fast.
+  // Damping ratio ~0.85 (near-critical) prevents floaty overshoot.
   const cascadeBoost = Math.min(combo, 5);
   const springTransition = useMemo(() => ({
     x: {
       type: 'spring' as const,
-      stiffness: 80 + cascadeBoost * 25,
-      damping: 32 + cascadeBoost * 5,
-      mass: 4.0 + cascadeBoost * 0.25,
+      stiffness: 320 + cascadeBoost * 60,
+      damping: 62 + cascadeBoost * 12,
+      mass: 4.0 + cascadeBoost * 0.3,
     },
     y: {
       type: 'spring' as const,
-      stiffness: 70 + cascadeBoost * 30,
-      damping: 30 + cascadeBoost * 6,
+      stiffness: 300 + cascadeBoost * 60,
+      damping: 60 + cascadeBoost * 12,
       mass: 4.5 + cascadeBoost * 0.3,
     },
   }), [cascadeBoost]);
