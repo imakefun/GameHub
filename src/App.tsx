@@ -7,6 +7,7 @@ import { LeaderboardsPage } from './pages/LeaderboardsPage';
 import { Alchemoji } from './games/alchemoji/Alchemoji';
 import { FarmingSim } from './games/farming-sim/FarmingSim';
 import { CapitalismSim } from './games/capitalism-sim/CapitalismSim';
+import { GemMiner } from './games/gem-miner/GemMiner';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/play/alchemoji" element={<Alchemoji />} />
         <Route path="/play/farming-sim" element={<FarmingSim />} />
         <Route path="/play/capitalism-sim" element={<CapitalismSim />} />
+        <Route path="/play/gem-miner" element={<GemMiner />} />
       </Routes>
     </HashRouter>
   );
