@@ -247,7 +247,7 @@ export function executeSwap(grid: Grid, from: Position, to: Position): Grid {
 // Clear Matches
 // ============================================================
 
-function emptyClearedInfo(): ClearedInfo {
+export function emptyClearedInfo(): ClearedInfo {
   return {
     gemsCleared: {
       ruby: 0, sapphire: 0, emerald: 0, topaz: 0,

@@ -1,12 +1,14 @@
 import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
 import type {
   GameState, GameAction, Position, PowerUpType, ObjectiveProgress,
-  ClearedInfo, Level, DesignerLevel,
+  ClearedInfo, Level, DesignerLevel, Grid, GemType,
 } from '../types';
 import { LEVELS, DEFAULT_POWERUPS } from '../data';
 import {
-  createGrid, executeSwap, isValidSwap, processBoard, findBestMove,
-  hasValidMoves, shuffleBoard, applyPowerUp, checkObjectives, cloneGrid,
+  createGrid, executeSwap, isValidSwap, findMatches, clearMatches,
+  applyGravity, refillGrid, emptyClearedInfo, mergeClearedInfo,
+  findBestMove, hasValidMoves, shuffleBoard,
+  applyPowerUp, checkObjectives, cloneGrid,
 } from '../engine/matchEngine';
 import { soundEngine } from '../systems/SoundEngine';
 
@@ -353,6 +355,79 @@ export function useGameState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.objectives, state.currentLevel]);
 
+  // Step-by-step cascade: find matches → highlight → clear → gravity → repeat
+  // Each step is rendered so gravity drops and chain reactions are visible.
+  const runCascade = useCallback((
+    startGrid: Grid,
+    gems: GemType[],
+    onComplete: (totalCleared: ClearedInfo, finalGrid: Grid) => void,
+  ) => {
+    let cascadeCount = 0;
+    let totalCleared = emptyClearedInfo();
+    let currentGrid = startGrid;
+
+    const step = () => {
+      const matches = findMatches(currentGrid);
+
+      if (matches.length === 0) {
+        // No more matches — cascade is done
+        dispatch({ type: 'SET_COMBO', combo: 0 });
+
+        let finalGrid = currentGrid;
+        if (!hasValidMoves(finalGrid)) {
+          finalGrid = shuffleBoard(finalGrid, gems);
+          dispatch({ type: 'SET_GRID', grid: finalGrid });
+        }
+
+        schedule(() => onComplete(totalCleared, finalGrid), 250);
+        return;
+      }
+
+      cascadeCount++;
+      dispatch({ type: 'SET_COMBO', combo: cascadeCount });
+
+      // Show matched cells
+      const matchedPositions = matches.flatMap(m => m.cells);
+      dispatch({ type: 'SET_MATCHED_CELLS', cells: matchedPositions });
+
+      // Play sounds
+      if (cascadeCount >= 3) soundEngine.play('matchSuper');
+      else if (cascadeCount >= 2) { soundEngine.play('matchBig'); soundEngine.play('cascade'); }
+      else soundEngine.play('match');
+      if (cascadeCount >= 2) soundEngine.play('combo');
+
+      // Wait for match highlight animation, then clear + gravity
+      schedule(() => {
+        const { grid: clearedGrid, cleared } = clearMatches(currentGrid, matches);
+
+        // Apply cascade multiplier
+        const multiplier = 1 + (cascadeCount - 1) * 0.5;
+        cleared.score = Math.round(cleared.score * multiplier);
+        totalCleared = mergeClearedInfo(totalCleared, cleared);
+
+        dispatch({ type: 'ADD_SCORE', points: cleared.score });
+        dispatch({ type: 'UPDATE_OBJECTIVES', cleared });
+        setLastScore(cleared.score);
+
+        if (cleared.rocksDestroyed > 0) soundEngine.play('rockBreak');
+        if (cleared.iceDestroyed > 0) soundEngine.play('iceBreak');
+        if (cleared.dirtCleared > 0) soundEngine.play('dirtClear');
+
+        // Apply gravity and refill — this triggers the visible drop animation
+        const gravityGrid = applyGravity(clearedGrid);
+        currentGrid = refillGrid(gravityGrid, gems);
+
+        dispatch({ type: 'SET_GRID', grid: currentGrid });
+        dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
+
+        // Wait for gravity drop animation to finish, then check next cascade
+        schedule(() => step(), 600);
+      }, 500);
+    };
+
+    step();
+  }, [schedule]);
+
   // Internal: execute a validated swap between two adjacent cells and process cascades
   const performSwap = useCallback((from: Position, to: Position) => {
     soundEngine.play('swap');
@@ -367,61 +442,20 @@ export function useGameState() {
     const level = LEVELS.find(l => l.id === state.currentLevel);
     const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
 
-    // Process matches with cascade
+    // Wait for swap animation to finish, then start cascade
     schedule(() => {
-      const result = processBoard(swappedGrid, gems);
+      runCascade(swappedGrid, gems, (totalCleared) => {
+        processingRef.current = false;
+        dispatch({ type: 'SET_PROCESSING', isProcessing: false });
+        dispatch({ type: 'SET_LAST_SWAP', swap: null });
 
-      if (result.cascadeCount > 0) {
-        dispatch({ type: 'SET_COMBO', combo: result.cascadeCount });
-        dispatch({ type: 'ADD_SCORE', points: result.totalCleared.score });
-        dispatch({ type: 'UPDATE_OBJECTIVES', cleared: result.totalCleared });
-        setLastScore(result.totalCleared.score);
-
-        if (result.cascadeCount >= 3) {
-          soundEngine.play('matchSuper');
-        } else if (result.cascadeCount >= 2) {
-          soundEngine.play('matchBig');
-          soundEngine.play('cascade');
-        } else {
-          soundEngine.play('match');
-        }
-
-        if (result.cascadeCount >= 2) soundEngine.play('combo');
-        if (result.totalCleared.rocksDestroyed > 0) soundEngine.play('rockBreak');
-        if (result.totalCleared.iceDestroyed > 0) soundEngine.play('iceBreak');
-        if (result.totalCleared.dirtCleared > 0) soundEngine.play('dirtClear');
-
-        if (result.allMatchedCells.length > 0) {
-          dispatch({ type: 'SET_MATCHED_CELLS', cells: result.allMatchedCells[0] });
-        }
-      }
-
-      // Wait for match animation to finish before applying the new grid (gravity + refill)
-      schedule(() => {
-        dispatch({ type: 'SET_GRID', grid: result.grid });
-        dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
-        dispatch({ type: 'SET_COMBO', combo: 0 });
-
-        let finalGrid = result.grid;
-        if (!hasValidMoves(finalGrid)) {
-          finalGrid = shuffleBoard(finalGrid, gems);
-          dispatch({ type: 'SET_GRID', grid: finalGrid });
-        }
-
-        // Wait for gravity drop animation to settle before unlocking input
-        schedule(() => {
-          processingRef.current = false;
-          dispatch({ type: 'SET_PROCESSING', isProcessing: false });
-          dispatch({ type: 'SET_LAST_SWAP', swap: null });
-
-          const newScore = state.score + result.totalCleared.score;
-          const newMoves = state.movesRemaining - 1;
-          checkEndConditionFromState(newScore, newMoves, result.totalCleared);
-        }, 500);
-      }, 450);
-    }, 400);
+        const newScore = state.score + totalCleared.score;
+        const newMoves = state.movesRemaining - 1;
+        checkEndConditionFromState(newScore, newMoves, totalCleared);
+      });
+    }, 450);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, checkEndConditionFromState]);
+  }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 
   const handleCellClick = useCallback((pos: Position) => {
     if (processingRef.current) return;
@@ -471,20 +505,11 @@ export function useGameState() {
 
       // Process cascades after power-up effect settles
       schedule(() => {
-        const result = processBoard(newGrid, gems);
-        if (result.cascadeCount > 0) {
-          dispatch({ type: 'ADD_SCORE', points: result.totalCleared.score });
-          dispatch({ type: 'UPDATE_OBJECTIVES', cleared: result.totalCleared });
-          dispatch({ type: 'SET_GRID', grid: result.grid });
-          setLastScore(result.totalCleared.score);
-          if (result.cascadeCount >= 2) soundEngine.play('cascade');
-        }
-
-        schedule(() => {
+        runCascade(newGrid, gems, (cascadeCleared) => {
           processingRef.current = false;
           dispatch({ type: 'SET_PROCESSING', isProcessing: false });
-          checkEndCondition(state.score + cleared.score + result.totalCleared.score, state.movesRemaining);
-        }, 500);
+          checkEndCondition(state.score + cleared.score + cascadeCleared.score, state.movesRemaining);
+        });
       }, 450);
 
       return;

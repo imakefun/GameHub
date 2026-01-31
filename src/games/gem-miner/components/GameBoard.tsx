@@ -346,14 +346,15 @@ export function GameBoard({
                   transition={{
                     x: {
                       type: 'spring',
-                      stiffness: 170,
-                      damping: 20,
+                      stiffness: 120,
+                      damping: 16,
                       mass: 1,
                     },
                     y: {
-                      type: 'tween',
-                      ease: [0.33, 0, 0.67, 1.2],  // gravity-like: accelerate then slight bounce
-                      duration: 0.45,
+                      type: 'spring',
+                      stiffness: 100,
+                      damping: 12,
+                      mass: 0.9,
                     },
                   }}
                   style={{
