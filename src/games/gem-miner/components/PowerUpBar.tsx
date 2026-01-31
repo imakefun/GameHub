@@ -14,7 +14,7 @@ const POWERUP_ORDER: PowerUpType[] = ['pickaxe', 'dynamite', 'drill', 'earthquak
 
 export function PowerUpBar({ powerUps, activePowerUp, onActivate, isProcessing }: PowerUpBarProps) {
   return (
-    <div className="w-full max-w-md mx-auto px-2 py-2">
+    <div className="w-full max-w-md mx-auto px-2 py-1">
       <div className="flex items-center justify-center gap-2">
         {POWERUP_ORDER.map((type, i) => {
           const def = POWERUP_DEFS[type];
