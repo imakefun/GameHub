@@ -379,7 +379,7 @@ export function useGameState() {
           dispatch({ type: 'SET_GRID', grid: finalGrid });
         }
 
-        schedule(() => onComplete(totalCleared, finalGrid), 400);
+        schedule(() => onComplete(totalCleared, finalGrid), 300);
         return;
       }
 
@@ -395,6 +395,11 @@ export function useGameState() {
       else if (cascadeCount >= 2) { soundEngine.play('matchBig'); soundEngine.play('cascade'); }
       else soundEngine.play('match');
       if (cascadeCount >= 2) soundEngine.play('combo');
+
+      // Progressive speedup: each successive cascade has shorter delays
+      // (spring stiffness also increases in GameBoard so animations settle faster)
+      const matchDelay = Math.max(250, 500 - (cascadeCount - 1) * 80);
+      const gravityDelay = Math.max(350, 800 - (cascadeCount - 1) * 120);
 
       // Wait for match highlight animation to play out
       schedule(() => {
@@ -420,8 +425,8 @@ export function useGameState() {
         dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
 
         // Wait for gravity drop spring animation to fully settle
-        schedule(() => step(), 1100);
-      }, 650);
+        schedule(() => step(), gravityDelay);
+      }, matchDelay);
     };
 
     step();
@@ -452,7 +457,7 @@ export function useGameState() {
         const newMoves = state.movesRemaining - 1;
         checkEndConditionFromState(newScore, newMoves, totalCleared);
       });
-    }, 800);
+    }, 600);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 

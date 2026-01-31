@@ -64,6 +64,25 @@ export function GameBoard({
   const gridRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
 
+  // Dynamic spring parameters: bouncy base for swaps, progressively
+  // snappier during cascades. Increasing mass + stiffness keeps damping
+  // ratio ~0.7 (minimal overshoot → rows never overlap during gravity).
+  const cascadeBoost = Math.min(combo, 5);
+  const springTransition = useMemo(() => ({
+    x: {
+      type: 'spring' as const,
+      stiffness: 60 + cascadeBoost * 25,
+      damping: 11 + cascadeBoost * 3,
+      mass: 0.8 + cascadeBoost * 0.25,
+    },
+    y: {
+      type: 'spring' as const,
+      stiffness: 50 + cascadeBoost * 30,
+      damping: 10 + cascadeBoost * 4,
+      mass: 1.0 + cascadeBoost * 0.3,
+    },
+  }), [cascadeBoost]);
+
   const hintSet = useMemo(() => {
     const s = new Set<string>();
     hintCells.forEach(p => s.add(`${p.row},${p.col}`));
@@ -344,20 +363,7 @@ export function GameBoard({
                     x: c * cellSize,
                     y: r * cellSize,
                   }}
-                  transition={{
-                    x: {
-                      type: 'spring',
-                      stiffness: 60,
-                      damping: 11,
-                      mass: 0.12,
-                    },
-                    y: {
-                      type: 'spring',
-                      stiffness: 45,
-                      damping: 8,
-                      mass: 0.14,
-                    },
-                  }}
+                  transition={springTransition}
                   style={{
                     width: cellSize,
                     height: cellSize,
