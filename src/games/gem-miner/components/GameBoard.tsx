@@ -64,22 +64,22 @@ export function GameBoard({
   const gridRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
 
-  // Dynamic spring parameters: bouncy base for swaps, progressively
-  // snappier during cascades. Increasing mass + stiffness keeps damping
-  // ratio ~0.7 (minimal overshoot → rows never overlap during gravity).
+  // Dynamic spring parameters: heavy, weighted feel with minimal bounce.
+  // Damping ratio ~0.85-0.9 (near-critical) prevents floaty overshoot.
+  // Cascades progressively increase stiffness for faster settling.
   const cascadeBoost = Math.min(combo, 5);
   const springTransition = useMemo(() => ({
     x: {
       type: 'spring' as const,
-      stiffness: 60 + cascadeBoost * 25,
-      damping: 11 + cascadeBoost * 3,
-      mass: 1.6 + cascadeBoost * 0.25,
+      stiffness: 80 + cascadeBoost * 25,
+      damping: 32 + cascadeBoost * 5,
+      mass: 4.0 + cascadeBoost * 0.25,
     },
     y: {
       type: 'spring' as const,
-      stiffness: 50 + cascadeBoost * 30,
-      damping: 10 + cascadeBoost * 4,
-      mass: 2.0 + cascadeBoost * 0.3,
+      stiffness: 70 + cascadeBoost * 30,
+      damping: 30 + cascadeBoost * 6,
+      mass: 4.5 + cascadeBoost * 0.3,
     },
   }), [cascadeBoost]);
 
