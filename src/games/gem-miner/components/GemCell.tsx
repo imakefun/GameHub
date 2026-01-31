@@ -219,8 +219,8 @@ export const GemCell = memo(function GemCell({
       }}
       transition={
         isMatched
-          ? { duration: 0.45, ease: 'easeInOut' }
-          : { type: 'spring', stiffness: 300, damping: 22 }
+          ? { duration: 0.55, ease: 'easeInOut' }
+          : { type: 'spring', stiffness: 200, damping: 18 }
       }
     >
       {/* Drop shadow beneath the gem */}
