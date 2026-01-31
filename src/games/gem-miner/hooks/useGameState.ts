@@ -272,12 +272,32 @@ export function useGameState() {
 
   // --- Actions ---
 
+  // Helper: clear existing board gems, wait for the visual clear, then run action.
+  // On level change / restart this gives a visible "wipe → fresh board" transition.
+  const clearAndRun = useCallback((action: () => void) => {
+    timeoutRef.current.forEach(t => clearTimeout(t));
+    timeoutRef.current = [];
+    processingRef.current = false;
+
+    if (state.grid.length > 0) {
+      const clearedGrid: Grid = state.grid.map(row =>
+        row.map(cell => ({ ...cell, gem: null, gemId: '', special: 'none' as const }))
+      );
+      dispatch({ type: 'SET_GRID', grid: clearedGrid });
+      schedule(() => action(), 300);
+    } else {
+      action();
+    }
+  }, [state.grid, schedule]);
+
   const startLevel = useCallback((levelId: number) => {
-    dispatch({ type: 'START_LEVEL', level: levelId });
-    setLastScore(0);
-    soundEngine.play('levelStart');
-    soundEngine.startMusic();
-  }, []);
+    clearAndRun(() => {
+      dispatch({ type: 'START_LEVEL', level: levelId });
+      setLastScore(0);
+      soundEngine.play('levelStart');
+      soundEngine.startMusic();
+    });
+  }, [clearAndRun]);
 
   const goToLevelSelect = useCallback(() => {
     timeoutRef.current.forEach(t => clearTimeout(t));
@@ -457,7 +477,7 @@ export function useGameState() {
         const newMoves = state.movesRemaining - 1;
         checkEndConditionFromState(newScore, newMoves, totalCleared);
       });
-    }, 200);
+    }, 100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 
@@ -605,21 +625,22 @@ export function useGameState() {
   }, [state.powerUps, state.activePowerUp, state.grid, state.currentLevel, schedule]);
 
   const resetLevel = useCallback(() => {
-    timeoutRef.current.forEach(t => clearTimeout(t));
-    timeoutRef.current = [];
-    processingRef.current = false;
-    setLastScore(0);
-    dispatch({ type: 'RESET_LEVEL' });
-    soundEngine.play('levelStart');
-    soundEngine.startMusic();
-  }, []);
+    clearAndRun(() => {
+      dispatch({ type: 'RESET_LEVEL' });
+      setLastScore(0);
+      soundEngine.play('levelStart');
+      soundEngine.startMusic();
+    });
+  }, [clearAndRun]);
 
   const playDesignerLevel = useCallback((level: DesignerLevel) => {
-    dispatch({ type: 'LOAD_DESIGNER_LEVEL', level });
-    setLastScore(0);
-    soundEngine.play('levelStart');
-    soundEngine.startMusic();
-  }, []);
+    clearAndRun(() => {
+      dispatch({ type: 'LOAD_DESIGNER_LEVEL', level });
+      setLastScore(0);
+      soundEngine.play('levelStart');
+      soundEngine.startMusic();
+    });
+  }, [clearAndRun]);
 
   const nextLevel = useCallback(() => {
     const nextId = state.currentLevel + 1;
