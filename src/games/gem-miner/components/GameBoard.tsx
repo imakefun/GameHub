@@ -73,13 +73,13 @@ export function GameBoard({
       type: 'spring' as const,
       stiffness: 60 + cascadeBoost * 25,
       damping: 11 + cascadeBoost * 3,
-      mass: 0.8 + cascadeBoost * 0.25,
+      mass: 1.6 + cascadeBoost * 0.25,
     },
     y: {
       type: 'spring' as const,
       stiffness: 50 + cascadeBoost * 30,
       damping: 10 + cascadeBoost * 4,
-      mass: 1.0 + cascadeBoost * 0.3,
+      mass: 2.0 + cascadeBoost * 0.3,
     },
   }), [cascadeBoost]);
 

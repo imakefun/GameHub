@@ -457,7 +457,7 @@ export function useGameState() {
         const newMoves = state.movesRemaining - 1;
         checkEndConditionFromState(newScore, newMoves, totalCleared);
       });
-    }, 600);
+    }, 400);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 
