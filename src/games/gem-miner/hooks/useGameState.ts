@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useRef, useEffect } from 'react';
+import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
 import type {
   GameState, GameAction, Position, PowerUpType, ObjectiveProgress,
   ClearedInfo, Level, DesignerLevel,
@@ -8,6 +8,7 @@ import {
   createGrid, executeSwap, isValidSwap, processBoard, findBestMove,
   hasValidMoves, shuffleBoard, applyPowerUp, checkObjectives, cloneGrid,
 } from '../engine/matchEngine';
+import { soundEngine } from '../systems/SoundEngine';
 
 const STORAGE_KEY = 'gem-miner-save';
 
@@ -247,6 +248,7 @@ export function useGameState() {
   const [state, dispatch] = useReducer(gameReducer, null, createInitialState);
   const processingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [lastScore, setLastScore] = useState(0);
 
   // Save on changes to persistent data
   useEffect(() => {
@@ -270,12 +272,16 @@ export function useGameState() {
 
   const startLevel = useCallback((levelId: number) => {
     dispatch({ type: 'START_LEVEL', level: levelId });
+    setLastScore(0);
+    soundEngine.play('levelStart');
+    soundEngine.startMusic();
   }, []);
 
   const goToLevelSelect = useCallback(() => {
     timeoutRef.current.forEach(t => clearTimeout(t));
     timeoutRef.current = [];
     processingRef.current = false;
+    soundEngine.stopMusic();
     dispatch({ type: 'SET_SCREEN', screen: 'levelSelect' });
   }, []);
 
@@ -315,6 +321,11 @@ export function useGameState() {
       processingRef.current = true;
       dispatch({ type: 'SET_PROCESSING', isProcessing: true });
 
+      // Play power-up specific sounds
+      if (powerUp === 'dynamite') soundEngine.play('powerUpDynamite');
+      else if (powerUp === 'drill') soundEngine.play('powerUpDrill');
+      else soundEngine.play('powerUpUse');
+
       const level = LEVELS.find(l => l.id === state.currentLevel);
       const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
 
@@ -322,6 +333,7 @@ export function useGameState() {
       dispatch({ type: 'ADD_SCORE', points: cleared.score });
       dispatch({ type: 'UPDATE_OBJECTIVES', cleared });
       dispatch({ type: 'SET_GRID', grid: newGrid });
+      setLastScore(cleared.score);
 
       // Process cascades
       schedule(() => {
@@ -330,6 +342,8 @@ export function useGameState() {
           dispatch({ type: 'ADD_SCORE', points: result.totalCleared.score });
           dispatch({ type: 'UPDATE_OBJECTIVES', cleared: result.totalCleared });
           dispatch({ type: 'SET_GRID', grid: result.grid });
+          setLastScore(result.totalCleared.score);
+          if (result.cascadeCount >= 2) soundEngine.play('cascade');
         }
 
         schedule(() => {
@@ -348,6 +362,7 @@ export function useGameState() {
       // Select the cell
       const cell = state.grid[pos.row]?.[pos.col];
       if (!cell || cell.modifier === 'bedrock' || cell.gem === null) return;
+      soundEngine.play('select');
       dispatch({ type: 'SELECT_CELL', position: pos });
       return;
     }
@@ -364,6 +379,7 @@ export function useGameState() {
 
     if (!isValidSwap(state.grid, from, to)) {
       // Not a valid swap - select the new cell instead
+      soundEngine.play('badSwap');
       const cell = state.grid[pos.row]?.[pos.col];
       if (cell && cell.modifier !== 'bedrock' && cell.gem !== null) {
         dispatch({ type: 'SELECT_CELL', position: pos });
@@ -374,6 +390,7 @@ export function useGameState() {
     }
 
     // Execute swap
+    soundEngine.play('swap');
     processingRef.current = true;
     dispatch({ type: 'SET_PROCESSING', isProcessing: true });
     dispatch({ type: 'SWAP_GEMS', from, to });
@@ -393,6 +410,27 @@ export function useGameState() {
         dispatch({ type: 'SET_COMBO', combo: result.cascadeCount });
         dispatch({ type: 'ADD_SCORE', points: result.totalCleared.score });
         dispatch({ type: 'UPDATE_OBJECTIVES', cleared: result.totalCleared });
+        setLastScore(result.totalCleared.score);
+
+        // Play match sounds based on cascade intensity
+        if (result.cascadeCount >= 3) {
+          soundEngine.play('matchSuper');
+        } else if (result.cascadeCount >= 2) {
+          soundEngine.play('matchBig');
+          soundEngine.play('cascade');
+        } else {
+          soundEngine.play('match');
+        }
+
+        // Play combo sound for big combos
+        if (result.cascadeCount >= 2) {
+          soundEngine.play('combo');
+        }
+
+        // Play sounds for special clears
+        if (result.totalCleared.rocksDestroyed > 0) soundEngine.play('rockBreak');
+        if (result.totalCleared.iceDestroyed > 0) soundEngine.play('iceBreak');
+        if (result.totalCleared.dirtCleared > 0) soundEngine.play('dirtClear');
 
         // Animate matched cells for each cascade step
         if (result.allMatchedCells.length > 0) {
@@ -528,11 +566,17 @@ export function useGameState() {
     timeoutRef.current.forEach(t => clearTimeout(t));
     timeoutRef.current = [];
     processingRef.current = false;
+    setLastScore(0);
     dispatch({ type: 'RESET_LEVEL' });
+    soundEngine.play('levelStart');
+    soundEngine.startMusic();
   }, []);
 
   const playDesignerLevel = useCallback((level: DesignerLevel) => {
     dispatch({ type: 'LOAD_DESIGNER_LEVEL', level });
+    setLastScore(0);
+    soundEngine.play('levelStart');
+    soundEngine.startMusic();
   }, []);
 
   const nextLevel = useCallback(() => {
@@ -547,6 +591,7 @@ export function useGameState() {
 
   return {
     state,
+    lastScore,
     dispatch,
     startLevel,
     goToLevelSelect,

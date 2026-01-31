@@ -12,6 +12,7 @@ import { LEVELS } from './data';
 export function GemMiner() {
   const {
     state,
+    lastScore,
     startLevel,
     goToLevelSelect,
     goToDesigner,
@@ -77,6 +78,8 @@ export function GemMiner() {
             activePowerUp={state.activePowerUp}
             onCellClick={handleCellClick}
             isProcessing={state.isProcessing}
+            combo={state.combo}
+            lastScore={lastScore}
           />
         )}
       </div>
