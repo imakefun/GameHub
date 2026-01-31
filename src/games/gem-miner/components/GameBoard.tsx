@@ -344,10 +344,17 @@ export function GameBoard({
                     y: r * cellSize,
                   }}
                   transition={{
-                    type: 'spring',
-                    stiffness: 320,
-                    damping: 26,
-                    mass: 0.8,
+                    x: {
+                      type: 'spring',
+                      stiffness: 170,
+                      damping: 20,
+                      mass: 1,
+                    },
+                    y: {
+                      type: 'tween',
+                      ease: [0.33, 0, 0.67, 1.2],  // gravity-like: accelerate then slight bounce
+                      duration: 0.45,
+                    },
                   }}
                   style={{
                     width: cellSize,

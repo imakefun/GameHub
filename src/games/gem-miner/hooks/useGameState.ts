@@ -396,6 +396,7 @@ export function useGameState() {
         }
       }
 
+      // Wait for match animation to finish before applying the new grid (gravity + refill)
       schedule(() => {
         dispatch({ type: 'SET_GRID', grid: result.grid });
         dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
@@ -407,6 +408,7 @@ export function useGameState() {
           dispatch({ type: 'SET_GRID', grid: finalGrid });
         }
 
+        // Wait for gravity drop animation to settle before unlocking input
         schedule(() => {
           processingRef.current = false;
           dispatch({ type: 'SET_PROCESSING', isProcessing: false });
@@ -415,9 +417,9 @@ export function useGameState() {
           const newScore = state.score + result.totalCleared.score;
           const newMoves = state.movesRemaining - 1;
           checkEndConditionFromState(newScore, newMoves, result.totalCleared);
-        }, 150);
-      }, 350);
-    }, 250);
+        }, 500);
+      }, 450);
+    }, 400);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, checkEndConditionFromState]);
 
@@ -467,7 +469,7 @@ export function useGameState() {
       dispatch({ type: 'SET_GRID', grid: newGrid });
       setLastScore(cleared.score);
 
-      // Process cascades
+      // Process cascades after power-up effect settles
       schedule(() => {
         const result = processBoard(newGrid, gems);
         if (result.cascadeCount > 0) {
@@ -481,10 +483,9 @@ export function useGameState() {
         schedule(() => {
           processingRef.current = false;
           dispatch({ type: 'SET_PROCESSING', isProcessing: false });
-          // Check win/lose
           checkEndCondition(state.score + cleared.score + result.totalCleared.score, state.movesRemaining);
-        }, 200);
-      }, 300);
+        }, 500);
+      }, 450);
 
       return;
     }
