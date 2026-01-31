@@ -93,7 +93,7 @@ export function GameHUD({ levelId, score, movesRemaining, objectives, combo, onB
   return (
     <div className="w-full max-w-md mx-auto">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-2 py-1.5">
+      <div className="flex items-center justify-between px-2 py-0.5">
         <button
           onClick={() => { soundEngine.play('buttonClick'); onBack(); }}
           className="flex items-center gap-1 text-stone-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-stone-800"
@@ -127,7 +127,7 @@ export function GameHUD({ levelId, score, movesRemaining, objectives, combo, onB
       </div>
 
       {/* Score and Moves */}
-      <div className="flex items-center justify-between px-3 py-1.5">
+      <div className="flex items-center justify-between px-3 py-0.5">
         <div className="flex items-center gap-2">
           <div className="text-xs text-stone-500 uppercase tracking-wider">Score</div>
           <AnimatedNumber value={score} className="text-lg font-bold text-white tabular-nums" />
@@ -176,7 +176,7 @@ export function GameHUD({ levelId, score, movesRemaining, objectives, combo, onB
       </div>
 
       {/* Objectives */}
-      <div className="flex items-center justify-center gap-3 px-3 py-1.5 flex-wrap">
+      <div className="flex items-center justify-center gap-3 px-3 py-0.5 flex-wrap">
         {objectives.map((obj, i) => {
           const progress = Math.min(obj.current / obj.target, 1);
           const isComplete = obj.current >= obj.target;

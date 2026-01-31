@@ -56,7 +56,7 @@ export function GemMiner() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 flex flex-col select-none">
+    <div className="h-dvh bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 flex flex-col select-none overflow-hidden">
       {/* HUD */}
       <GameHUD
         levelId={state.currentLevel}
@@ -69,7 +69,7 @@ export function GemMiner() {
       />
 
       {/* Game Board */}
-      <div className="flex-1 flex items-center justify-center px-2 py-2">
+      <div className="flex-1 flex items-center justify-center px-1 py-0 min-h-0">
         {state.grid.length > 0 && (
           <GameBoard
             grid={state.grid}
