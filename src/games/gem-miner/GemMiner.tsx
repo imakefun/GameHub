@@ -17,6 +17,7 @@ export function GemMiner() {
     goToLevelSelect,
     goToDesigner,
     handleCellClick,
+    handleSwap,
     activatePowerUp,
     resetLevel,
     playDesignerLevel,
@@ -77,6 +78,7 @@ export function GemMiner() {
             matchedCells={state.matchedCells}
             activePowerUp={state.activePowerUp}
             onCellClick={handleCellClick}
+            onSwap={handleSwap}
             isProcessing={state.isProcessing}
             combo={state.combo}
             lastScore={lastScore}

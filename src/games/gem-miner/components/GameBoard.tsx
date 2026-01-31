@@ -15,9 +15,21 @@ interface GameBoardProps {
   matchedCells: Position[];
   activePowerUp: PowerUpType | null;
   onCellClick: (pos: Position) => void;
+  onSwap: (from: Position, to: Position) => void;
   isProcessing: boolean;
   combo: number;
-  lastScore: number; // score delta to display
+  lastScore: number;
+}
+
+// Drag state stored in a ref for 60fps performance (no re-renders during drag)
+interface DragState {
+  row: number;
+  col: number;
+  startX: number;
+  startY: number;
+  element: HTMLElement | null;
+  pointerId: number;
+  settled: boolean; // true once swap or tap detected
 }
 
 export function GameBoard({
@@ -27,6 +39,7 @@ export function GameBoard({
   matchedCells,
   activePowerUp,
   onCellClick,
+  onSwap,
   isProcessing,
   combo,
   lastScore,
@@ -48,7 +61,8 @@ export function GameBoard({
   const shakeControls = useAnimation();
   const prevMatchedRef = useRef<string>('');
   const prevComboRef = useRef(0);
-  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   const hintSet = useMemo(() => {
     const s = new Set<string>();
@@ -62,14 +76,143 @@ export function GameBoard({
     return s;
   }, [matchedCells]);
 
-  // Calculate pixel position for a grid cell (relative to board inner area)
+  // Calculate pixel position for a grid cell
   const getCellCenter = useCallback((row: number, col: number) => {
-    // Offset by the board container's padding (4px border)
     return {
       x: col * cellSize + cellSize / 2 + 4,
       y: row * cellSize + cellSize / 2 + 4,
     };
   }, [cellSize]);
+
+  // Identify cell from pointer coordinates relative to the grid area
+  const cellFromPointer = useCallback((clientX: number, clientY: number): Position | null => {
+    const el = gridRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const col = Math.floor(x / cellSize);
+    const row = Math.floor(y / cellSize);
+    if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+    return { row, col };
+  }, [cellSize, rows, cols]);
+
+  // --- Pointer event handlers for swipe / drag ---
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (isProcessing) return;
+    const pos = cellFromPointer(e.clientX, e.clientY);
+    if (!pos) return;
+
+    const cell = grid[pos.row]?.[pos.col];
+    if (!cell) return;
+    // Allow tap on rock for power-ups, but don't allow drag
+    if (!cell.gem && cell.modifier !== 'rock') return;
+
+    // Find the wrapper element for this cell
+    const wrapper = gridRef.current?.querySelector(`[data-cell="${pos.row},${pos.col}"]`) as HTMLElement | null;
+
+    // Capture pointer for reliable tracking
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    dragRef.current = {
+      row: pos.row,
+      col: pos.col,
+      startX: e.clientX,
+      startY: e.clientY,
+      element: wrapper,
+      pointerId: e.pointerId,
+      settled: false,
+    };
+
+    // Visual: slightly lift the gem
+    if (wrapper && cell.gem) {
+      wrapper.style.zIndex = '20';
+      wrapper.style.transition = 'none';
+    }
+  }, [isProcessing, cellFromPointer, grid]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag || drag.settled) return;
+
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    // Clamp drag offset to one axis (whichever is dominant) and to one cell size
+    let ox = 0, oy = 0;
+    if (absDx > absDy) {
+      ox = Math.max(-cellSize, Math.min(cellSize, dx));
+    } else {
+      oy = Math.max(-cellSize, Math.min(cellSize, dy));
+    }
+
+    // Apply visual offset directly to DOM for 60fps
+    if (drag.element) {
+      drag.element.style.transform = `translate(${ox}px, ${oy}px) scale(1.08)`;
+    }
+
+    // Check if swipe threshold crossed
+    const threshold = cellSize * 0.35;
+    if (absDx > threshold || absDy > threshold) {
+      let targetRow = drag.row;
+      let targetCol = drag.col;
+      if (absDx > absDy) {
+        targetCol += dx > 0 ? 1 : -1;
+      } else {
+        targetRow += dy > 0 ? 1 : -1;
+      }
+
+      // Bounds check
+      if (targetRow >= 0 && targetRow < rows && targetCol >= 0 && targetCol < cols) {
+        drag.settled = true;
+        // Reset visual (let framer-motion handle the animated transition)
+        if (drag.element) {
+          drag.element.style.zIndex = '';
+          drag.element.style.transition = '';
+          drag.element.style.transform = '';
+        }
+        onSwap({ row: drag.row, col: drag.col }, { row: targetRow, col: targetCol });
+      }
+    }
+  }, [cellSize, rows, cols, onSwap]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+
+    // Reset visual
+    if (drag.element) {
+      drag.element.style.zIndex = '';
+      drag.element.style.transition = '';
+      drag.element.style.transform = '';
+    }
+
+    dragRef.current = null;
+
+    if (drag.settled) return; // Already handled as swipe
+
+    // If minimal movement, treat as tap
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 10) {
+      onCellClick({ row: drag.row, col: drag.col });
+    }
+  }, [onCellClick]);
+
+  const handlePointerCancel = useCallback(() => {
+    const drag = dragRef.current;
+    if (drag?.element) {
+      drag.element.style.zIndex = '';
+      drag.element.style.transition = '';
+      drag.element.style.transform = '';
+    }
+    dragRef.current = null;
+  }, []);
 
   // --- Particle effects on matched cells ---
   useEffect(() => {
@@ -112,7 +255,6 @@ export function GameBoard({
         transition: { duration: 0.4, ease: 'easeOut' },
       });
 
-      // Screen flash on big combos
       if (combo >= 3 && particleRef.current) {
         particleRef.current.screenFlash('rgba(251, 191, 36, 0.15)', 0.3);
       }
@@ -137,7 +279,6 @@ export function GameBoard({
   return (
     <div className="flex flex-col items-center w-full">
       <motion.div
-        ref={boardContainerRef}
         animate={shakeControls}
         className="relative rounded-xl overflow-hidden"
         style={{
@@ -148,21 +289,27 @@ export function GameBoard({
           border: '2px solid #44403c',
         }}
       >
-        {/* Inner grid area */}
+        {/* Inner grid area with pointer event handling */}
         <div
+          ref={gridRef}
           className="absolute"
           style={{
             left: 4, top: 4,
             width: boardWidth,
             height: boardHeight,
             background: 'rgba(41, 37, 36, 0.5)',
+            touchAction: 'none', // Prevent browser scroll/zoom during swipe
           }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
         >
           {/* Grid background lines */}
           {Array.from({ length: rows + 1 }).map((_, i) => (
             <div
               key={`h${i}`}
-              className="absolute w-full"
+              className="absolute w-full pointer-events-none"
               style={{
                 top: i * cellSize,
                 height: 1,
@@ -173,7 +320,7 @@ export function GameBoard({
           {Array.from({ length: cols + 1 }).map((_, i) => (
             <div
               key={`v${i}`}
-              className="absolute h-full"
+              className="absolute h-full pointer-events-none"
               style={{
                 left: i * cellSize,
                 width: 1,
@@ -182,21 +329,43 @@ export function GameBoard({
             />
           ))}
 
-          {/* Gem cells */}
+          {/* Gem cells in position-animated wrappers */}
           {grid.map((row, r) =>
             row.map((cell, c) => {
               const key = `${r},${c}`;
               return (
-                <GemCell
-                  key={cell.gemId || `empty-${key}`}
-                  cell={cell}
-                  isSelected={selectedCell?.row === r && selectedCell?.col === c}
-                  isHinted={hintSet.has(key)}
-                  isMatched={matchedSet.has(key)}
-                  isPowerUpTarget={!!activePowerUp && activePowerUp !== 'earthquake' && activePowerUp !== 'lantern'}
-                  cellSize={cellSize}
-                  onClick={onCellClick}
-                />
+                <motion.div
+                  key={cell.gemId || `static-${key}`}
+                  data-cell={key}
+                  className="absolute"
+                  initial={false}
+                  animate={{
+                    x: c * cellSize,
+                    y: r * cellSize,
+                  }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 320,
+                    damping: 26,
+                    mass: 0.8,
+                  }}
+                  style={{
+                    width: cellSize,
+                    height: cellSize,
+                    left: 0,
+                    top: 0,
+                    willChange: 'transform',
+                  }}
+                >
+                  <GemCell
+                    cell={cell}
+                    isSelected={selectedCell?.row === r && selectedCell?.col === c}
+                    isHinted={hintSet.has(key)}
+                    isMatched={matchedSet.has(key)}
+                    isPowerUpTarget={!!activePowerUp && activePowerUp !== 'earthquake' && activePowerUp !== 'lantern'}
+                    cellSize={cellSize}
+                  />
+                </motion.div>
               );
             })
           )}
@@ -208,7 +377,7 @@ export function GameBoard({
         {/* Floating score popups */}
         <FloatingScoreLayer apiRef={floatingRef} />
 
-        {/* Processing overlay */}
+        {/* Processing overlay (blocks pointer events) */}
         {isProcessing && (
           <div className="absolute inset-0 z-40" style={{ cursor: 'not-allowed' }} />
         )}

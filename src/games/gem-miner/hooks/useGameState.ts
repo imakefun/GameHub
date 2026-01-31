@@ -289,6 +289,138 @@ export function useGameState() {
     dispatch({ type: 'SET_SCREEN', screen: 'designer' });
   }, []);
 
+  const checkEndCondition = useCallback((totalScore: number, movesLeft: number) => {
+    const objectivesMet = checkObjectives(state.objectives);
+
+    if (objectivesMet) {
+      const level = LEVELS.find(l => l.id === state.currentLevel);
+      if (level) {
+        const stars = totalScore >= level.starThresholds[2] ? 3
+          : totalScore >= level.starThresholds[1] ? 2
+          : totalScore >= level.starThresholds[0] ? 1 : 1;
+        dispatch({ type: 'SET_LEVEL_STARS', level: level.id, stars });
+
+        for (const reward of level.rewards) {
+          if (reward.powerUp && reward.count) {
+            dispatch({ type: 'ADD_POWERUP_REWARD', powerUp: reward.powerUp, count: reward.count });
+          }
+        }
+      }
+      dispatch({ type: 'SET_LEVEL_RESULT', result: 'win' });
+    } else if (movesLeft <= 0) {
+      dispatch({ type: 'SET_LEVEL_RESULT', result: 'lose' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.objectives, state.currentLevel]);
+
+  const checkEndConditionFromState = useCallback((totalScore: number, movesLeft: number, lastCleared: ClearedInfo) => {
+    const updatedObjectives = state.objectives.map(obj => {
+      const updated = { ...obj };
+      if (obj.type === 'score') {
+        updated.current = totalScore;
+      } else if (obj.type === 'collect_gems' && obj.gemType) {
+        updated.current = obj.current + (lastCleared.gemsCleared[obj.gemType] || 0);
+      } else if (obj.type === 'clear_rocks') {
+        updated.current = obj.current + lastCleared.rocksDestroyed;
+      } else if (obj.type === 'clear_ice') {
+        updated.current = obj.current + lastCleared.iceDestroyed;
+      } else if (obj.type === 'clear_dirt') {
+        updated.current = obj.current + lastCleared.dirtCleared;
+      }
+      return updated;
+    });
+
+    const objectivesMet = checkObjectives(updatedObjectives);
+
+    if (objectivesMet) {
+      const level = LEVELS.find(l => l.id === state.currentLevel);
+      if (level) {
+        const stars = totalScore >= level.starThresholds[2] ? 3
+          : totalScore >= level.starThresholds[1] ? 2
+          : totalScore >= level.starThresholds[0] ? 1 : 1;
+        dispatch({ type: 'SET_LEVEL_STARS', level: level.id, stars });
+
+        for (const reward of level.rewards) {
+          if (reward.powerUp && reward.count) {
+            dispatch({ type: 'ADD_POWERUP_REWARD', powerUp: reward.powerUp, count: reward.count });
+          }
+        }
+      }
+      dispatch({ type: 'SET_LEVEL_RESULT', result: 'win' });
+    } else if (movesLeft <= 0) {
+      dispatch({ type: 'SET_LEVEL_RESULT', result: 'lose' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.objectives, state.currentLevel]);
+
+  // Internal: execute a validated swap between two adjacent cells and process cascades
+  const performSwap = useCallback((from: Position, to: Position) => {
+    soundEngine.play('swap');
+    processingRef.current = true;
+    dispatch({ type: 'SET_PROCESSING', isProcessing: true });
+    dispatch({ type: 'SWAP_GEMS', from, to });
+    dispatch({ type: 'DECREMENT_MOVES' });
+
+    const swappedGrid = executeSwap(cloneGrid(state.grid), from, to);
+    dispatch({ type: 'SET_GRID', grid: swappedGrid });
+
+    const level = LEVELS.find(l => l.id === state.currentLevel);
+    const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
+
+    // Process matches with cascade
+    schedule(() => {
+      const result = processBoard(swappedGrid, gems);
+
+      if (result.cascadeCount > 0) {
+        dispatch({ type: 'SET_COMBO', combo: result.cascadeCount });
+        dispatch({ type: 'ADD_SCORE', points: result.totalCleared.score });
+        dispatch({ type: 'UPDATE_OBJECTIVES', cleared: result.totalCleared });
+        setLastScore(result.totalCleared.score);
+
+        if (result.cascadeCount >= 3) {
+          soundEngine.play('matchSuper');
+        } else if (result.cascadeCount >= 2) {
+          soundEngine.play('matchBig');
+          soundEngine.play('cascade');
+        } else {
+          soundEngine.play('match');
+        }
+
+        if (result.cascadeCount >= 2) soundEngine.play('combo');
+        if (result.totalCleared.rocksDestroyed > 0) soundEngine.play('rockBreak');
+        if (result.totalCleared.iceDestroyed > 0) soundEngine.play('iceBreak');
+        if (result.totalCleared.dirtCleared > 0) soundEngine.play('dirtClear');
+
+        if (result.allMatchedCells.length > 0) {
+          dispatch({ type: 'SET_MATCHED_CELLS', cells: result.allMatchedCells[0] });
+        }
+      }
+
+      schedule(() => {
+        dispatch({ type: 'SET_GRID', grid: result.grid });
+        dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
+        dispatch({ type: 'SET_COMBO', combo: 0 });
+
+        let finalGrid = result.grid;
+        if (!hasValidMoves(finalGrid)) {
+          finalGrid = shuffleBoard(finalGrid, gems);
+          dispatch({ type: 'SET_GRID', grid: finalGrid });
+        }
+
+        schedule(() => {
+          processingRef.current = false;
+          dispatch({ type: 'SET_PROCESSING', isProcessing: false });
+          dispatch({ type: 'SET_LAST_SWAP', swap: null });
+
+          const newScore = state.score + result.totalCleared.score;
+          const newMoves = state.movesRemaining - 1;
+          checkEndConditionFromState(newScore, newMoves, result.totalCleared);
+        }, 150);
+      }, 350);
+    }, 250);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, checkEndConditionFromState]);
+
   const handleCellClick = useCallback((pos: Position) => {
     if (processingRef.current) return;
 
@@ -390,148 +522,28 @@ export function useGameState() {
     }
 
     // Execute swap
-    soundEngine.play('swap');
-    processingRef.current = true;
-    dispatch({ type: 'SET_PROCESSING', isProcessing: true });
-    dispatch({ type: 'SWAP_GEMS', from, to });
-    dispatch({ type: 'DECREMENT_MOVES' });
-
-    const swappedGrid = executeSwap(cloneGrid(state.grid), from, to);
-    dispatch({ type: 'SET_GRID', grid: swappedGrid });
-
-    const level = LEVELS.find(l => l.id === state.currentLevel);
-    const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
-
-    // Process matches with cascade
-    schedule(() => {
-      const result = processBoard(swappedGrid, gems);
-
-      if (result.cascadeCount > 0) {
-        dispatch({ type: 'SET_COMBO', combo: result.cascadeCount });
-        dispatch({ type: 'ADD_SCORE', points: result.totalCleared.score });
-        dispatch({ type: 'UPDATE_OBJECTIVES', cleared: result.totalCleared });
-        setLastScore(result.totalCleared.score);
-
-        // Play match sounds based on cascade intensity
-        if (result.cascadeCount >= 3) {
-          soundEngine.play('matchSuper');
-        } else if (result.cascadeCount >= 2) {
-          soundEngine.play('matchBig');
-          soundEngine.play('cascade');
-        } else {
-          soundEngine.play('match');
-        }
-
-        // Play combo sound for big combos
-        if (result.cascadeCount >= 2) {
-          soundEngine.play('combo');
-        }
-
-        // Play sounds for special clears
-        if (result.totalCleared.rocksDestroyed > 0) soundEngine.play('rockBreak');
-        if (result.totalCleared.iceDestroyed > 0) soundEngine.play('iceBreak');
-        if (result.totalCleared.dirtCleared > 0) soundEngine.play('dirtClear');
-
-        // Animate matched cells for each cascade step
-        if (result.allMatchedCells.length > 0) {
-          dispatch({ type: 'SET_MATCHED_CELLS', cells: result.allMatchedCells[0] });
-        }
-      }
-
-      schedule(() => {
-        dispatch({ type: 'SET_GRID', grid: result.grid });
-        dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
-        dispatch({ type: 'SET_COMBO', combo: 0 });
-
-        // Ensure board has valid moves
-        let finalGrid = result.grid;
-        if (!hasValidMoves(finalGrid)) {
-          finalGrid = shuffleBoard(finalGrid, gems);
-          dispatch({ type: 'SET_GRID', grid: finalGrid });
-        }
-
-        schedule(() => {
-          processingRef.current = false;
-          dispatch({ type: 'SET_PROCESSING', isProcessing: false });
-          dispatch({ type: 'SET_LAST_SWAP', swap: null });
-
-          // Check win/lose after the move resolves
-          const newScore = state.score + result.totalCleared.score;
-          const newMoves = state.movesRemaining - 1;
-          checkEndConditionFromState(newScore, newMoves, result.totalCleared);
-        }, 150);
-      }, 350);
-    }, 250);
+    performSwap(from, to);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.grid, state.selectedCell, state.activePowerUp, state.currentLevel, state.score, state.movesRemaining, state.objectives]);
+  }, [state.grid, state.selectedCell, state.activePowerUp, state.currentLevel, state.score, state.movesRemaining, state.objectives, performSwap]);
 
-  const checkEndCondition = useCallback((totalScore: number, movesLeft: number) => {
-    // Re-read objectives from state to get latest
-    const objectivesMet = checkObjectives(state.objectives);
+  // Direct swap handler for swipe gestures (bypasses cell selection)
+  const handleSwap = useCallback((from: Position, to: Position) => {
+    if (processingRef.current) return;
+    if (state.activePowerUp) return;
 
-    if (objectivesMet) {
-      // Win!
-      const level = LEVELS.find(l => l.id === state.currentLevel);
-      if (level) {
-        const stars = totalScore >= level.starThresholds[2] ? 3
-          : totalScore >= level.starThresholds[1] ? 2
-          : totalScore >= level.starThresholds[0] ? 1 : 1;
-        dispatch({ type: 'SET_LEVEL_STARS', level: level.id, stars });
+    const fromCell = state.grid[from.row]?.[from.col];
+    const toCell = state.grid[to.row]?.[to.col];
+    if (!fromCell?.gem || !toCell?.gem) return;
+    if (fromCell.modifier === 'bedrock' || toCell.modifier === 'bedrock') return;
 
-        // Award rewards
-        for (const reward of level.rewards) {
-          if (reward.powerUp && reward.count) {
-            dispatch({ type: 'ADD_POWERUP_REWARD', powerUp: reward.powerUp, count: reward.count });
-          }
-        }
-      }
-      dispatch({ type: 'SET_LEVEL_RESULT', result: 'win' });
-    } else if (movesLeft <= 0) {
-      dispatch({ type: 'SET_LEVEL_RESULT', result: 'lose' });
+    if (!isValidSwap(state.grid, from, to)) {
+      soundEngine.play('badSwap');
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.objectives, state.currentLevel]);
 
-  const checkEndConditionFromState = useCallback((totalScore: number, movesLeft: number, lastCleared: ClearedInfo) => {
-    // Check with the updated objectives
-    const updatedObjectives = state.objectives.map(obj => {
-      const updated = { ...obj };
-      if (obj.type === 'score') {
-        updated.current = totalScore;
-      } else if (obj.type === 'collect_gems' && obj.gemType) {
-        updated.current = obj.current + (lastCleared.gemsCleared[obj.gemType] || 0);
-      } else if (obj.type === 'clear_rocks') {
-        updated.current = obj.current + lastCleared.rocksDestroyed;
-      } else if (obj.type === 'clear_ice') {
-        updated.current = obj.current + lastCleared.iceDestroyed;
-      } else if (obj.type === 'clear_dirt') {
-        updated.current = obj.current + lastCleared.dirtCleared;
-      }
-      return updated;
-    });
-
-    const objectivesMet = checkObjectives(updatedObjectives);
-
-    if (objectivesMet) {
-      const level = LEVELS.find(l => l.id === state.currentLevel);
-      if (level) {
-        const stars = totalScore >= level.starThresholds[2] ? 3
-          : totalScore >= level.starThresholds[1] ? 2
-          : totalScore >= level.starThresholds[0] ? 1 : 1;
-        dispatch({ type: 'SET_LEVEL_STARS', level: level.id, stars });
-
-        for (const reward of level.rewards) {
-          if (reward.powerUp && reward.count) {
-            dispatch({ type: 'ADD_POWERUP_REWARD', powerUp: reward.powerUp, count: reward.count });
-          }
-        }
-      }
-      dispatch({ type: 'SET_LEVEL_RESULT', result: 'win' });
-    } else if (movesLeft <= 0) {
-      dispatch({ type: 'SET_LEVEL_RESULT', result: 'lose' });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.objectives, state.currentLevel]);
+    dispatch({ type: 'CLEAR_SELECTION' });
+    performSwap(from, to);
+  }, [state.grid, state.activePowerUp, performSwap]);
 
   const activatePowerUp = useCallback((powerUp: PowerUpType) => {
     if (state.powerUps[powerUp] <= 0) return;
@@ -597,6 +609,7 @@ export function useGameState() {
     goToLevelSelect,
     goToDesigner,
     handleCellClick,
+    handleSwap,
     activatePowerUp,
     resetLevel,
     playDesignerLevel,
