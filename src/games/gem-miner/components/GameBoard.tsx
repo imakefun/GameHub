@@ -329,8 +329,9 @@ export function GameBoard({
             />
           ))}
 
-          {/* Gem cells in position-animated wrappers */}
-          {grid.map((row, r) =>
+          {/* Gem cells in position-animated wrappers — flatMap so React
+              reconciles keys across rows (enables vertical swap animation) */}
+          {grid.flatMap((row, r) =>
             row.map((cell, c) => {
               const key = `${r},${c}`;
               return (
@@ -346,15 +347,15 @@ export function GameBoard({
                   transition={{
                     x: {
                       type: 'spring',
-                      stiffness: 120,
-                      damping: 16,
-                      mass: 1,
+                      stiffness: 60,
+                      damping: 11,
+                      mass: 0.12,
                     },
                     y: {
                       type: 'spring',
-                      stiffness: 100,
-                      damping: 12,
-                      mass: 0.9,
+                      stiffness: 45,
+                      damping: 8,
+                      mass: 0.14,
                     },
                   }}
                   style={{

@@ -379,7 +379,7 @@ export function useGameState() {
           dispatch({ type: 'SET_GRID', grid: finalGrid });
         }
 
-        schedule(() => onComplete(totalCleared, finalGrid), 250);
+        schedule(() => onComplete(totalCleared, finalGrid), 400);
         return;
       }
 
@@ -396,11 +396,10 @@ export function useGameState() {
       else soundEngine.play('match');
       if (cascadeCount >= 2) soundEngine.play('combo');
 
-      // Wait for match highlight animation, then clear + gravity
+      // Wait for match highlight animation to play out
       schedule(() => {
         const { grid: clearedGrid, cleared } = clearMatches(currentGrid, matches);
 
-        // Apply cascade multiplier
         const multiplier = 1 + (cascadeCount - 1) * 0.5;
         cleared.score = Math.round(cleared.score * multiplier);
         totalCleared = mergeClearedInfo(totalCleared, cleared);
@@ -413,16 +412,16 @@ export function useGameState() {
         if (cleared.iceDestroyed > 0) soundEngine.play('iceBreak');
         if (cleared.dirtCleared > 0) soundEngine.play('dirtClear');
 
-        // Apply gravity and refill — this triggers the visible drop animation
+        // Apply gravity and refill — triggers the visible drop animation
         const gravityGrid = applyGravity(clearedGrid);
         currentGrid = refillGrid(gravityGrid, gems);
 
         dispatch({ type: 'SET_GRID', grid: currentGrid });
         dispatch({ type: 'SET_MATCHED_CELLS', cells: [] });
 
-        // Wait for gravity drop animation to finish, then check next cascade
-        schedule(() => step(), 600);
-      }, 500);
+        // Wait for gravity drop spring animation to fully settle
+        schedule(() => step(), 1100);
+      }, 650);
     };
 
     step();
@@ -442,7 +441,7 @@ export function useGameState() {
     const level = LEVELS.find(l => l.id === state.currentLevel);
     const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
 
-    // Wait for swap animation to finish, then start cascade
+    // Wait for swap spring animation to finish, then start cascade
     schedule(() => {
       runCascade(swappedGrid, gems, (totalCleared) => {
         processingRef.current = false;
@@ -453,7 +452,7 @@ export function useGameState() {
         const newMoves = state.movesRemaining - 1;
         checkEndConditionFromState(newScore, newMoves, totalCleared);
       });
-    }, 450);
+    }, 800);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 
