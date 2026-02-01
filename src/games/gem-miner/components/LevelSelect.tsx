@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Pickaxe, Wrench, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LEVELS } from '../data/levels';
-import { loadSubmittedLevels } from '../data/submittedLevels';
+import { fetchSubmittedLevels } from '../data/submittedLevels';
 
 interface LevelSelectProps {
   levelStars: Record<number, number>;
@@ -35,7 +35,11 @@ const ZONES = [
 
 export function LevelSelect({ levelStars, onSelectLevel, onDesigner, onSubmittedLevels }: LevelSelectProps) {
   const navigate = useNavigate();
-  const [submittedCount] = useState(() => loadSubmittedLevels().length);
+  const [submittedCount, setSubmittedCount] = useState(0);
+
+  useEffect(() => {
+    fetchSubmittedLevels().then(levels => setSubmittedCount(levels.length));
+  }, []);
 
   // A level is unlocked if it's level 1 or the previous level has stars
   const isUnlocked = (levelId: number): boolean => {

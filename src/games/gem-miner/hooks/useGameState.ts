@@ -4,7 +4,7 @@ import type {
   ClearedInfo, Level, DesignerLevel, Grid, GemType,
 } from '../types';
 import { LEVELS, DEFAULT_POWERUPS } from '../data';
-import { saveSubmittedLevel } from '../data/submittedLevels';
+import { submitLevel as submitLevelApi } from '../data/submittedLevels';
 import {
   createGrid, executeSwap, isValidSwap, findMatches, clearMatches,
   applyGravity, refillGrid, emptyClearedInfo, mergeClearedInfo,
@@ -317,7 +317,7 @@ export function useGameState() {
   }, []);
 
   const submitLevel = useCallback((level: DesignerLevel) => {
-    saveSubmittedLevel(level);
+    submitLevelApi(level);
   }, []);
 
   const checkEndCondition = useCallback((totalScore: number, movesLeft: number) => {

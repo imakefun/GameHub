@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Shuffle, Trash2, Play } from 'lucide-react';
+import { ArrowLeft, Shuffle, Trash2, Play, RefreshCw } from 'lucide-react';
 import type { DesignerLevel, SubmittedLevel } from '../types';
-import { loadSubmittedLevels, deleteSubmittedLevel, getRandomSubmittedLevel } from '../data/submittedLevels';
+import { fetchSubmittedLevels, deleteSubmittedLevel } from '../data/submittedLevels';
 
 interface SubmittedLevelsProps {
   onBack: () => void;
@@ -10,17 +10,28 @@ interface SubmittedLevelsProps {
 }
 
 export function SubmittedLevels({ onBack, onPlay }: SubmittedLevelsProps) {
-  const [levels, setLevels] = useState<SubmittedLevel[]>(() => loadSubmittedLevels());
+  const [levels, setLevels] = useState<SubmittedLevel[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleDelete = useCallback((id: string) => {
-    deleteSubmittedLevel(id);
-    setLevels(loadSubmittedLevels());
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const data = await fetchSubmittedLevels();
+    setLevels(data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    await deleteSubmittedLevel(id);
+    setLevels(prev => prev.filter(l => l.id !== id));
   }, []);
 
   const handlePlayRandom = useCallback(() => {
-    const level = getRandomSubmittedLevel();
-    if (level) onPlay(level);
-  }, [onPlay]);
+    if (levels.length === 0) return;
+    const level = levels[Math.floor(Math.random() * levels.length)];
+    onPlay(level);
+  }, [levels, onPlay]);
 
   const formatDate = (ts: number) => {
     const d = new Date(ts);
@@ -40,9 +51,16 @@ export function SubmittedLevels({ onBack, onPlay }: SubmittedLevelsProps) {
             <span className="text-sm">Back</span>
           </button>
 
-          <h1 className="text-sm font-bold text-amber-400">Submitted Levels</h1>
+          <h1 className="text-sm font-bold text-amber-400">Community Levels</h1>
 
-          <span className="text-xs text-stone-500">{levels.length} level{levels.length !== 1 ? 's' : ''}</span>
+          <button
+            onClick={refresh}
+            className="flex items-center gap-1 text-stone-500 hover:text-white transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span className="text-xs">{levels.length}</span>
+          </button>
         </div>
       </div>
 
@@ -59,11 +77,19 @@ export function SubmittedLevels({ onBack, onPlay }: SubmittedLevelsProps) {
           </motion.button>
         )}
 
+        {/* Loading state */}
+        {loading && levels.length === 0 && (
+          <div className="text-center py-16">
+            <RefreshCw size={24} className="animate-spin mx-auto mb-3 text-stone-500" />
+            <p className="text-stone-500 text-sm">Loading community levels...</p>
+          </div>
+        )}
+
         {/* Empty state */}
-        {levels.length === 0 && (
+        {!loading && levels.length === 0 && (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📭</div>
-            <p className="text-stone-400 text-sm">No submitted levels yet.</p>
+            <p className="text-stone-400 text-sm">No community levels yet.</p>
             <p className="text-stone-500 text-xs mt-1">Design a level and hit Submit to add it here!</p>
           </div>
         )}
