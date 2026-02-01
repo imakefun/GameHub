@@ -5,3 +5,4 @@ export { PowerUpBar } from './PowerUpBar';
 export { WinLoseModal } from './WinLoseModal';
 export { LevelSelect } from './LevelSelect';
 export { LevelDesigner } from './LevelDesigner';
+export { SubmittedLevels } from './SubmittedLevels';

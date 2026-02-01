@@ -1,12 +1,15 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Pickaxe, Wrench } from 'lucide-react';
+import { ArrowLeft, Pickaxe, Wrench, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LEVELS } from '../data/levels';
+import { fetchSubmittedLevels } from '../data/submittedLevels';
 
 interface LevelSelectProps {
   levelStars: Record<number, number>;
   onSelectLevel: (levelId: number) => void;
   onDesigner: () => void;
+  onSubmittedLevels: () => void;
 }
 
 function StarIcons({ count }: { count: number }) {
@@ -30,8 +33,13 @@ const ZONES = [
   { name: 'The Motherload', range: [13, 15], color: '#d97706', emoji: '💎' },
 ];
 
-export function LevelSelect({ levelStars, onSelectLevel, onDesigner }: LevelSelectProps) {
+export function LevelSelect({ levelStars, onSelectLevel, onDesigner, onSubmittedLevels }: LevelSelectProps) {
   const navigate = useNavigate();
+  const [submittedCount, setSubmittedCount] = useState(0);
+
+  useEffect(() => {
+    fetchSubmittedLevels().then(levels => setSubmittedCount(levels.length));
+  }, []);
 
   // A level is unlocked if it's level 1 or the previous level has stars
   const isUnlocked = (levelId: number): boolean => {
@@ -60,13 +68,27 @@ export function LevelSelect({ levelStars, onSelectLevel, onDesigner }: LevelSele
             <h1 className="text-lg font-bold text-amber-400">Gem Miner</h1>
           </div>
 
-          <button
-            onClick={onDesigner}
-            className="flex items-center gap-1 text-stone-400 hover:text-amber-400 transition-colors px-2 py-1 rounded-lg hover:bg-stone-800"
-          >
-            <Wrench size={16} />
-            <span className="text-xs">Design</span>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onSubmittedLevels}
+              className="flex items-center gap-1 text-stone-400 hover:text-amber-400 transition-colors px-2 py-1 rounded-lg hover:bg-stone-800 relative"
+            >
+              <Users size={16} />
+              <span className="text-xs">Community</span>
+              {submittedCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center bg-amber-600 text-white text-[9px] font-bold rounded-full px-1">
+                  {submittedCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={onDesigner}
+              className="flex items-center gap-1 text-stone-400 hover:text-amber-400 transition-colors px-2 py-1 rounded-lg hover:bg-stone-800"
+            >
+              <Wrench size={16} />
+              <span className="text-xs">Design</span>
+            </button>
+          </div>
         </div>
 
         {/* Star progress */}

@@ -6,6 +6,7 @@ import {
   WinLoseModal,
   LevelSelect,
   LevelDesigner,
+  SubmittedLevels,
 } from './components';
 import { LEVELS } from './data';
 
@@ -16,6 +17,8 @@ export function GemMiner() {
     startLevel,
     goToLevelSelect,
     goToDesigner,
+    goToSubmittedLevels,
+    submitLevel,
     handleCellClick,
     handleSwap,
     activatePowerUp,
@@ -31,6 +34,7 @@ export function GemMiner() {
         levelStars={state.levelStars}
         onSelectLevel={startLevel}
         onDesigner={goToDesigner}
+        onSubmittedLevels={goToSubmittedLevels}
       />
     );
   }
@@ -41,6 +45,17 @@ export function GemMiner() {
       <LevelDesigner
         onBack={goToLevelSelect}
         onPlayTest={playDesignerLevel}
+        onSubmit={submitLevel}
+      />
+    );
+  }
+
+  // Submitted Levels Screen
+  if (state.screen === 'submittedLevels') {
+    return (
+      <SubmittedLevels
+        onBack={goToLevelSelect}
+        onPlay={playDesignerLevel}
       />
     );
   }

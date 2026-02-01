@@ -41,7 +41,7 @@ export const LEVELS: Level[] = [
     objectives: [{ type: 'collect_gems', target: 15, gemType: 'ruby' }],
     maxMoves: 25,
     starThresholds: [1000, 2000, 3000],
-    rewards: [{ powerUp: 'pickaxe', count: 1 }],
+    rewards: [],
   },
   {
     id: 3,
@@ -56,7 +56,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 28,
     starThresholds: [1200, 2200, 3500],
-    rewards: [{ powerUp: 'dynamite', count: 1 }],
+    rewards: [{ powerUp: 'pickaxe', count: 1 }],
   },
 
   // --- ZONE 2: Crystal Caves (Levels 4-6) ---
@@ -79,7 +79,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 25,
     starThresholds: [1500, 2800, 4000],
-    rewards: [{ powerUp: 'pickaxe', count: 2 }],
+    rewards: [],
   },
   {
     id: 5,
@@ -128,7 +128,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 28,
     starThresholds: [2000, 3500, 5000],
-    rewards: [{ powerUp: 'drill', count: 1 }],
+    rewards: [],
   },
 
   // --- ZONE 3: Rocky Depths (Levels 7-9) ---
@@ -148,7 +148,7 @@ export const LEVELS: Level[] = [
     objectives: [{ type: 'clear_rocks', target: 10 }],
     maxMoves: 30,
     starThresholds: [2500, 4000, 6000],
-    rewards: [{ powerUp: 'dynamite', count: 2 }],
+    rewards: [{ powerUp: 'dynamite', count: 1 }],
   },
   {
     id: 8,
@@ -167,7 +167,7 @@ export const LEVELS: Level[] = [
     objectives: [{ type: 'collect_gems', target: 18, gemType: 'diamond' }],
     maxMoves: 30,
     starThresholds: [3000, 5000, 7500],
-    rewards: [{ powerUp: 'pickaxe', count: 2 }],
+    rewards: [],
   },
   {
     id: 9,
@@ -192,7 +192,7 @@ export const LEVELS: Level[] = [
     objectives: [{ type: 'clear_rocks', target: 12 }],
     maxMoves: 35,
     starThresholds: [3500, 5500, 8000],
-    rewards: [{ powerUp: 'earthquake', count: 1 }],
+    rewards: [{ powerUp: 'drill', count: 1 }],
   },
 
   // --- ZONE 4: Obsidian Caverns (Levels 10-12) ---
@@ -215,7 +215,7 @@ export const LEVELS: Level[] = [
     objectives: [{ type: 'score', target: 4000 }],
     maxMoves: 28,
     starThresholds: [4000, 6500, 9000],
-    rewards: [{ powerUp: 'dynamite', count: 2 }],
+    rewards: [],
   },
   {
     id: 11,
@@ -240,7 +240,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 32,
     starThresholds: [4500, 7000, 10000],
-    rewards: [{ powerUp: 'drill', count: 1 }, { powerUp: 'pickaxe', count: 2 }],
+    rewards: [{ powerUp: 'pickaxe', count: 1 }],
   },
   {
     id: 12,
@@ -271,7 +271,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 35,
     starThresholds: [5000, 8000, 12000],
-    rewards: [{ powerUp: 'earthquake', count: 1 }, { powerUp: 'dynamite', count: 1 }],
+    rewards: [{ powerUp: 'dynamite', count: 1 }],
   },
 
   // --- ZONE 5: The Motherload (Levels 13-15) ---
@@ -302,7 +302,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 35,
     starThresholds: [4000, 7000, 11000],
-    rewards: [{ powerUp: 'dynamite', count: 2 }, { powerUp: 'drill', count: 1 }],
+    rewards: [{ powerUp: 'drill', count: 1 }],
   },
   {
     id: 14,
@@ -330,7 +330,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 35,
     starThresholds: [6000, 10000, 15000],
-    rewards: [{ powerUp: 'earthquake', count: 1 }, { powerUp: 'pickaxe', count: 3 }],
+    rewards: [{ powerUp: 'earthquake', count: 1 }],
   },
   {
     id: 15,
@@ -359,7 +359,7 @@ export const LEVELS: Level[] = [
     ],
     maxMoves: 45,
     starThresholds: [8000, 14000, 20000],
-    rewards: [{ powerUp: 'dynamite', count: 3 }, { powerUp: 'drill', count: 2 }, { powerUp: 'earthquake', count: 1 }],
+    rewards: [{ powerUp: 'dynamite', count: 1 }],
   },
 ];
 

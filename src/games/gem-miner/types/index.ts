@@ -108,7 +108,7 @@ export interface Level {
 }
 
 // --- Game State Types ---
-export type Screen = 'levelSelect' | 'playing' | 'designer';
+export type Screen = 'levelSelect' | 'playing' | 'designer' | 'submittedLevels';
 export type AnimationPhase = 'idle' | 'swapping' | 'matching' | 'falling' | 'refilling' | 'cascading';
 export type LevelResult = 'none' | 'win' | 'lose';
 
@@ -148,6 +148,11 @@ export interface DesignerLevel {
   objectives: Objective[];
   maxMoves: number;
   starThresholds: [number, number, number];
+}
+
+export interface SubmittedLevel extends DesignerLevel {
+  id: string;
+  submittedAt: number;
 }
 
 // --- Action Types ---

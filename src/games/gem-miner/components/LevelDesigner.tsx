@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ArrowLeft, Play, Download, Upload, Trash2, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Play, Download, Upload, Trash2, Plus, Minus, Send } from 'lucide-react';
 import type { CellModifier, GemType, Objective, ObjectiveType, DesignerLevel, DesignerCell } from '../types';
 import { GEM_DEFS } from '../data/gems';
 import { ALL_GEM_TYPES } from '../data/gems';
@@ -7,6 +7,7 @@ import { ALL_GEM_TYPES } from '../data/gems';
 interface LevelDesignerProps {
   onBack: () => void;
   onPlayTest: (level: DesignerLevel) => void;
+  onSubmit: (level: DesignerLevel) => void;
 }
 
 type PaintTool = CellModifier;
@@ -45,7 +46,7 @@ function resizeGrid(old: DesignerCell[][], newRows: number, newCols: number): De
   );
 }
 
-export function LevelDesigner({ onBack, onPlayTest }: LevelDesignerProps) {
+export function LevelDesigner({ onBack, onPlayTest, onSubmit }: LevelDesignerProps) {
   const [name, setName] = useState('Custom Level');
   const [description, setDescription] = useState('A custom designed level');
   const [rows, setRows] = useState(8);
@@ -124,6 +125,14 @@ export function LevelDesigner({ onBack, onPlayTest }: LevelDesignerProps) {
   const handlePlayTest = useCallback(() => {
     onPlayTest(buildLevel());
   }, [buildLevel, onPlayTest]);
+
+  const [submitFlash, setSubmitFlash] = useState(false);
+
+  const handleSubmit = useCallback(() => {
+    onSubmit(buildLevel());
+    setSubmitFlash(true);
+    setTimeout(() => setSubmitFlash(false), 1500);
+  }, [buildLevel, onSubmit]);
 
   const handleExport = useCallback(() => {
     const level = buildLevel();
@@ -485,6 +494,17 @@ export function LevelDesigner({ onBack, onPlayTest }: LevelDesignerProps) {
           >
             <Download size={14} />
             <span>Export</span>
+          </button>
+          <button
+            onClick={handleSubmit}
+            className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              submitFlash
+                ? 'bg-green-600 text-white'
+                : 'bg-amber-600 hover:bg-amber-500 text-white'
+            }`}
+          >
+            <Send size={14} />
+            <span>{submitFlash ? 'Submitted!' : 'Submit'}</span>
           </button>
           <div className="flex-1" />
           <button

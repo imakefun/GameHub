@@ -4,6 +4,7 @@ import type {
   ClearedInfo, Level, DesignerLevel, Grid, GemType,
 } from '../types';
 import { LEVELS, DEFAULT_POWERUPS } from '../data';
+import { submitLevel as submitLevelApi } from '../data/submittedLevels';
 import {
   createGrid, executeSwap, isValidSwap, findMatches, clearMatches,
   applyGravity, refillGrid, emptyClearedInfo, mergeClearedInfo,
@@ -309,6 +310,14 @@ export function useGameState() {
 
   const goToDesigner = useCallback(() => {
     dispatch({ type: 'SET_SCREEN', screen: 'designer' });
+  }, []);
+
+  const goToSubmittedLevels = useCallback(() => {
+    dispatch({ type: 'SET_SCREEN', screen: 'submittedLevels' });
+  }, []);
+
+  const submitLevel = useCallback((level: DesignerLevel) => {
+    submitLevelApi(level);
   }, []);
 
   const checkEndCondition = useCallback((totalScore: number, movesLeft: number) => {
@@ -659,6 +668,8 @@ export function useGameState() {
     startLevel,
     goToLevelSelect,
     goToDesigner,
+    goToSubmittedLevels,
+    submitLevel,
     handleCellClick,
     handleSwap,
     activatePowerUp,
