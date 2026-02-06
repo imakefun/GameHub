@@ -8,6 +8,8 @@ import {
   LevelSelect,
   LevelDesigner,
   SubmittedLevels,
+  TutorialPopup,
+  getTutorialForLevel,
 } from './components';
 import { LEVELS } from './data';
 
@@ -31,6 +33,19 @@ export function GemMiner() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeTutorial, setActiveTutorial] = useState<string | null>(null);
+
+  // Check for tutorials when level changes
+  useEffect(() => {
+    if (state.screen === 'playing' && state.currentLevel > 0) {
+      const tutorial = getTutorialForLevel(state.currentLevel);
+      if (tutorial) {
+        // Small delay so the board renders first
+        const timer = setTimeout(() => setActiveTutorial(tutorial), 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [state.screen, state.currentLevel]);
 
   // Handle fullscreen changes
   useEffect(() => {
@@ -149,6 +164,12 @@ export function GemMiner() {
         onReplay={resetLevel}
         onNext={nextLevel}
         onLevelSelect={goToLevelSelect}
+      />
+
+      {/* Tutorial Popup */}
+      <TutorialPopup
+        tutorialKey={activeTutorial}
+        onClose={() => setActiveTutorial(null)}
       />
     </div>
   );
