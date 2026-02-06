@@ -12,6 +12,13 @@ interface GemBoard3DProps {
   cellSize?: number;
 }
 
+// Track gem positions for animation
+interface GemAnimState {
+  lastRow: number;
+  lastCol: number;
+  isNew: boolean;
+}
+
 // Convert grid position to 3D world position
 function gridToWorld(row: number, col: number, rows: number, cols: number, cellSize: number): [number, number, number] {
   const halfWidth = (cols * cellSize) / 2;
@@ -32,9 +39,12 @@ export function GemBoard3D({
   const rows = grid.length;
   const cols = grid[0]?.length ?? 0;
 
-  // Track swipe gesture
+  // Track gem positions across renders for animations
+  const gemStates = useRef<Map<string, GemAnimState>>(new Map());
+
+  // Track swipe gesture - use pixel threshold for screen coordinates
   const swipeStart = useRef<{ row: number; col: number; x: number; y: number } | null>(null);
-  const swipeThreshold = cellSize * 0.4; // 40% of cell size to trigger swipe
+  const swipeThreshold = 20; // Pixels
 
   const handlePointerDown = useCallback((row: number, col: number, e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -85,36 +95,70 @@ export function GemBoard3D({
     }
   }, [onGemClick, onSwipe, rows, cols, swipeThreshold]);
 
-  // Flatten grid and create gem instances
+  // Flatten grid and create gem instances with animation tracking
   const gems = useMemo(() => {
     const result: {
       id: string;
       gem: Gem;
       row: number;
       col: number;
-      position: [number, number, number];
+      initialPosition: [number, number, number];
+      targetPosition: [number, number, number];
       isSelected: boolean;
       isMatched: boolean;
+      isNew: boolean;
     }[] = [];
+
+    const currentIds = new Set<string>();
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const gem = grid[row][col];
         if (!gem) continue;
 
-        const position = gridToWorld(row, col, rows, cols, cellSize);
+        currentIds.add(gem.id);
+        const targetPosition = gridToWorld(row, col, rows, cols, cellSize);
         const isSelected = selectedGem?.row === row && selectedGem?.col === col;
         const isMatched = matchedGems.has(gem.id);
+
+        // Check if this is a new gem or has moved
+        const prevState = gemStates.current.get(gem.id);
+        let initialPosition: [number, number, number];
+        let isNew = false;
+
+        if (!prevState) {
+          // New gem - start from above the board for drop animation
+          isNew = true;
+          initialPosition = gridToWorld(-2, col, rows, cols, cellSize);
+        } else if (prevState.lastRow !== row || prevState.lastCol !== col) {
+          // Gem has moved - start from previous position
+          initialPosition = gridToWorld(prevState.lastRow, prevState.lastCol, rows, cols, cellSize);
+        } else {
+          // Gem hasn't moved - start at current position
+          initialPosition = targetPosition;
+        }
+
+        // Update tracking state
+        gemStates.current.set(gem.id, { lastRow: row, lastCol: col, isNew: false });
 
         result.push({
           id: gem.id,
           gem,
           row,
           col,
-          position,
+          initialPosition,
+          targetPosition,
           isSelected,
           isMatched,
+          isNew,
         });
+      }
+    }
+
+    // Clean up old gem states
+    for (const id of gemStates.current.keys()) {
+      if (!currentIds.has(id)) {
+        gemStates.current.delete(id);
       }
     }
 
@@ -143,15 +187,15 @@ export function GemBoard3D({
       />
 
       {/* Gems */}
-      {gems.map(({ id, gem, row, col, position, isSelected, isMatched }) => (
+      {gems.map(({ id, gem, row, col, initialPosition, targetPosition, isSelected, isMatched, isNew }) => (
         <Gem3D
           key={id}
           type={gem.type as GemType}
-          position={position}
-          targetPosition={position}
+          position={initialPosition}
+          targetPosition={targetPosition}
           isSelected={isSelected}
           isMatched={isMatched}
-          isNew={false}
+          isNew={isNew}
           onClick={() => onGemClick(row, col)}
           onPointerDown={(e) => handlePointerDown(row, col, e)}
           onPointerUp={(e) => handlePointerUp(row, col, e)}

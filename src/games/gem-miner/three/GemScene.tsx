@@ -1,11 +1,19 @@
-import { Suspense } from 'react';
+import { Suspense, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Environment, ContactShadows } from '@react-three/drei';
 import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 import * as THREE from 'three';
-import type { Gem } from '../types';
+import type { Gem, GemType } from '../types';
 import { GemBoard3D } from './GemBoard3D';
+import { ParticleSystem } from './Particles';
+
+interface ParticleBurst {
+  id: string;
+  position: [number, number, number];
+  gemType: GemType;
+  timestamp: number;
+}
 
 interface GemSceneProps {
   grid: (Gem | null)[][];
@@ -87,6 +95,15 @@ function Effects() {
   );
 }
 
+// Convert grid position to 3D world position (must match GemBoard3D)
+function gridToWorld(row: number, col: number, rows: number, cols: number, cellSize: number): [number, number, number] {
+  const halfWidth = (cols * cellSize) / 2;
+  const halfHeight = (rows * cellSize) / 2;
+  const x = col * cellSize - halfWidth + cellSize / 2;
+  const y = -(row * cellSize - halfHeight + cellSize / 2);
+  return [x, y, 0];
+}
+
 export function GemScene({
   grid,
   selectedGem,
@@ -97,10 +114,50 @@ export function GemScene({
 }: GemSceneProps) {
   const rows = grid.length;
   const cols = grid[0]?.length ?? 0;
+  const cellSize = 1;
 
   // Camera distance based on grid size
   const maxDim = Math.max(rows, cols);
   const cameraZ = maxDim * 1.2 + 2;
+
+  // Track particle bursts for matched gems
+  const burstsRef = useRef<ParticleBurst[]>([]);
+  const processedMatches = useRef<Set<string>>(new Set());
+
+  // Generate particle bursts when gems are matched
+  useEffect(() => {
+    const newBursts: ParticleBurst[] = [];
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const gem = grid[row]?.[col];
+        if (!gem) continue;
+
+        if (matchedGems.has(gem.id) && !processedMatches.current.has(gem.id)) {
+          processedMatches.current.add(gem.id);
+          const position = gridToWorld(row, col, rows, cols, cellSize);
+          newBursts.push({
+            id: `burst_${gem.id}_${Date.now()}`,
+            position,
+            gemType: gem.type,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    }
+
+    if (newBursts.length > 0) {
+      burstsRef.current = [...burstsRef.current, ...newBursts].slice(-50); // Keep last 50
+    }
+
+    // Clean up old processed matches
+    if (processedMatches.current.size > 200) {
+      const arr = Array.from(processedMatches.current);
+      arr.slice(0, 100).forEach(id => processedMatches.current.delete(id));
+    }
+  }, [grid, matchedGems, rows, cols]);
+
+  const bursts = burstsRef.current;
 
   return (
     <div className={`w-full h-full ${className}`}>
@@ -142,8 +199,11 @@ export function GemScene({
             matchedGems={matchedGems}
             onGemClick={onGemClick}
             onSwipe={onSwipe}
-            cellSize={1}
+            cellSize={cellSize}
           />
+
+          {/* Particle effects for matches */}
+          <ParticleSystem bursts={bursts} />
 
           {/* Post-processing effects */}
           <Effects />
