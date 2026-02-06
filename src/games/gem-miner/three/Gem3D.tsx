@@ -16,9 +16,7 @@ interface Gem3DProps {
   isHinted: boolean;
   isFailed: boolean;
   isNew: boolean;
-  onClick?: () => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
-  onPointerUp?: (e: ThreeEvent<PointerEvent>) => void;
 }
 
 // Fast lerp for snappy animations
@@ -34,9 +32,7 @@ export function Gem3D({
   isHinted,
   isFailed,
   isNew,
-  onClick,
   onPointerDown,
-  onPointerUp,
 }: Gem3DProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -103,9 +99,7 @@ export function Gem3D({
       ref={meshRef}
       geometry={geometry}
       material={material}
-      onClick={onClick}
       onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
     />
   );
 }
