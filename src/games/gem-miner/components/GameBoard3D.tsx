@@ -18,14 +18,16 @@ interface GameBoard3DProps {
 
 // Convert grid cells to Gem objects for Three.js scene
 function gridToGems(grid: Grid): (import('../types').Gem | null)[][] {
-  return grid.map(row =>
-    row.map(cell => {
-      if (!cell.gem) return null;
+  return grid.map((row, rowIdx) =>
+    row.map((cell, colIdx) => {
+      // Return gem info even for cells without gems (to show modifiers)
       return {
-        id: cell.gemId || `${Math.random()}`,
+        id: cell.gemId || `empty_${rowIdx}_${colIdx}`,
         type: cell.gem as GemType,
-        row: 0, // Will be set by position in array
-        col: 0,
+        special: cell.special,
+        modifier: cell.modifier,
+        row: rowIdx,
+        col: colIdx,
       };
     })
   );
@@ -34,7 +36,7 @@ function gridToGems(grid: Grid): (import('../types').Gem | null)[][] {
 export function GameBoard3D({
   grid,
   selectedCell,
-  hintCells: _hintCells, // TODO: Implement hint visualization in 3D
+  hintCells,
   matchedCells,
   activePowerUp,
   onCellClick,
@@ -72,6 +74,18 @@ export function GameBoard3D({
     }
     return set;
   }, [matchedCells, grid]);
+
+  // Create hinted gems set by gemId
+  const hintedGems = useMemo(() => {
+    const set = new Set<string>();
+    for (const pos of hintCells) {
+      const cell = grid[pos.row]?.[pos.col];
+      if (cell?.gemId) {
+        set.add(cell.gemId);
+      }
+    }
+    return set;
+  }, [hintCells, grid]);
 
   // Convert selectedCell to format expected by GemScene
   const selected = useMemo(() => {
@@ -166,6 +180,7 @@ export function GameBoard3D({
             grid={gems}
             selectedGem={selected}
             matchedGems={matchedGems}
+            hintedGems={hintedGems}
             onGemClick={handleGemClick}
             onSwipe={handleSwipe}
           />

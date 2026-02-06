@@ -2,16 +2,18 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { GemType } from '../types';
+import type { GemType, SpecialGemType } from '../types';
 import { getGemMaterial, gemMaterialConfigs } from './materials';
 import { getGemGeometry, createGlowGeometry } from './geometries';
 
 interface Gem3DProps {
   type: GemType;
+  special: SpecialGemType;
   position: [number, number, number];
   targetPosition: [number, number, number];
   isSelected: boolean;
   isMatched: boolean;
+  isHinted: boolean;
   isNew: boolean;
   onClick?: () => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
@@ -25,10 +27,12 @@ const SPRING_MASS = 4.0;
 
 export function Gem3D({
   type,
+  special,
   position,
   targetPosition,
   isSelected,
   isMatched,
+  isHinted,
   isNew,
   onClick,
   onPointerDown,
@@ -36,6 +40,8 @@ export function Gem3D({
 }: Gem3DProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const specialRef = useRef<THREE.Group>(null);
 
   // Animation state - mutated directly for performance
   const animState = useRef({
@@ -54,6 +60,10 @@ export function Gem3D({
     rotVel: 0.3 + Math.random() * 0.2,
     // Match dissolve
     dissolve: 0,
+    // Hint pulse
+    hintPhase: 0,
+    // Special effects
+    specialPhase: 0,
   });
 
   const geometry = useMemo(() => getGemGeometry(type), [type]);
@@ -69,6 +79,35 @@ export function Gem3D({
       side: THREE.BackSide,
     });
   }, [type]);
+
+  // Selection ring material
+  const ringMaterial = useMemo(() => {
+    const config = gemMaterialConfigs[type];
+    return new THREE.MeshBasicMaterial({
+      color: new THREE.Color(config.color),
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+    });
+  }, [type]);
+
+  // Special gem effect materials
+  const stripeMaterial = useMemo(() => {
+    return new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.6,
+    });
+  }, []);
+
+  const bombGlowMaterial = useMemo(() => {
+    return new THREE.MeshBasicMaterial({
+      color: '#ff4400',
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.BackSide,
+    });
+  }, []);
 
   // Spring physics simulation
   useFrame((_, delta) => {
@@ -110,18 +149,43 @@ export function Gem3D({
     state.scale += state.scaleVel * dt;
     state.scale = Math.max(0, Math.min(1.5, state.scale)); // Clamp
 
-    // Rotation - constant slow spin + faster when selected
+    // Rotation - constant slow spin + faster when selected or hinted
     const baseRotSpeed = state.rotVel;
-    const selectBoost = isSelected ? 2 : 0;
+    const selectBoost = isSelected ? 2 : isHinted ? 1 : 0;
     state.rotY += (baseRotSpeed + selectBoost) * dt;
 
+    // Hint pulse animation
+    if (isHinted) {
+      state.hintPhase += dt * 4;
+    } else {
+      state.hintPhase = 0;
+    }
+
+    // Special effects phase
+    state.specialPhase += dt * 3;
+
     // Apply transforms
-    const bounceScale = isSelected ? 1.1 : 1;
-    const finalScale = state.scale * bounceScale;
+    const hintPulse = isHinted ? 1 + Math.sin(state.hintPhase) * 0.08 : 1;
+    const bounceScale = isSelected ? 1.15 : 1;
+    const finalScale = state.scale * bounceScale * hintPulse;
 
     meshRef.current.position.set(state.posX, state.posY, state.posZ);
     meshRef.current.rotation.y = state.rotY;
     meshRef.current.scale.setScalar(finalScale);
+
+    // Selection ring
+    if (ringRef.current) {
+      ringRef.current.position.set(state.posX, state.posY, state.posZ - 0.35);
+      ringRef.current.rotation.x = -Math.PI / 2;
+
+      // Animate ring
+      const targetRingOpacity = isSelected ? 0.7 : 0;
+      ringMaterial.opacity += (targetRingOpacity - ringMaterial.opacity) * dt * 10;
+
+      // Pulse scale when selected
+      const ringPulse = isSelected ? 1 + Math.sin(state.specialPhase * 2) * 0.1 : 1;
+      ringRef.current.scale.setScalar(ringPulse);
+    }
 
     // Glow effect
     if (glowRef.current) {
@@ -129,25 +193,52 @@ export function Gem3D({
       glowRef.current.rotation.copy(meshRef.current.rotation);
       glowRef.current.scale.setScalar(finalScale * 1.15);
 
-      // Animate glow opacity
-      const targetGlow = isSelected ? 0.5 : isMatched ? 0.8 : 0;
+      // Animate glow opacity - pulsing for hints
+      let targetGlow = isMatched ? 0.8 : isSelected ? 0.5 : 0;
+      if (isHinted) {
+        targetGlow = 0.3 + Math.sin(state.hintPhase) * 0.3;
+      }
       glowMaterial.opacity += (targetGlow - glowMaterial.opacity) * dt * 10;
     }
 
-    // Update material emissive for match effect
+    // Special gem effects
+    if (specialRef.current) {
+      specialRef.current.position.copy(meshRef.current.position);
+      specialRef.current.rotation.y = state.rotY;
+      specialRef.current.scale.setScalar(finalScale);
+
+      // Bomb pulsing
+      if (special === 'bomb') {
+        bombGlowMaterial.opacity = 0.3 + Math.sin(state.specialPhase * 2) * 0.2;
+      }
+    }
+
+    // Update material emissive for match/hint effect
     if (isMatched) {
       state.dissolve += dt * 3;
       material.emissiveIntensity = 0.3 + state.dissolve * 2;
       material.opacity = Math.max(0, 1 - state.dissolve);
     } else {
       state.dissolve = 0;
-      material.emissiveIntensity = isSelected ? 0.6 : 0.3;
+      const hintEmissive = isHinted ? 0.4 + Math.sin(state.hintPhase) * 0.2 : 0;
+      material.emissiveIntensity = isSelected ? 0.6 : 0.3 + hintEmissive;
       material.opacity = 1;
+    }
+
+    // Prismatic rainbow effect
+    if (special === 'prismatic' && material.iridescence !== undefined) {
+      material.iridescence = 0.8 + Math.sin(state.specialPhase) * 0.2;
     }
   });
 
   return (
     <group>
+      {/* Selection ring under the gem */}
+      <mesh ref={ringRef} renderOrder={-1}>
+        <ringGeometry args={[0.35, 0.45, 32]} />
+        <primitive object={ringMaterial} attach="material" />
+      </mesh>
+
       {/* Glow mesh (rendered behind) */}
       <mesh
         ref={glowRef}
@@ -155,6 +246,37 @@ export function Gem3D({
         material={glowMaterial}
         renderOrder={0}
       />
+
+      {/* Special gem effects */}
+      {special !== 'none' && (
+        <group ref={specialRef}>
+          {/* Striped horizontal - white band */}
+          {special === 'striped_h' && (
+            <mesh>
+              <boxGeometry args={[0.6, 0.1, 0.6]} />
+              <primitive object={stripeMaterial} attach="material" />
+            </mesh>
+          )}
+
+          {/* Striped vertical - white band */}
+          {special === 'striped_v' && (
+            <mesh>
+              <boxGeometry args={[0.1, 0.6, 0.6]} />
+              <primitive object={stripeMaterial} attach="material" />
+            </mesh>
+          )}
+
+          {/* Bomb - outer glow sphere */}
+          {special === 'bomb' && (
+            <mesh>
+              <sphereGeometry args={[0.5, 16, 16]} />
+              <primitive object={bombGlowMaterial} attach="material" />
+            </mesh>
+          )}
+
+          {/* Prismatic - no extra geometry, handled via material */}
+        </group>
+      )}
 
       {/* Main gem mesh */}
       <mesh
@@ -165,8 +287,7 @@ export function Gem3D({
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         renderOrder={1}
-      >
-      </mesh>
+      />
     </group>
   );
 }

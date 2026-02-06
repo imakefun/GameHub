@@ -1,12 +1,14 @@
 import { useRef, useCallback, useMemo } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
-import type { Gem, GemType } from '../types';
+import type { Gem, GemType, SpecialGemType, CellModifier } from '../types';
 import { Gem3D } from './Gem3D';
+import { CellOverlay } from './CellOverlay';
 
 interface GemBoard3DProps {
   grid: (Gem | null)[][];
   selectedGem: { row: number; col: number } | null;
   matchedGems: Set<string>;
+  hintedGems: Set<string>;
   onGemClick: (row: number, col: number) => void;
   onSwipe: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void;
   cellSize?: number;
@@ -32,6 +34,7 @@ export function GemBoard3D({
   grid,
   selectedGem,
   matchedGems,
+  hintedGems,
   onGemClick,
   onSwipe,
   cellSize = 1,
@@ -96,8 +99,8 @@ export function GemBoard3D({
   }, [onGemClick, onSwipe, rows, cols, swipeThreshold]);
 
   // Flatten grid and create gem instances with animation tracking
-  const gems = useMemo(() => {
-    const result: {
+  const { gems, cellOverlays } = useMemo(() => {
+    const gemResult: {
       id: string;
       gem: Gem;
       row: number;
@@ -106,7 +109,16 @@ export function GemBoard3D({
       targetPosition: [number, number, number];
       isSelected: boolean;
       isMatched: boolean;
+      isHinted: boolean;
       isNew: boolean;
+      special: SpecialGemType;
+    }[] = [];
+
+    const overlayResult: {
+      row: number;
+      col: number;
+      position: [number, number, number];
+      modifier: CellModifier;
     }[] = [];
 
     const currentIds = new Set<string>();
@@ -116,10 +128,25 @@ export function GemBoard3D({
         const gem = grid[row][col];
         if (!gem) continue;
 
-        currentIds.add(gem.id);
         const targetPosition = gridToWorld(row, col, rows, cols, cellSize);
+
+        // Add cell modifier overlay if present
+        if (gem.modifier && gem.modifier !== 'none') {
+          overlayResult.push({
+            row,
+            col,
+            position: targetPosition,
+            modifier: gem.modifier,
+          });
+        }
+
+        // Skip gem rendering if no gem type (e.g., rock-only cell)
+        if (!gem.type) continue;
+
+        currentIds.add(gem.id);
         const isSelected = selectedGem?.row === row && selectedGem?.col === col;
         const isMatched = matchedGems.has(gem.id);
+        const isHinted = hintedGems.has(gem.id);
 
         // Check if this is a new gem or has moved
         const prevState = gemStates.current.get(gem.id);
@@ -141,7 +168,7 @@ export function GemBoard3D({
         // Update tracking state
         gemStates.current.set(gem.id, { lastRow: row, lastCol: col, isNew: false });
 
-        result.push({
+        gemResult.push({
           id: gem.id,
           gem,
           row,
@@ -150,7 +177,9 @@ export function GemBoard3D({
           targetPosition,
           isSelected,
           isMatched,
+          isHinted,
           isNew,
+          special: gem.special || 'none',
         });
       }
     }
@@ -162,8 +191,8 @@ export function GemBoard3D({
       }
     }
 
-    return result;
-  }, [grid, rows, cols, cellSize, selectedGem, matchedGems]);
+    return { gems: gemResult, cellOverlays: overlayResult };
+  }, [grid, rows, cols, cellSize, selectedGem, matchedGems, hintedGems]);
 
   return (
     <group>
@@ -186,15 +215,27 @@ export function GemBoard3D({
         position={[0, 0, -0.4]}
       />
 
+      {/* Cell modifier overlays (ice, dirt, rock) */}
+      {cellOverlays.map(({ row, col, position, modifier }) => (
+        <CellOverlay
+          key={`overlay_${row}_${col}`}
+          position={position}
+          modifier={modifier}
+          cellSize={cellSize}
+        />
+      ))}
+
       {/* Gems */}
-      {gems.map(({ id, gem, row, col, initialPosition, targetPosition, isSelected, isMatched, isNew }) => (
+      {gems.map(({ id, gem, row, col, initialPosition, targetPosition, isSelected, isMatched, isHinted, isNew, special }) => (
         <Gem3D
           key={id}
           type={gem.type as GemType}
+          special={special}
           position={initialPosition}
           targetPosition={targetPosition}
           isSelected={isSelected}
           isMatched={isMatched}
+          isHinted={isHinted}
           isNew={isNew}
           onClick={() => onGemClick(row, col)}
           onPointerDown={(e) => handlePointerDown(row, col, e)}
