@@ -4,10 +4,16 @@ import type { CellModifier, GemType, Objective, ObjectiveType, DesignerLevel, De
 import { GEM_DEFS } from '../data/gems';
 import { ALL_GEM_TYPES } from '../data/gems';
 
+interface SubmitResult {
+  success: boolean;
+  error?: string;
+  details?: string[];
+}
+
 interface LevelDesignerProps {
   onBack: () => void;
   onPlayTest: (level: DesignerLevel) => void;
-  onSubmit: (level: DesignerLevel) => void;
+  onSubmit: (level: DesignerLevel) => Promise<SubmitResult>;
 }
 
 type PaintTool = CellModifier;
@@ -127,11 +133,33 @@ export function LevelDesigner({ onBack, onPlayTest, onSubmit }: LevelDesignerPro
   }, [buildLevel, onPlayTest]);
 
   const [submitFlash, setSubmitFlash] = useState(false);
+  const [submitError, setSubmitError] = useState<{ message: string; details: string[] } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = useCallback(() => {
-    onSubmit(buildLevel());
-    setSubmitFlash(true);
-    setTimeout(() => setSubmitFlash(false), 1500);
+  const handleSubmit = useCallback(async () => {
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      const result = await onSubmit(buildLevel());
+
+      if (result.success) {
+        setSubmitFlash(true);
+        setTimeout(() => setSubmitFlash(false), 1500);
+      } else {
+        setSubmitError({
+          message: result.error || 'Submission failed',
+          details: result.details || [],
+        });
+      }
+    } catch {
+      setSubmitError({
+        message: 'An unexpected error occurred',
+        details: [],
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [buildLevel, onSubmit]);
 
   const handleExport = useCallback(() => {
@@ -478,6 +506,31 @@ export function LevelDesigner({ onBack, onPlayTest, onSubmit }: LevelDesignerPro
         )}
       </div>
 
+      {/* Error message */}
+      {submitError && (
+        <div className="fixed bottom-20 left-3 right-3 max-w-md mx-auto bg-red-900/90 border border-red-700 rounded-lg p-3 z-30">
+          <div className="flex items-start gap-2">
+            <span className="text-red-400 text-lg">⚠️</span>
+            <div className="flex-1">
+              <p className="text-sm text-red-200 font-medium">{submitError.message}</p>
+              {submitError.details.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5">
+                  {submitError.details.map((detail, i) => (
+                    <li key={i} className="text-xs text-red-300/80">• {detail}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button
+              onClick={() => setSubmitError(null)}
+              className="text-red-400 hover:text-red-300 text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bottom action bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-stone-950/95 backdrop-blur-sm border-t border-stone-800 py-2 px-3 z-20">
         <div className="max-w-md mx-auto flex items-center gap-2">
@@ -497,14 +550,17 @@ export function LevelDesigner({ onBack, onPlayTest, onSubmit }: LevelDesignerPro
           </button>
           <button
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
               submitFlash
                 ? 'bg-green-600 text-white'
+                : isSubmitting
+                ? 'bg-stone-600 text-stone-400 cursor-wait'
                 : 'bg-amber-600 hover:bg-amber-500 text-white'
             }`}
           >
-            <Send size={14} />
-            <span>{submitFlash ? 'Submitted!' : 'Submit'}</span>
+            <Send size={14} className={isSubmitting ? 'animate-pulse' : ''} />
+            <span>{submitFlash ? 'Submitted!' : isSubmitting ? 'Submitting...' : 'Submit'}</span>
           </button>
           <div className="flex-1" />
           <button

@@ -4,7 +4,7 @@ import type {
   ClearedInfo, Level, DesignerLevel, Grid, GemType,
 } from '../types';
 import { LEVELS, DEFAULT_POWERUPS } from '../data';
-import { submitLevel as submitLevelApi } from '../data/submittedLevels';
+import { submitLevel as submitLevelApi, SubmissionError } from '../data/submittedLevels';
 import {
   createGrid, executeSwap, isValidSwap, canAttemptSwap, findMatches, clearMatches,
   applyGravity, refillGrid, emptyClearedInfo, mergeClearedInfo,
@@ -317,8 +317,16 @@ export function useGameState() {
     dispatch({ type: 'SET_SCREEN', screen: 'submittedLevels' });
   }, []);
 
-  const submitLevel = useCallback((level: DesignerLevel) => {
-    submitLevelApi(level);
+  const submitLevel = useCallback(async (level: DesignerLevel): Promise<{ success: boolean; error?: string; details?: string[] }> => {
+    try {
+      await submitLevelApi(level);
+      return { success: true };
+    } catch (err) {
+      if (err instanceof SubmissionError) {
+        return { success: false, error: err.message, details: err.details };
+      }
+      return { success: false, error: 'Failed to submit level. Please try again.' };
+    }
   }, []);
 
   const checkEndCondition = useCallback((totalScore: number, movesLeft: number) => {
