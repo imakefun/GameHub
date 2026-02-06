@@ -9,6 +9,7 @@ interface GemSceneProps {
   selectedGem: { row: number; col: number } | null;
   matchedGems: Set<string>;
   hintedGems: Set<string>;
+  failedGems: Set<string>;
   onGemClick: (row: number, col: number) => void;
   onSwipe: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void;
   className?: string;
@@ -29,6 +30,7 @@ export function GemScene({
   selectedGem,
   matchedGems,
   hintedGems,
+  failedGems,
   onGemClick,
   onSwipe,
   className = '',
@@ -65,6 +67,7 @@ export function GemScene({
             selectedGem={selectedGem}
             matchedGems={matchedGems}
             hintedGems={hintedGems}
+            failedGems={failedGems}
             onGemClick={onGemClick}
             onSwipe={onSwipe}
             cellSize={cellSize}

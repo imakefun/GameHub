@@ -14,6 +14,7 @@ interface GameBoard3DProps {
   isProcessing: boolean;
   combo: number;
   lastScore: number;
+  failedSwap: { from: Position; to: Position } | null;
 }
 
 // Convert grid cells to Gem objects for Three.js scene
@@ -44,6 +45,7 @@ export function GameBoard3D({
   isProcessing,
   combo,
   lastScore,
+  failedSwap,
 }: GameBoard3DProps) {
   const rows = grid.length;
   const cols = grid[0]?.length || 0;
@@ -86,6 +88,18 @@ export function GameBoard3D({
     }
     return set;
   }, [hintCells, grid]);
+
+  // Create failed swap gems set by gemId (for shake animation)
+  const failedGems = useMemo(() => {
+    const set = new Set<string>();
+    if (failedSwap) {
+      const fromCell = grid[failedSwap.from.row]?.[failedSwap.from.col];
+      const toCell = grid[failedSwap.to.row]?.[failedSwap.to.col];
+      if (fromCell?.gemId) set.add(fromCell.gemId);
+      if (toCell?.gemId) set.add(toCell.gemId);
+    }
+    return set;
+  }, [failedSwap, grid]);
 
   // Convert selectedCell to format expected by GemScene
   const selected = useMemo(() => {
@@ -181,6 +195,7 @@ export function GameBoard3D({
             selectedGem={selected}
             matchedGems={matchedGems}
             hintedGems={hintedGems}
+            failedGems={failedGems}
             onGemClick={handleGemClick}
             onSwipe={handleSwipe}
           />

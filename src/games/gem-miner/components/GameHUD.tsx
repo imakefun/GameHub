@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import type { ObjectiveProgress, GemType } from '../types';
 import { GEM_DEFS } from '../data/gems';
 import { LEVELS } from '../data/levels';
@@ -14,6 +14,8 @@ interface GameHUDProps {
   combo: number;
   onBack: () => void;
   onReset: () => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
 }
 
 function objectiveLabel(obj: ObjectiveProgress): string {
@@ -75,7 +77,7 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
   return <span className={className}>{display.toLocaleString()}</span>;
 }
 
-export function GameHUD({ levelId, score, movesRemaining, objectives, combo, onBack, onReset }: GameHUDProps) {
+export function GameHUD({ levelId, score, movesRemaining, objectives, combo, onBack, onReset, isFullscreen, onToggleFullscreen }: GameHUDProps) {
   const level = LEVELS.find(l => l.id === levelId);
   const levelName = level?.name || `Level ${levelId}`;
   const [sfxOn, setSfxOn] = useState(soundEngine.sfxEnabled);
@@ -113,8 +115,16 @@ export function GameHUD({ levelId, score, movesRemaining, objectives, combo, onB
           <button
             onClick={toggleSound}
             className="text-stone-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-stone-800"
+            title={sfxOn ? 'Mute' : 'Unmute'}
           >
             {sfxOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+          <button
+            onClick={() => { soundEngine.play('buttonClick'); onToggleFullscreen(); }}
+            className="text-stone-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-stone-800"
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
           </button>
           <button
             onClick={() => { soundEngine.play('buttonClick'); onReset(); }}

@@ -14,6 +14,7 @@ interface Gem3DProps {
   isSelected: boolean;
   isMatched: boolean;
   isHinted: boolean;
+  isFailed: boolean;
   isNew: boolean;
   onClick?: () => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
@@ -31,6 +32,7 @@ export function Gem3D({
   isSelected,
   isMatched,
   isHinted,
+  isFailed,
   isNew,
   onClick,
   onPointerDown,
@@ -44,6 +46,7 @@ export function Gem3D({
     posY: position[1],
     posZ: position[2],
     scale: isNew ? 0.01 : 1,
+    shakeTime: 0,
   });
 
   const geometry = useMemo(() => getGemGeometry(type), [type]);
@@ -81,8 +84,17 @@ export function Gem3D({
     const targetScale = isMatched ? 0 : (isSelected ? 1.15 : (isHinted ? 1.08 : 1));
     state.scale += (targetScale - state.scale) * lerpFactor * 1.5;
 
+    // Shake animation for failed swaps
+    let shakeOffsetX = 0;
+    if (isFailed) {
+      state.shakeTime += dt * 40; // Fast shake frequency
+      shakeOffsetX = Math.sin(state.shakeTime) * 0.12 * Math.exp(-state.shakeTime * 0.15);
+    } else {
+      state.shakeTime = 0;
+    }
+
     // Apply transforms - no rotation
-    meshRef.current.position.set(state.posX, state.posY, state.posZ);
+    meshRef.current.position.set(state.posX + shakeOffsetX, state.posY, state.posZ);
     meshRef.current.scale.setScalar(Math.max(0.01, state.scale));
   });
 

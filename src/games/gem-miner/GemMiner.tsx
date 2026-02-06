@@ -1,4 +1,5 @@
 import { useGameState } from './hooks/useGameState';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   GameBoard,
   GameHUD,
@@ -14,6 +15,7 @@ export function GemMiner() {
   const {
     state,
     lastScore,
+    failedSwap,
     startLevel,
     goToLevelSelect,
     goToDesigner,
@@ -26,6 +28,26 @@ export function GemMiner() {
     playDesignerLevel,
     nextLevel,
   } = useGameState();
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Handle fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }, []);
 
   // Level Select Screen
   if (state.screen === 'levelSelect') {
@@ -71,7 +93,10 @@ export function GemMiner() {
     : 0;
 
   return (
-    <div className="h-dvh bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 flex flex-col select-none overflow-hidden">
+    <div
+      ref={containerRef}
+      className="h-dvh bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 flex flex-col select-none overflow-hidden"
+    >
       {/* HUD */}
       <GameHUD
         levelId={state.currentLevel}
@@ -81,6 +106,8 @@ export function GemMiner() {
         combo={state.combo}
         onBack={goToLevelSelect}
         onReset={resetLevel}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
       />
 
       {/* Game Board */}
@@ -97,17 +124,20 @@ export function GemMiner() {
             isProcessing={state.isProcessing}
             combo={state.combo}
             lastScore={lastScore}
+            failedSwap={failedSwap}
           />
         )}
       </div>
 
-      {/* Power-Up Bar */}
-      <PowerUpBar
-        powerUps={state.powerUps}
-        activePowerUp={state.activePowerUp}
-        onActivate={activatePowerUp}
-        isProcessing={state.isProcessing}
-      />
+      {/* Power-Up Bar - compact in fullscreen */}
+      <div className={isFullscreen ? 'scale-90 origin-bottom' : ''}>
+        <PowerUpBar
+          powerUps={state.powerUps}
+          activePowerUp={state.activePowerUp}
+          onActivate={activatePowerUp}
+          isProcessing={state.isProcessing}
+        />
+      </div>
 
       {/* Win/Lose Modal */}
       <WinLoseModal

@@ -6,7 +6,7 @@ import type {
 import { LEVELS, DEFAULT_POWERUPS } from '../data';
 import { submitLevel as submitLevelApi } from '../data/submittedLevels';
 import {
-  createGrid, executeSwap, isValidSwap, findMatches, clearMatches,
+  createGrid, executeSwap, isValidSwap, canAttemptSwap, findMatches, clearMatches,
   applyGravity, refillGrid, emptyClearedInfo, mergeClearedInfo,
   findBestMove, hasValidMoves, shuffleBoard,
   applyPowerUp, checkObjectives, cloneGrid,
@@ -252,6 +252,7 @@ export function useGameState() {
   const processingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [lastScore, setLastScore] = useState(0);
+  const [failedSwap, setFailedSwap] = useState<{ from: Position; to: Position } | null>(null);
 
   // Save on changes to persistent data
   useEffect(() => {
@@ -568,11 +569,12 @@ export function useGameState() {
     const from = state.selectedCell;
     const to = pos;
 
-    if (!isValidSwap(state.grid, from, to)) {
-      // Not a valid swap - select the new cell instead
-      soundEngine.play('badSwap');
+    // Check if cells are adjacent and can be swapped
+    if (!canAttemptSwap(state.grid, from, to)) {
+      // Not adjacent - select the new cell instead
       const cell = state.grid[pos.row]?.[pos.col];
       if (cell && cell.modifier !== 'bedrock' && cell.gem !== null) {
+        soundEngine.play('select');
         dispatch({ type: 'SELECT_CELL', position: pos });
       } else {
         dispatch({ type: 'CLEAR_SELECTION' });
@@ -580,7 +582,36 @@ export function useGameState() {
       return;
     }
 
-    // Execute swap
+    // Adjacent cells - attempt the swap
+    if (!isValidSwap(state.grid, from, to)) {
+      // Adjacent but won't create matches - do failed swap animation
+      soundEngine.play('swap');
+      dispatch({ type: 'CLEAR_SELECTION' });
+      processingRef.current = true;
+      dispatch({ type: 'SET_PROCESSING', isProcessing: true });
+
+      // Swap visually
+      const swappedGrid = executeSwap(cloneGrid(state.grid), from, to);
+      dispatch({ type: 'SET_GRID', grid: swappedGrid });
+
+      // After short delay, swap back with shake
+      schedule(() => {
+        soundEngine.play('badSwap');
+        setFailedSwap({ from, to });
+        const originalGrid = executeSwap(cloneGrid(swappedGrid), from, to);
+        dispatch({ type: 'SET_GRID', grid: originalGrid });
+
+        // Clear failed swap state after animation
+        schedule(() => {
+          setFailedSwap(null);
+          processingRef.current = false;
+          dispatch({ type: 'SET_PROCESSING', isProcessing: false });
+        }, 300);
+      }, 200);
+      return;
+    }
+
+    // Execute valid swap
     performSwap(from, to);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.selectedCell, state.activePowerUp, state.currentLevel, state.score, state.movesRemaining, state.objectives, performSwap]);
@@ -595,14 +626,41 @@ export function useGameState() {
     if (!fromCell?.gem || !toCell?.gem) return;
     if (fromCell.modifier === 'bedrock' || toCell.modifier === 'bedrock') return;
 
+    if (!canAttemptSwap(state.grid, from, to)) {
+      return;
+    }
+
     if (!isValidSwap(state.grid, from, to)) {
-      soundEngine.play('badSwap');
+      // Adjacent but won't create matches - do failed swap animation
+      soundEngine.play('swap');
+      dispatch({ type: 'CLEAR_SELECTION' });
+      processingRef.current = true;
+      dispatch({ type: 'SET_PROCESSING', isProcessing: true });
+
+      // Swap visually
+      const swappedGrid = executeSwap(cloneGrid(state.grid), from, to);
+      dispatch({ type: 'SET_GRID', grid: swappedGrid });
+
+      // After short delay, swap back with shake
+      schedule(() => {
+        soundEngine.play('badSwap');
+        setFailedSwap({ from, to });
+        const originalGrid = executeSwap(cloneGrid(swappedGrid), from, to);
+        dispatch({ type: 'SET_GRID', grid: originalGrid });
+
+        // Clear failed swap state after animation
+        schedule(() => {
+          setFailedSwap(null);
+          processingRef.current = false;
+          dispatch({ type: 'SET_PROCESSING', isProcessing: false });
+        }, 300);
+      }, 200);
       return;
     }
 
     dispatch({ type: 'CLEAR_SELECTION' });
     performSwap(from, to);
-  }, [state.grid, state.activePowerUp, performSwap]);
+  }, [state.grid, state.activePowerUp, performSwap, schedule]);
 
   const activatePowerUp = useCallback((powerUp: PowerUpType) => {
     if (state.powerUps[powerUp] <= 0) return;
@@ -664,6 +722,7 @@ export function useGameState() {
   return {
     state,
     lastScore,
+    failedSwap,
     dispatch,
     startLevel,
     goToLevelSelect,
