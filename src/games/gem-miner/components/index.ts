@@ -1,4 +1,7 @@
-export { GameBoard } from './GameBoard';
+// Using 3D Three.js game board for enhanced visuals
+export { GameBoard3D as GameBoard } from './GameBoard3D';
+// Original 2D board (kept for fallback)
+export { GameBoard as GameBoard2D } from './GameBoard';
 export { GemCell } from './GemCell';
 export { GameHUD } from './GameHUD';
 export { PowerUpBar } from './PowerUpBar';
