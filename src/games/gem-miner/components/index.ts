@@ -9,3 +9,4 @@ export { WinLoseModal } from './WinLoseModal';
 export { LevelSelect } from './LevelSelect';
 export { LevelDesigner } from './LevelDesigner';
 export { SubmittedLevels } from './SubmittedLevels';
+export { TutorialPopup, getTutorialForLevel } from './TutorialPopup';
