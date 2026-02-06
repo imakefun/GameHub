@@ -196,24 +196,11 @@ export function GemBoard3D({
 
   return (
     <group>
-      {/* Background plane for the grid */}
-      <mesh position={[0, 0, -0.5]} receiveShadow>
-        <planeGeometry args={[cols * cellSize + 0.2, rows * cellSize + 0.2]} />
-        <meshStandardMaterial
-          color="#1a1a2e"
-          metalness={0.3}
-          roughness={0.8}
-          transparent
-          opacity={0.9}
-        />
+      {/* Simple background plane */}
+      <mesh position={[0, 0, -0.3]}>
+        <planeGeometry args={[cols * cellSize + 0.3, rows * cellSize + 0.3]} />
+        <meshBasicMaterial color="#1a1a2e" />
       </mesh>
-
-      {/* Grid lines */}
-      <gridHelper
-        args={[Math.max(rows, cols) * cellSize, Math.max(rows, cols), '#333344', '#222233']}
-        rotation={[Math.PI / 2, 0, 0]}
-        position={[0, 0, -0.4]}
-      />
 
       {/* Cell modifier overlays (ice, dirt, rock) */}
       {cellOverlays.map(({ row, col, position, modifier }) => (
