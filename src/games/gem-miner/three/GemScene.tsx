@@ -14,16 +14,12 @@ interface GemSceneProps {
   className?: string;
 }
 
-// Simple, fast lighting - no shadows
+// Minimal lighting
 function Lights() {
   return (
     <>
-      {/* Single directional light */}
-      <directionalLight position={[5, 8, 5]} intensity={1.2} color="#ffffff" />
-      {/* Fill light */}
-      <directionalLight position={[-3, 2, 3]} intensity={0.4} color="#aaccff" />
-      {/* Ambient */}
-      <ambientLight intensity={0.5} />
+      <directionalLight position={[3, 5, 5]} intensity={1} />
+      <ambientLight intensity={0.6} />
     </>
   );
 }
@@ -41,24 +37,25 @@ export function GemScene({
   const cols = grid[0]?.length ?? 0;
   const cellSize = 1;
 
-  // Camera distance based on grid size
+  // Camera closer for larger board appearance
   const maxDim = Math.max(rows, cols);
-  const cameraZ = maxDim * 1.2 + 2;
+  const cameraZ = maxDim * 0.9 + 1;
 
   return (
-    <div className={`w-full h-full ${className}`}>
+    <div className={`w-full h-full ${className}`} style={{ touchAction: 'none' }}>
       <Canvas
-        dpr={1} // Force 1x pixel ratio for performance
+        dpr={1}
         camera={{
           position: [0, 0, cameraZ],
-          fov: 50,
+          fov: 55,
           near: 0.1,
-          far: 100,
+          far: 50,
         }}
         gl={{
-          antialias: false, // Disable for performance
+          antialias: false,
           powerPreference: 'high-performance',
           toneMapping: THREE.NoToneMapping,
+          precision: 'lowp',
         }}
       >
         <Suspense fallback={null}>
