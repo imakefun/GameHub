@@ -1,4 +1,4 @@
-import { useRef, useCallback, useMemo } from 'react';
+import { useRef, useCallback, useMemo, useEffect } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Gem, GemType, SpecialGemType, CellModifier } from '../types';
 import { Gem3D } from './Gem3D';
@@ -47,58 +47,91 @@ export function GemBoard3D({
   // Track gem positions across renders for animations
   const gemStates = useRef<Map<string, GemAnimState>>(new Map());
 
-  // Track swipe gesture - use pixel threshold for screen coordinates
-  const swipeStart = useRef<{ row: number; col: number; x: number; y: number } | null>(null);
-  const swipeThreshold = 20; // Pixels
+  // Swipe gesture state - track globally for reliability
+  const gestureRef = useRef<{
+    active: boolean;
+    startRow: number;
+    startCol: number;
+    startX: number;
+    startY: number;
+    handled: boolean;
+  } | null>(null);
 
+  const swipeThreshold = 25; // Pixels - trigger swap when exceeded
+
+  // Handle pointer down on a gem - start tracking gesture
   const handlePointerDown = useCallback((row: number, col: number, e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    swipeStart.current = { row, col, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+    gestureRef.current = {
+      active: true,
+      startRow: row,
+      startCol: col,
+      startX: e.nativeEvent.clientX,
+      startY: e.nativeEvent.clientY,
+      handled: false,
+    };
   }, []);
 
-  const handlePointerUp = useCallback((row: number, col: number, e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    const event = e.nativeEvent;
+  // Global pointer move handler - detect swipe direction during movement
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      const gesture = gestureRef.current;
+      if (!gesture || !gesture.active || gesture.handled) return;
 
-    if (!swipeStart.current) {
-      onGemClick(row, col);
-      return;
-    }
+      const dx = e.clientX - gesture.startX;
+      const dy = e.clientY - gesture.startY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
 
-    const dx = event.clientX - swipeStart.current.x;
-    const dy = event.clientY - swipeStart.current.y;
-    const startRow = swipeStart.current.row;
-    const startCol = swipeStart.current.col;
+      // Check if swipe threshold exceeded
+      if (absDx >= swipeThreshold || absDy >= swipeThreshold) {
+        // Determine direction and execute swap immediately
+        let toRow = gesture.startRow;
+        let toCol = gesture.startCol;
 
-    swipeStart.current = null;
+        if (absDx > absDy) {
+          toCol = gesture.startCol + (dx > 0 ? 1 : -1);
+        } else {
+          toRow = gesture.startRow + (dy > 0 ? 1 : -1);
+        }
 
-    // Check if it was a swipe
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
+        // Mark as handled so we don't trigger again
+        gesture.handled = true;
 
-    if (absDx < swipeThreshold && absDy < swipeThreshold) {
-      // It was a tap, not a swipe
-      onGemClick(row, col);
-      return;
-    }
+        // Validate and execute swap
+        if (toRow >= 0 && toRow < rows && toCol >= 0 && toCol < cols) {
+          onSwipe(gesture.startRow, gesture.startCol, toRow, toCol);
+        }
+      }
+    };
 
-    // Determine swipe direction
-    let toRow = startRow;
-    let toCol = startCol;
+    const handlePointerUp = () => {
+      const gesture = gestureRef.current;
+      if (!gesture) return;
 
-    if (absDx > absDy) {
-      // Horizontal swipe
-      toCol = startCol + (dx > 0 ? 1 : -1);
-    } else {
-      // Vertical swipe
-      toRow = startRow + (dy > 0 ? 1 : -1);
-    }
+      // If gesture wasn't handled as a swipe, it was a tap
+      if (gesture.active && !gesture.handled) {
+        onGemClick(gesture.startRow, gesture.startCol);
+      }
 
-    // Validate target is within bounds
-    if (toRow >= 0 && toRow < rows && toCol >= 0 && toCol < cols) {
-      onSwipe(startRow, startCol, toRow, toCol);
-    }
-  }, [onGemClick, onSwipe, rows, cols, swipeThreshold]);
+      gestureRef.current = null;
+    };
+
+    const handlePointerCancel = () => {
+      gestureRef.current = null;
+    };
+
+    // Use passive: false for touch events to allow preventDefault if needed
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
+    };
+  }, [rows, cols, onSwipe, onGemClick, swipeThreshold]);
 
   // Flatten grid and create gem instances with animation tracking
   const { gems, cellOverlays } = useMemo(() => {
@@ -230,9 +263,7 @@ export function GemBoard3D({
           isHinted={isHinted}
           isFailed={isFailed}
           isNew={isNew}
-          onClick={() => onGemClick(row, col)}
           onPointerDown={(e) => handlePointerDown(row, col, e)}
-          onPointerUp={(e) => handlePointerUp(row, col, e)}
         />
       ))}
     </group>
