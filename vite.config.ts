@@ -27,14 +27,24 @@ function communityLevelsApi(): Plugin {
         console.error('[community-levels-api] Failed to initialize database:', err);
       }
 
-      server.middlewares.use('/api/community-levels', (req, res) => {
-        // Check if database is ready
-        if (!dbInitialized) {
-          res.writeHead(503, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Database not ready' }));
-          return;
-        }
-        // Get client IP for rate limiting
+      // Return middleware function to run BEFORE Vite's internal middleware
+      return () => {
+        server.middlewares.use((req, res, next) => {
+          // Only handle /api/community-levels requests
+          if (!req.url?.startsWith('/api/community-levels')) {
+            return next();
+          }
+
+          console.log('[community-levels-api] Handling request:', req.method, req.url);
+
+          // Check if database is ready
+          if (!dbInitialized) {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Database not ready' }));
+            return;
+          }
+
+          // Get client IP for rate limiting
         const ip = req.headers['x-forwarded-for']?.toString().split(',')[0] ||
                    req.socket.remoteAddress ||
                    'unknown';
@@ -168,12 +178,13 @@ function communityLevelsApi(): Plugin {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Internal server error' }));
         }
-      });
+        });
 
-      // Close database on server close
-      server.httpServer?.on('close', () => {
-        closeDatabase();
-      });
+        // Close database on server close
+        server.httpServer?.on('close', () => {
+          closeDatabase();
+        });
+      };
     },
   };
 }
