@@ -19,8 +19,9 @@ interface Gem3DProps {
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
 }
 
-// Fast lerp for snappy animations
-const LERP_SPEED = 18;
+// Lerp speed tuned for visible but responsive animations
+// Industry standard: ~200-250ms for tile movements
+const LERP_SPEED = 12;
 
 export function Gem3D({
   type,

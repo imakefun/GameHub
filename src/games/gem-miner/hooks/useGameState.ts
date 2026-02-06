@@ -409,7 +409,7 @@ export function useGameState() {
           dispatch({ type: 'SET_GRID', grid: finalGrid });
         }
 
-        schedule(() => onComplete(totalCleared, finalGrid), 80);
+        schedule(() => onComplete(totalCleared, finalGrid), 120);
         return;
       }
 
@@ -427,9 +427,9 @@ export function useGameState() {
       if (cascadeCount >= 2) soundEngine.play('combo');
 
       // Progressive speedup: each successive cascade has shorter delays
-      // Lerp animations are fast, so keep delays minimal
-      const matchDelay = Math.max(80, 150 - (cascadeCount - 1) * 25);
-      const gravityDelay = Math.max(100, 180 - (cascadeCount - 1) * 30);
+      // Industry standard: ~200-250ms per phase, speed up slightly with combos
+      const matchDelay = Math.max(150, 220 - (cascadeCount - 1) * 20);
+      const gravityDelay = Math.max(180, 280 - (cascadeCount - 1) * 25);
 
       // Wait for match highlight animation to play out
       schedule(() => {
@@ -477,6 +477,7 @@ export function useGameState() {
     const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
 
     // Wait for swap animation to finish, then start cascade
+    // Industry standard swap duration is ~250ms
     schedule(() => {
       runCascade(swappedGrid, gems, (totalCleared) => {
         processingRef.current = false;
@@ -487,7 +488,7 @@ export function useGameState() {
         const newMoves = state.movesRemaining - 1;
         checkEndConditionFromState(newScore, newMoves, totalCleared);
       });
-    }, 50);
+    }, 100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 
