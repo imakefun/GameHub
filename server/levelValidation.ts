@@ -26,7 +26,7 @@ const CONSTRAINTS = {
   maxMoves: { min: 5, max: 100 },
   starThresholds: { min: 100, max: 1000000 },
   objectives: { min: 1, max: 5 },
-  objectiveTarget: { min: 1, max: 1000 },
+  objectiveTarget: { min: 1, max: 100000 }, // Higher limit for score objectives
   availableGems: { min: 3, max: 7 },
 };
 
