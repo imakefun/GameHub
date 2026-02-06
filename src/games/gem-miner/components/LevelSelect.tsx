@@ -24,13 +24,18 @@ function StarIcons({ count }: { count: number }) {
   );
 }
 
-// Group levels by zones
+// Group levels by zones (10 zones, 10 levels each)
 const ZONES = [
-  { name: 'Surface', range: [1, 3], color: '#78716c', emoji: '⛏️' },
-  { name: 'Crystal Caves', range: [4, 6], color: '#06b6d4', emoji: '🧊' },
-  { name: 'Rocky Depths', range: [7, 9], color: '#a8a29e', emoji: '🪨' },
-  { name: 'Obsidian Caverns', range: [10, 12], color: '#374151', emoji: '🌋' },
-  { name: 'The Motherload', range: [13, 15], color: '#d97706', emoji: '💎' },
+  { name: 'Surface Mines', range: [1, 10], color: '#78716c', emoji: '⛏️' },
+  { name: 'Dusty Tunnels', range: [11, 20], color: '#a16207', emoji: '🕳️' },
+  { name: 'Rocky Depths', range: [21, 30], color: '#a8a29e', emoji: '🪨' },
+  { name: 'Locked Chambers', range: [31, 40], color: '#6b7280', emoji: '🔒' },
+  { name: 'Bedrock Fortress', range: [41, 50], color: '#374151', emoji: '🏰' },
+  { name: 'Crystal Kingdom', range: [51, 60], color: '#06b6d4', emoji: '💎' },
+  { name: 'Magma Caverns', range: [61, 70], color: '#dc2626', emoji: '🌋' },
+  { name: 'Abyssal Depths', range: [71, 80], color: '#1e1b4b', emoji: '🌊' },
+  { name: 'Core Approach', range: [81, 90], color: '#7c2d12', emoji: '🔥' },
+  { name: 'Earth\'s Core', range: [91, 100], color: '#d97706', emoji: '🌍' },
 ];
 
 export function LevelSelect({ levelStars, onSelectLevel, onDesigner, onSubmittedLevels }: LevelSelectProps) {
