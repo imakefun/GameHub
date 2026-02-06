@@ -41,38 +41,50 @@ export async function fetchSubmittedLevels(): Promise<SubmittedLevel[]> {
  * Throws SubmissionError with details if validation fails
  */
 export async function submitLevel(level: DesignerLevel): Promise<SubmittedLevel> {
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(level),
-  });
+  let res: Response;
+
+  try {
+    res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(level),
+    });
+  } catch (networkErr) {
+    // Network error (server not running, CORS issues, etc.)
+    throw new SubmissionError('Network error. Is the server running?');
+  }
 
   if (!res.ok) {
     // Try to parse error details from response
+    let errorData: { error?: string; message?: string; details?: string[] } | null = null;
+
     try {
-      const errorData = await res.json();
-
-      // Handle rate limiting
-      if (res.status === 429) {
-        throw new SubmissionError(
-          errorData.message || 'Rate limit exceeded. Please try again later.',
-          []
-        );
+      const text = await res.text();
+      if (text) {
+        errorData = JSON.parse(text);
       }
-
-      // Handle validation errors
-      if (errorData.details && Array.isArray(errorData.details)) {
-        throw new SubmissionError(
-          errorData.error || 'Validation failed',
-          errorData.details
-        );
-      }
-
-      throw new SubmissionError(errorData.error || 'Failed to submit level');
-    } catch (e) {
-      if (e instanceof SubmissionError) throw e;
-      throw new SubmissionError('Failed to submit level');
+    } catch {
+      // Response wasn't JSON - might be HTML error page
+      throw new SubmissionError(`Server error (${res.status}): ${res.statusText}`);
     }
+
+    // Handle rate limiting
+    if (res.status === 429) {
+      throw new SubmissionError(
+        errorData?.message || 'Rate limit exceeded. Please try again later.',
+        []
+      );
+    }
+
+    // Handle validation errors
+    if (errorData?.details && Array.isArray(errorData.details)) {
+      throw new SubmissionError(
+        errorData.error || 'Validation failed',
+        errorData.details
+      );
+    }
+
+    throw new SubmissionError(errorData?.error || `Server error (${res.status})`);
   }
 
   return res.json();

@@ -13,13 +13,27 @@ import {
 import { validateLevel, isValidLevelId } from './server/levelValidation'
 
 function communityLevelsApi(): Plugin {
+  let dbInitialized = false;
+
   return {
     name: 'community-levels-api',
     configureServer(server) {
       // Initialize database when server starts
-      initDatabase();
+      try {
+        initDatabase();
+        dbInitialized = true;
+        console.log('[community-levels-api] Database initialized successfully');
+      } catch (err) {
+        console.error('[community-levels-api] Failed to initialize database:', err);
+      }
 
       server.middlewares.use('/api/community-levels', (req, res) => {
+        // Check if database is ready
+        if (!dbInitialized) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Database not ready' }));
+          return;
+        }
         // Get client IP for rate limiting
         const ip = req.headers['x-forwarded-for']?.toString().split(',')[0] ||
                    req.socket.remoteAddress ||
@@ -40,8 +54,11 @@ function communityLevelsApi(): Plugin {
 
         // POST — submit a new level
         if (req.method === 'POST') {
+          console.log('[community-levels-api] POST request received');
+
           // Check rate limit
           if (!checkRateLimit(ipHash, 5)) {
+            console.log('[community-levels-api] Rate limit exceeded for', ipHash);
             res.writeHead(429, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
               error: 'Rate limit exceeded',
@@ -53,20 +70,24 @@ function communityLevelsApi(): Plugin {
           let body = '';
           req.on('data', (chunk: Buffer) => { body += chunk.toString() });
           req.on('end', () => {
+            console.log('[community-levels-api] Body received, length:', body.length);
             try {
               // Parse JSON
               let levelData: unknown;
               try {
                 levelData = JSON.parse(body);
-              } catch {
+              } catch (parseErr) {
+                console.error('[community-levels-api] JSON parse error:', parseErr);
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Invalid JSON' }));
                 return;
               }
 
               // Validate and sanitize the level
+              console.log('[community-levels-api] Validating level...');
               const validation = validateLevel(levelData);
               if (!validation.valid || !validation.sanitized) {
+                console.log('[community-levels-api] Validation failed:', validation.errors);
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                   error: 'Validation failed',
@@ -74,6 +95,8 @@ function communityLevelsApi(): Plugin {
                 }));
                 return;
               }
+
+              console.log('[community-levels-api] Validation passed');
 
               // Generate unique ID
               const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -86,16 +109,23 @@ function communityLevelsApi(): Plugin {
               };
 
               // Insert into database
+              console.log('[community-levels-api] Inserting into database...');
               const saved = insertLevel(submittedLevel, ipHash);
+              console.log('[community-levels-api] Level saved with id:', saved.id);
 
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(saved));
             } catch (err) {
-              console.error('Error submitting level:', err);
+              console.error('[community-levels-api] Error submitting level:', err);
               res.writeHead(500, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: 'Internal server error' }));
             }
           });
+
+          req.on('error', (err) => {
+            console.error('[community-levels-api] Request error:', err);
+          });
+
           return;
         }
 
