@@ -12,12 +12,14 @@ import {
   getTutorialForLevel,
 } from './components';
 import { LEVELS } from './data';
+import type { DesignerLevel } from './types';
 
 export function GemMiner() {
   const {
     state,
     lastScore,
     failedSwap,
+    isTestMode,
     startLevel,
     goToLevelSelect,
     goToDesigner,
@@ -28,8 +30,12 @@ export function GemMiner() {
     activatePowerUp,
     resetLevel,
     playDesignerLevel,
+    returnFromTest,
     nextLevel,
   } = useGameState();
+
+  // Track the name of the level being tested
+  const [testLevelName, setTestLevelName] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -76,12 +82,24 @@ export function GemMiner() {
     );
   }
 
+  // Wrapper to handle play testing from designer
+  const handlePlayTestFromDesigner = useCallback((level: DesignerLevel) => {
+    setTestLevelName(level.name || 'Custom Level');
+    playDesignerLevel(level, 'designer');
+  }, [playDesignerLevel]);
+
+  // Wrapper to handle play testing from submitted levels
+  const handlePlayFromSubmitted = useCallback((level: DesignerLevel) => {
+    setTestLevelName(level.name || 'Community Level');
+    playDesignerLevel(level, 'submittedLevels');
+  }, [playDesignerLevel]);
+
   // Level Designer Screen
   if (state.screen === 'designer') {
     return (
       <LevelDesigner
         onBack={goToLevelSelect}
-        onPlayTest={playDesignerLevel}
+        onPlayTest={handlePlayTestFromDesigner}
         onSubmit={submitLevel}
       />
     );
@@ -92,7 +110,7 @@ export function GemMiner() {
     return (
       <SubmittedLevels
         onBack={goToLevelSelect}
-        onPlay={playDesignerLevel}
+        onPlay={handlePlayFromSubmitted}
       />
     );
   }
@@ -119,7 +137,7 @@ export function GemMiner() {
         movesRemaining={state.movesRemaining}
         objectives={state.objectives}
         combo={state.combo}
-        onBack={goToLevelSelect}
+        onBack={isTestMode ? returnFromTest : goToLevelSelect}
         onReset={resetLevel}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
@@ -161,9 +179,11 @@ export function GemMiner() {
         score={state.score}
         objectives={state.objectives}
         stars={Math.max(currentStars, stars)}
+        isTestMode={isTestMode}
+        levelName={isTestMode ? testLevelName || undefined : undefined}
         onReplay={resetLevel}
         onNext={nextLevel}
-        onLevelSelect={goToLevelSelect}
+        onLevelSelect={isTestMode ? returnFromTest : goToLevelSelect}
       />
 
       {/* Tutorial Popup */}

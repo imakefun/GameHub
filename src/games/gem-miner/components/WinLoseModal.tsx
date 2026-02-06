@@ -10,6 +10,8 @@ interface WinLoseModalProps {
   score: number;
   objectives: ObjectiveProgress[];
   stars: number;
+  isTestMode?: boolean;
+  levelName?: string; // For custom levels that aren't in LEVELS
   onReplay: () => void;
   onNext: () => void;
   onLevelSelect: () => void;
@@ -61,12 +63,15 @@ export function WinLoseModal({
   score,
   objectives,
   stars,
+  isTestMode = false,
+  levelName,
   onReplay,
   onNext,
   onLevelSelect,
 }: WinLoseModalProps) {
   const level = LEVELS.find(l => l.id === levelId);
-  const hasNextLevel = LEVELS.some(l => l.id === levelId + 1);
+  const hasNextLevel = !isTestMode && LEVELS.some(l => l.id === levelId + 1);
+  const displayName = levelName || level?.name;
   const soundPlayedRef = useRef<LevelResult>('none');
 
   // Play sound when result changes
@@ -176,14 +181,14 @@ export function WinLoseModal({
               >
                 {result === 'win' ? 'Level Complete!' : 'Out of Moves'}
               </motion.h2>
-              {level && (
+              {displayName && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
                   className="text-stone-500 text-sm mt-1"
                 >
-                  {level.name}
+                  {isTestMode ? `Testing: ${displayName}` : displayName}
                 </motion.p>
               )}
             </div>
@@ -233,8 +238,8 @@ export function WinLoseModal({
               })}
             </div>
 
-            {/* Rewards (win only) */}
-            {result === 'win' && level && level.rewards.length > 0 && (
+            {/* Rewards (win only, not in test mode) */}
+            {result === 'win' && !isTestMode && level && level.rewards.length > 0 && (
               <div className="px-6 py-2">
                 <div className="text-stone-500 text-xs uppercase tracking-wider text-center mb-1">Rewards</div>
                 <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -264,9 +269,13 @@ export function WinLoseModal({
               <motion.button
                 onClick={() => { soundEngine.play('buttonClick'); onLevelSelect(); }}
                 whileTap={{ scale: 0.95 }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-stone-400 bg-stone-800 border border-stone-700 hover:bg-stone-700 transition-colors"
+                className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isTestMode
+                    ? 'flex-[2] text-white bg-amber-600 border border-amber-500 hover:bg-amber-500'
+                    : 'flex-1 text-stone-400 bg-stone-800 border border-stone-700 hover:bg-stone-700'
+                }`}
               >
-                Levels
+                {isTestMode ? 'Back to Editor' : 'Levels'}
               </motion.button>
               <motion.button
                 onClick={() => { soundEngine.play('buttonClick'); onReplay(); }}
