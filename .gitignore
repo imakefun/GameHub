@@ -23,5 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 
-# Database
-data/
+# Database (SQLite files in root data directory)
+/data/
