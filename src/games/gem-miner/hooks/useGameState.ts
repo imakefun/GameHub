@@ -409,7 +409,7 @@ export function useGameState() {
           dispatch({ type: 'SET_GRID', grid: finalGrid });
         }
 
-        schedule(() => onComplete(totalCleared, finalGrid), 300);
+        schedule(() => onComplete(totalCleared, finalGrid), 80);
         return;
       }
 
@@ -427,9 +427,9 @@ export function useGameState() {
       if (cascadeCount >= 2) soundEngine.play('combo');
 
       // Progressive speedup: each successive cascade has shorter delays
-      // (spring stiffness also increases in GameBoard so animations settle faster)
-      const matchDelay = Math.max(250, 500 - (cascadeCount - 1) * 80);
-      const gravityDelay = Math.max(350, 800 - (cascadeCount - 1) * 120);
+      // Lerp animations are fast, so keep delays minimal
+      const matchDelay = Math.max(80, 150 - (cascadeCount - 1) * 25);
+      const gravityDelay = Math.max(100, 180 - (cascadeCount - 1) * 30);
 
       // Wait for match highlight animation to play out
       schedule(() => {
@@ -476,7 +476,7 @@ export function useGameState() {
     const level = LEVELS.find(l => l.id === state.currentLevel);
     const gems = level?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz'];
 
-    // Wait for swap spring animation to finish, then start cascade
+    // Wait for swap animation to finish, then start cascade
     schedule(() => {
       runCascade(swappedGrid, gems, (totalCleared) => {
         processingRef.current = false;
@@ -487,7 +487,7 @@ export function useGameState() {
         const newMoves = state.movesRemaining - 1;
         checkEndConditionFromState(newScore, newMoves, totalCleared);
       });
-    }, 100);
+    }, 50);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.grid, state.currentLevel, state.score, state.movesRemaining, schedule, runCascade, checkEndConditionFromState]);
 
@@ -544,7 +544,7 @@ export function useGameState() {
           dispatch({ type: 'SET_PROCESSING', isProcessing: false });
           checkEndCondition(state.score + cleared.score + cascadeCleared.score, state.movesRemaining);
         });
-      }, 450);
+      }, 150);
 
       return;
     }
@@ -606,8 +606,8 @@ export function useGameState() {
           setFailedSwap(null);
           processingRef.current = false;
           dispatch({ type: 'SET_PROCESSING', isProcessing: false });
-        }, 300);
-      }, 200);
+        }, 200);
+      }, 120);
       return;
     }
 
@@ -653,8 +653,8 @@ export function useGameState() {
           setFailedSwap(null);
           processingRef.current = false;
           dispatch({ type: 'SET_PROCESSING', isProcessing: false });
-        }, 300);
-      }, 200);
+        }, 200);
+      }, 120);
       return;
     }
 
