@@ -5,6 +5,14 @@
 // --- Gem Types ---
 export type GemType = 'ruby' | 'sapphire' | 'emerald' | 'topaz' | 'amethyst' | 'diamond' | 'obsidian';
 
+// Simple gem interface for 3D rendering
+export interface Gem {
+  id: string;
+  type: GemType;
+  row: number;
+  col: number;
+}
+
 export type SpecialGemType = 'none' | 'striped_h' | 'striped_v' | 'bomb' | 'prismatic';
 
 export interface GemDef {
