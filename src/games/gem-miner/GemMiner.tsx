@@ -37,6 +37,9 @@ export function GemMiner() {
   // Track the name of the level being tested
   const [testLevelName, setTestLevelName] = useState<string | null>(null);
 
+  // Store the level being designed so it persists when returning from test
+  const [designerLevel, setDesignerLevel] = useState<DesignerLevel | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeTutorial, setActiveTutorial] = useState<string | null>(null);
@@ -73,6 +76,7 @@ export function GemMiner() {
   // Wrapper to handle play testing from designer (must be before conditional returns)
   const handlePlayTestFromDesigner = useCallback((level: DesignerLevel) => {
     setTestLevelName(level.name || 'Custom Level');
+    setDesignerLevel(level); // Save the level so we can restore it after testing
     playDesignerLevel(level, 'designer');
   }, [playDesignerLevel]);
 
@@ -101,6 +105,7 @@ export function GemMiner() {
         onBack={goToLevelSelect}
         onPlayTest={handlePlayTestFromDesigner}
         onSubmit={submitLevel}
+        initialLevel={designerLevel}
       />
     );
   }

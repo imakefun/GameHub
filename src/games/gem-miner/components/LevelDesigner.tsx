@@ -14,6 +14,7 @@ interface LevelDesignerProps {
   onBack: () => void;
   onPlayTest: (level: DesignerLevel) => void;
   onSubmit: (level: DesignerLevel) => Promise<SubmitResult>;
+  initialLevel?: DesignerLevel | null;
 }
 
 type PaintTool = CellModifier;
@@ -52,17 +53,26 @@ function resizeGrid(old: DesignerCell[][], newRows: number, newCols: number): De
   );
 }
 
-export function LevelDesigner({ onBack, onPlayTest, onSubmit }: LevelDesignerProps) {
-  const [name, setName] = useState('Custom Level');
-  const [description, setDescription] = useState('A custom designed level');
-  const [rows, setRows] = useState(8);
-  const [cols, setCols] = useState(8);
-  const [grid, setGrid] = useState<DesignerCell[][]>(() => createEmptyGrid(8, 8));
+export function LevelDesigner({ onBack, onPlayTest, onSubmit, initialLevel }: LevelDesignerProps) {
+  // Initialize state from initialLevel if provided (restoring after test)
+  const [name, setName] = useState(initialLevel?.name || 'Custom Level');
+  const [description, setDescription] = useState(initialLevel?.description || 'A custom designed level');
+  const [rows, setRows] = useState(initialLevel?.rows || 8);
+  const [cols, setCols] = useState(initialLevel?.cols || 8);
+  const [grid, setGrid] = useState<DesignerCell[][]>(() =>
+    initialLevel?.grid || createEmptyGrid(8, 8)
+  );
   const [activeTool, setActiveTool] = useState<PaintTool>('none');
-  const [selectedGems, setSelectedGems] = useState<GemType[]>(['ruby', 'sapphire', 'emerald', 'topaz']);
-  const [objectives, setObjectives] = useState<Objective[]>([{ type: 'score', target: 1000 }]);
-  const [maxMoves, setMaxMoves] = useState(25);
-  const [starThresholds, setStarThresholds] = useState<[number, number, number]>([1000, 2000, 3500]);
+  const [selectedGems, setSelectedGems] = useState<GemType[]>(
+    initialLevel?.availableGems || ['ruby', 'sapphire', 'emerald', 'topaz']
+  );
+  const [objectives, setObjectives] = useState<Objective[]>(
+    initialLevel?.objectives || [{ type: 'score', target: 1000 }]
+  );
+  const [maxMoves, setMaxMoves] = useState(initialLevel?.maxMoves || 25);
+  const [starThresholds, setStarThresholds] = useState<[number, number, number]>(
+    initialLevel?.starThresholds || [1000, 2000, 3500]
+  );
   const [activeTab, setActiveTab] = useState<'grid' | 'settings'>('grid');
 
   const handleCellTap = useCallback((r: number, c: number) => {
