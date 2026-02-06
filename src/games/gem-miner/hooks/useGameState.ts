@@ -225,7 +225,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         starThresholds: dl.starThresholds,
         rewards: [],
       };
-      return initLevel(state, customLevel);
+      const newState = initLevel(state, customLevel);
+      // Store the source screen for returning after test
+      return { ...newState, testSource: action.source || 'designer' } as GameState;
     }
 
     case 'ADD_POWERUP_REWARD': {
@@ -709,14 +711,20 @@ export function useGameState() {
     });
   }, [clearAndRun]);
 
-  const playDesignerLevel = useCallback((level: DesignerLevel) => {
+  const playDesignerLevel = useCallback((level: DesignerLevel, source: 'designer' | 'submittedLevels' = 'designer') => {
     clearAndRun(() => {
-      dispatch({ type: 'LOAD_DESIGNER_LEVEL', level });
+      dispatch({ type: 'LOAD_DESIGNER_LEVEL', level, source });
       setLastScore(0);
       soundEngine.play('levelStart');
       soundEngine.startMusic();
     });
   }, [clearAndRun]);
+
+  const returnFromTest = useCallback(() => {
+    // Return to the screen we came from when testing
+    const source = state.testSource || 'designer';
+    dispatch({ type: 'SET_SCREEN', screen: source });
+  }, [state.testSource]);
 
   const nextLevel = useCallback(() => {
     const nextId = state.currentLevel + 1;
@@ -728,10 +736,14 @@ export function useGameState() {
     }
   }, [state.currentLevel, startLevel, goToLevelSelect]);
 
+  // Check if we're in test mode (playing a custom level)
+  const isTestMode = state.currentLevel === 999;
+
   return {
     state,
     lastScore,
     failedSwap,
+    isTestMode,
     dispatch,
     startLevel,
     goToLevelSelect,
@@ -743,6 +755,7 @@ export function useGameState() {
     activatePowerUp,
     resetLevel,
     playDesignerLevel,
+    returnFromTest,
     nextLevel,
   };
 }

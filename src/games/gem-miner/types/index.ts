@@ -140,6 +140,7 @@ export interface GameState {
   hintCells: Position[];
   matchedCells: Position[];
   lastSwap: { from: Position; to: Position } | null;
+  testSource?: 'designer' | 'submittedLevels'; // Where we came from when play testing
 }
 
 // --- Designer Types ---
@@ -188,5 +189,5 @@ export type GameAction =
   | { type: 'SET_MATCHED_CELLS'; cells: Position[] }
   | { type: 'SET_LAST_SWAP'; swap: { from: Position; to: Position } | null }
   | { type: 'RESET_LEVEL' }
-  | { type: 'LOAD_DESIGNER_LEVEL'; level: DesignerLevel }
+  | { type: 'LOAD_DESIGNER_LEVEL'; level: DesignerLevel; source?: 'designer' | 'submittedLevels' }
   | { type: 'ADD_POWERUP_REWARD'; powerUp: PowerUpType; count: number };
