@@ -70,6 +70,18 @@ export function GemMiner() {
     }
   }, []);
 
+  // Wrapper to handle play testing from designer (must be before conditional returns)
+  const handlePlayTestFromDesigner = useCallback((level: DesignerLevel) => {
+    setTestLevelName(level.name || 'Custom Level');
+    playDesignerLevel(level, 'designer');
+  }, [playDesignerLevel]);
+
+  // Wrapper to handle play testing from submitted levels (must be before conditional returns)
+  const handlePlayFromSubmitted = useCallback((level: DesignerLevel) => {
+    setTestLevelName(level.name || 'Community Level');
+    playDesignerLevel(level, 'submittedLevels');
+  }, [playDesignerLevel]);
+
   // Level Select Screen
   if (state.screen === 'levelSelect') {
     return (
@@ -81,18 +93,6 @@ export function GemMiner() {
       />
     );
   }
-
-  // Wrapper to handle play testing from designer
-  const handlePlayTestFromDesigner = useCallback((level: DesignerLevel) => {
-    setTestLevelName(level.name || 'Custom Level');
-    playDesignerLevel(level, 'designer');
-  }, [playDesignerLevel]);
-
-  // Wrapper to handle play testing from submitted levels
-  const handlePlayFromSubmitted = useCallback((level: DesignerLevel) => {
-    setTestLevelName(level.name || 'Community Level');
-    playDesignerLevel(level, 'submittedLevels');
-  }, [playDesignerLevel]);
 
   // Level Designer Screen
   if (state.screen === 'designer') {
