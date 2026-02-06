@@ -9,6 +9,7 @@ interface GemBoard3DProps {
   selectedGem: { row: number; col: number } | null;
   matchedGems: Set<string>;
   hintedGems: Set<string>;
+  failedGems: Set<string>;
   onGemClick: (row: number, col: number) => void;
   onSwipe: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void;
   cellSize?: number;
@@ -35,6 +36,7 @@ export function GemBoard3D({
   selectedGem,
   matchedGems,
   hintedGems,
+  failedGems,
   onGemClick,
   onSwipe,
   cellSize = 1,
@@ -110,6 +112,7 @@ export function GemBoard3D({
       isSelected: boolean;
       isMatched: boolean;
       isHinted: boolean;
+      isFailed: boolean;
       isNew: boolean;
       special: SpecialGemType;
     }[] = [];
@@ -147,6 +150,7 @@ export function GemBoard3D({
         const isSelected = selectedGem?.row === row && selectedGem?.col === col;
         const isMatched = matchedGems.has(gem.id);
         const isHinted = hintedGems.has(gem.id);
+        const isFailed = failedGems.has(gem.id);
 
         // Check if this is a new gem or has moved
         const prevState = gemStates.current.get(gem.id);
@@ -178,6 +182,7 @@ export function GemBoard3D({
           isSelected,
           isMatched,
           isHinted,
+          isFailed,
           isNew,
           special: gem.special || 'none',
         });
@@ -192,7 +197,7 @@ export function GemBoard3D({
     }
 
     return { gems: gemResult, cellOverlays: overlayResult };
-  }, [grid, rows, cols, cellSize, selectedGem, matchedGems, hintedGems]);
+  }, [grid, rows, cols, cellSize, selectedGem, matchedGems, hintedGems, failedGems]);
 
   return (
     <group>
@@ -213,7 +218,7 @@ export function GemBoard3D({
       ))}
 
       {/* Gems */}
-      {gems.map(({ id, gem, row, col, initialPosition, targetPosition, isSelected, isMatched, isHinted, isNew, special }) => (
+      {gems.map(({ id, gem, row, col, initialPosition, targetPosition, isSelected, isMatched, isHinted, isFailed, isNew, special }) => (
         <Gem3D
           key={id}
           type={gem.type as GemType}
@@ -223,6 +228,7 @@ export function GemBoard3D({
           isSelected={isSelected}
           isMatched={isMatched}
           isHinted={isHinted}
+          isFailed={isFailed}
           isNew={isNew}
           onClick={() => onGemClick(row, col)}
           onPointerDown={(e) => handlePointerDown(row, col, e)}

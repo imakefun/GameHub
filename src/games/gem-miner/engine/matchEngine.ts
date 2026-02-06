@@ -190,14 +190,23 @@ export function findMatches(grid: Grid): Match[] {
 // Swap Validation
 // ============================================================
 
-export function isValidSwap(grid: Grid, from: Position, to: Position): boolean {
+// Check if two cells can be swapped (adjacent and swappable) - doesn't check if matches will be created
+export function canAttemptSwap(grid: Grid, from: Position, to: Position): boolean {
   if (!isAdjacent(from, to)) return false;
   if (!inBounds(grid, from.row, from.col) || !inBounds(grid, to.row, to.col)) return false;
 
   const cellA = grid[from.row][from.col];
   const cellB = grid[to.row][to.col];
 
-  if (!isSwappable(cellA) || !isSwappable(cellB)) return false;
+  return isSwappable(cellA) && isSwappable(cellB);
+}
+
+// Check if swap will create matches (returns true only if valid AND creates matches)
+export function isValidSwap(grid: Grid, from: Position, to: Position): boolean {
+  if (!canAttemptSwap(grid, from, to)) return false;
+
+  const cellA = grid[from.row][from.col];
+  const cellB = grid[to.row][to.col];
 
   // Prismatic gem can swap with anything
   if (cellA.special === 'prismatic' || cellB.special === 'prismatic') return true;
