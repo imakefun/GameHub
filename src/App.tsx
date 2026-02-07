@@ -8,6 +8,7 @@ import { Alchemoji } from './games/alchemoji/Alchemoji';
 import { FarmingSim } from './games/farming-sim/FarmingSim';
 import { CapitalismSim } from './games/capitalism-sim/CapitalismSim';
 import { GemMiner } from './games/gem-miner/GemMiner';
+import { CreaturesOfTheNight } from './games/creatures-of-the-night/CreaturesOfTheNight';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/play/farming-sim" element={<FarmingSim />} />
         <Route path="/play/capitalism-sim" element={<CapitalismSim />} />
         <Route path="/play/gem-miner" element={<GemMiner />} />
+        <Route path="/play/creatures-of-the-night" element={<CreaturesOfTheNight />} />
       </Routes>
     </HashRouter>
   );
