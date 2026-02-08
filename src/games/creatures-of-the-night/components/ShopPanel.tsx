@@ -8,15 +8,14 @@ interface ShopPanelProps {
   currencies: Currencies;
   config: GameConfig;
   ownedCards: OwnedCard[];
-  dailyFreePackAvailable: boolean;
+  starterTomeClaimed: boolean;
   onPurchasePack: (packId: string) => void;
-  onOpenPack: (cards: CardDefinition[]) => void;
-  onClaimDaily: () => void;
+  onOpenPack: (cards: CardDefinition[], packId: string) => void;
+  onClaimStarterTome: () => void;
 }
 
 const CURRENCY_ICONS: Record<keyof Currencies, string> = {
   shadowEssence: '🌑',
-  soulShards: '💎',
   lunarCrystals: '🌙',
   voidEnergy: '🔮',
 };
@@ -31,10 +30,10 @@ export function ShopPanel({
   currencies,
   config,
   ownedCards,
-  dailyFreePackAvailable,
+  starterTomeClaimed,
   onPurchasePack,
   onOpenPack,
-  onClaimDaily,
+  onClaimStarterTome,
 }: ShopPanelProps) {
   const [openingPackId, setOpeningPackId] = useState<string | null>(null);
 
@@ -42,8 +41,9 @@ export function ShopPanel({
     const pack = config.packs.find((p) => p.id === packId);
     if (!pack) return;
 
-    if (pack.isFree) {
-      onClaimDaily();
+    if (!pack.cost) {
+      // Free pack (starter tome)
+      onClaimStarterTome();
     } else {
       const { currency, amount } = pack.cost;
       if (currencies[currency] < amount) return;
@@ -59,8 +59,8 @@ export function ShopPanel({
         <span>🏪</span> Dark Market
       </h2>
 
-      {/* Daily free pack */}
-      {dailyFreePackAvailable && (
+      {/* Starter Tome */}
+      {!starterTomeClaimed && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -69,15 +69,15 @@ export function ShopPanel({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-amber-400 flex items-center gap-2">
-                <span>🎁</span> Daily Grimoire
+                <span>📜</span> Starter Tome
               </h3>
               <p className="text-sm text-surface-400 mt-0.5">
-                Free daily pack - 3 cards
+                Free one-time tome - 5 Twilight cards
               </p>
             </div>
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => handleBuyAndOpen('daily-free')}
+              onClick={() => handleBuyAndOpen('starter-tome')}
               className="px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-amber-500 to-amber-600 text-black text-sm"
             >
               Claim Free
@@ -86,14 +86,15 @@ export function ShopPanel({
         </motion.div>
       )}
 
-      {/* Card Packs */}
+      {/* Tomes */}
       <div>
-        <h3 className="font-semibold text-surface-300 mb-3">Card Packs</h3>
+        <h3 className="font-semibold text-surface-300 mb-3">Tomes</h3>
         <div className="grid gap-3">
           {config.packs
-            .filter((p) => !p.isFree)
+            .filter((p) => p.cost !== null)
             .map((pack) => {
-              const canAfford = currencies[pack.cost.currency] >= pack.cost.amount;
+              const cost = pack.cost!;
+              const canAfford = currencies[cost.currency] >= cost.amount;
               const highestTier = Object.keys(pack.tierWeights).pop() || 'twilight';
               const color = TIER_COLORS[highestTier as keyof typeof TIER_COLORS] || TIER_COLORS.twilight;
 
@@ -119,6 +120,9 @@ export function ShopPanel({
                         {pack.guaranteed && (
                           <span className="text-amber-400">★ {pack.guaranteed}</span>
                         )}
+                        {pack.isPremium && (
+                          <span className="text-pink-400">Premium</span>
+                        )}
                       </div>
                     </div>
                     <motion.button
@@ -136,7 +140,7 @@ export function ShopPanel({
                           : {}
                       }
                     >
-                      {CURRENCY_ICONS[pack.cost.currency]} {formatNumber(pack.cost.amount)}
+                      {CURRENCY_ICONS[cost.currency]} {formatNumber(cost.amount)}
                     </motion.button>
                   </div>
                 </div>
@@ -153,7 +157,7 @@ export function ShopPanel({
             ownedCards={ownedCards}
             packId={openingPackId}
             onClose={() => setOpeningPackId(null)}
-            onConfirm={(cards) => onOpenPack(cards)}
+            onConfirm={(cards) => onOpenPack(cards, openingPackId)}
           />
         )}
       </AnimatePresence>

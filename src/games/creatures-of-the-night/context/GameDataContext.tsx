@@ -7,16 +7,24 @@ import type {
   TypeSynergy,
   CrossTypeSynergy,
   FeatureUnlock,
+  CLReward,
+  DailyQuest,
   GameConfig,
+  GameSettings,
 } from '../types';
-import type { GameSettings } from '../types';
 import { fetchGameData, DEFAULT_SETTINGS, clearCache } from '../services/sheetsService';
 import { isSheetsConfigured } from '../config/sheets';
 
 import { cards as localCards } from '../data/cards';
 import { packs as localPacks } from '../data/packs';
 import { expeditions as localExpeditions } from '../data/expeditions';
-import { typeSynergies as localTypeSynergies, crossTypeSynergies as localCrossSynergies, featureUnlocks as localFeatureUnlocks } from '../data/synergies';
+import {
+  typeSynergies as localTypeSynergies,
+  crossTypeSynergies as localCrossSynergies,
+  featureUnlocks as localFeatureUnlocks,
+  clRewards as localCLRewards,
+  dailyQuestPool as localDailyQuestPool,
+} from '../data/synergies';
 
 interface GameDataContextType {
   config: GameConfig;
@@ -35,6 +43,8 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [typeSynergies] = useState<TypeSynergy[]>(localTypeSynergies);
   const [crossTypeSynergies] = useState<CrossTypeSynergy[]>(localCrossSynergies);
   const [featureUnlocks] = useState<FeatureUnlock[]>(localFeatureUnlocks);
+  const [clRewards] = useState<CLReward[]>(localCLRewards);
+  const [dailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +92,8 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     typeSynergies,
     crossTypeSynergies,
     featureUnlocks,
+    clRewards,
+    dailyQuestPool,
     settings,
   };
 

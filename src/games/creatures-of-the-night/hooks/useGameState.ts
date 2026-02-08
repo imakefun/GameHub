@@ -3,68 +3,179 @@ import type {
   GameState,
   GameAction,
   GameConfig,
-  Currencies,
   OwnedCard,
   CardDefinition,
+  CardTier,
   CardType,
+  CosmicPhase,
 } from '../types';
-import { TIER_ORDER } from '../types';
+import {
+  TIER_ORDER,
+  TIER_MAX_LEVEL,
+  TIER_CL_MULTIPLIER,
+  TIER_DUPLICATE_SHARDS,
+  ASCENSION_COSTS,
+  AWAKENING_INFO,
+  TYPE_SPECIALIZATIONS,
+} from '../types';
 
 const STORAGE_KEY = 'creatures-of-the-night-save';
 
-// ---- Helpers ----
+// Crypt slot unlock thresholds: start with 3, max 7
+const CRYPT_SLOT_UNLOCKS: { cl: number; slot: number }[] = [
+  { cl: 15, slot: 4 },
+  { cl: 25, slot: 5 },
+  { cl: 50, slot: 6 },
+  { cl: 75, slot: 7 },
+];
 
-function getCardDef(config: GameConfig, defId: string): CardDefinition | undefined {
+// ============================================================
+// Exported Helpers
+// ============================================================
+
+/** True when local time is between 18:00 and 05:59. */
+export function isNightTime(): boolean {
+  const hour = new Date().getHours();
+  return hour >= 18 || hour < 6;
+}
+
+/** Current cosmic phase based on local clock. */
+export function getCosmicPhase(): CosmicPhase {
+  return isNightTime() ? 'night' : 'day';
+}
+
+/**
+ * Cosmic-cycle production bonus for a card type (fractional).
+ *
+ *  Day  (6 AM - 6 PM): Beast / Stone / Magic  +20 %
+ *                       Shadow / Lycanthrope / Undead  -10 %
+ *  Night (6 PM - 6 AM): Shadow / Lycanthrope / Undead / Infernal  +30 %
+ *                        Beast  -10 %
+ */
+export function getCosmicBonus(type: CardType): number {
+  if (isNightTime()) {
+    if (
+      type === 'shadow' ||
+      type === 'lycanthrope' ||
+      type === 'undead' ||
+      type === 'infernal'
+    )
+      return 0.3;
+    if (type === 'beast') return -0.1;
+  } else {
+    if (type === 'beast' || type === 'stone' || type === 'magic') return 0.2;
+    if (type === 'shadow' || type === 'lycanthrope' || type === 'undead')
+      return -0.1;
+  }
+  return 0;
+}
+
+/**
+ * Soul-shard cost to go from `level` to `level + 1`.
+ *
+ * Formula: ceil(2 * tierMult * (1 + (level - 1) * 0.1))
+ *   tierMult: twilight=1  dusk=2  midnight=4  umbral=8  eternal=20
+ *
+ * Examples: Twilight 1->2 = 2,  Twilight 29->30 = 8,  Eternal 1->2 = 40
+ */
+export function levelUpCost(level: number, tier: CardTier): number {
+  const tierMult: Record<CardTier, number> = {
+    twilight: 1,
+    dusk: 2,
+    midnight: 4,
+    umbral: 8,
+    eternal: 20,
+  };
+  return Math.ceil(2 * tierMult[tier] * (1 + (level - 1) * 0.1));
+}
+
+/**
+ * Effective generation *amount* per collection event
+ * (before cosmic / synergy / fatigue).
+ *
+ *   baseGenerationAmount
+ *     * (1 + (level - 1) * essencePerLevelPercent)
+ *     * typeSpec.amountMultiplier
+ *     * (awakened ? 1.25 : 1)
+ */
+export function getEffectiveGeneration(
+  card: OwnedCard,
+  def: CardDefinition,
+  config: GameConfig,
+): number {
+  const spec = TYPE_SPECIALIZATIONS[def.type];
+  const lvlMult = 1 + (card.level - 1) * config.settings.essencePerLevelPercent;
+  let amount = def.baseGenerationAmount * lvlMult * spec.amountMultiplier;
+  if (card.awakened) amount *= 1.25;
+  return amount;
+}
+
+/**
+ * Derive Collection Level from accumulated CL points.
+ *
+ * Points required to reach CL n  =  5 * (n - 1) * n
+ *   CL 1 = 0 pts,  CL 2 = 10 pts,  CL 3 = 30 pts,  CL 4 = 60 pts ...
+ */
+export function collectionLevelForPoints(points: number): number {
+  if (points <= 0) return 1;
+  return Math.floor((5 + Math.sqrt(25 + 20 * points)) / 10);
+}
+
+// ============================================================
+// Internal Helpers
+// ============================================================
+
+function getCardDef(
+  config: GameConfig,
+  defId: string,
+): CardDefinition | undefined {
   return config.cards.find((c) => c.id === defId);
 }
 
-function essenceRateForCard(card: OwnedCard, def: CardDefinition, config: GameConfig): number {
-  const levelBonus = 1 + (card.level - 1) * config.settings.essencePerLevelMultiplier;
-  return def.baseEssenceRate * levelBonus;
+/** Effective collection interval in seconds (type-spec + night modifier). */
+function effectiveInterval(def: CardDefinition): number {
+  const spec = TYPE_SPECIALIZATIONS[def.type];
+  let interval = def.baseInterval * spec.intervalMultiplier;
+  if (isNightTime() && spec.nightIntervalMultiplier) {
+    interval *= spec.nightIntervalMultiplier;
+  }
+  return interval;
 }
 
-function levelUpCost(level: number, config: GameConfig): number {
-  return Math.floor(
-    config.settings.levelUpBaseCost * Math.pow(config.settings.levelUpCostMultiplier, level - 1)
-  );
-}
-
-function experienceForLevel(level: number): number {
-  return Math.floor(100 * Math.pow(1.2, level - 1));
-}
-
-function getPlacedCardTypes(ownedCards: OwnedCard[], config: GameConfig): Record<CardType, number> {
+function getPlacedTypeCounts(
+  ownedCards: OwnedCard[],
+  config: GameConfig,
+): Record<string, number> {
   const counts: Record<string, number> = {};
-  ownedCards
-    .filter((c) => c.placedInCrypt)
-    .forEach((c) => {
-      const def = getCardDef(config, c.definitionId);
-      if (def) {
-        counts[def.type] = (counts[def.type] || 0) + 1;
-      }
-    });
-  return counts as Record<CardType, number>;
+  for (const c of ownedCards) {
+    if (!c.placedInCrypt) continue;
+    const def = getCardDef(config, c.definitionId);
+    if (def) counts[def.type] = (counts[def.type] || 0) + 1;
+  }
+  return counts;
 }
 
-function getSynergyBonus(ownedCards: OwnedCard[], cardType: CardType, config: GameConfig): number {
-  const typeCounts = getPlacedCardTypes(ownedCards, config);
+function getSynergyBonus(
+  ownedCards: OwnedCard[],
+  cardType: CardType,
+  config: GameConfig,
+): number {
+  const counts = getPlacedTypeCounts(ownedCards, config);
   let bonus = 0;
 
-  // Type synergy
-  const typeSynergy = config.typeSynergies.find((s) => s.type === cardType);
-  if (typeSynergy) {
-    const count = typeCounts[cardType] || 0;
-    for (const threshold of typeSynergy.thresholds) {
-      if (count >= threshold.count) bonus = threshold.bonus;
+  const ts = config.typeSynergies.find((s) => s.type === cardType);
+  if (ts) {
+    const count = counts[cardType] || 0;
+    for (const th of ts.thresholds) {
+      if (count >= th.count) bonus = th.bonus;
     }
   }
 
-  // Cross-type synergies
   for (const cross of config.crossTypeSynergies) {
     if (
       (cross.type1 === cardType || cross.type2 === cardType) &&
-      (typeCounts[cross.type1] || 0) > 0 &&
-      (typeCounts[cross.type2] || 0) > 0
+      (counts[cross.type1] || 0) > 0 &&
+      (counts[cross.type2] || 0) > 0
     ) {
       bonus += cross.productionBonus;
     }
@@ -73,17 +184,92 @@ function getSynergyBonus(ownedCards: OwnedCard[], cardType: CardType, config: Ga
   return bonus;
 }
 
-// ---- Initial State ----
+function cryptSlotsForCL(cl: number, max: number): number {
+  let slots = 3;
+  for (const u of CRYPT_SLOT_UNLOCKS) {
+    if (cl >= u.cl) slots = u.slot;
+  }
+  return Math.min(slots, max);
+}
+
+/** Recompute CL, crypt slots and feature unlocks after points change. */
+function deriveCLFields(
+  clPoints: number,
+  config: GameConfig,
+  currentUnlocks: string[],
+): Pick<GameState, 'collectionLevel' | 'cryptSlots' | 'unlockedFeatures'> {
+  const cl = collectionLevelForPoints(clPoints);
+  const slots = cryptSlotsForCL(cl, config.settings.maxCryptSlots);
+  const unlocks = [...currentUnlocks];
+  for (const fu of config.featureUnlocks) {
+    if (cl >= fu.cl && !unlocks.includes(fu.feature)) {
+      unlocks.push(fu.feature);
+    }
+  }
+  return { collectionLevel: cl, cryptSlots: slots, unlockedFeatures: unlocks };
+}
+
+/** Full per-second rate for a placed card (all multipliers). */
+function cardRatePerSecond(
+  card: OwnedCard,
+  def: CardDefinition,
+  config: GameConfig,
+  ownedCards: OwnedCard[],
+  now: number,
+): number {
+  const amount = getEffectiveGeneration(card, def, config);
+  const interval = effectiveInterval(def);
+  let rate = amount / interval;
+
+  rate *= 1 + getCosmicBonus(def.type);
+  rate *= 1 + getSynergyBonus(ownedCards, def.type, config) / 100;
+
+  // Fatigue / damage -> 50% production
+  if (card.fatigueUntil && now < card.fatigueUntil) {
+    rate *= 0.5;
+  }
+
+  return rate;
+}
+
+/**
+ * Apply per-collection specialization effects (failChance, randomVariance,
+ * doubleChance).  Used by COLLECT_CARD / COLLECT_ALL.
+ */
+function applyCollectionEffects(amount: number, type: CardType): number {
+  const spec = TYPE_SPECIALIZATIONS[type];
+
+  // Fail -> produce nothing
+  if (spec.failChance && Math.random() < spec.failChance) return 0;
+
+  let result = amount;
+
+  // Random variance
+  if (spec.randomVariance) {
+    result *= 1 + (Math.random() * 2 - 1) * spec.randomVariance;
+  }
+
+  // Double chance
+  if (spec.doubleChance && Math.random() < spec.doubleChance) {
+    result *= 2;
+  }
+
+  return result;
+}
+
+// ============================================================
+// Initial State
+// ============================================================
 
 function createInitialState(config: GameConfig): GameState {
-  // Start with a Shadow Rat already placed
-  const starterCard = config.cards.find((c) => c.id === 'beast-shadow-rat');
-  const starterOwned: OwnedCard[] = starterCard
+  const starter = config.cards.find((c) => c.id === 'shadow-shadow-rat');
+  const starterOwned: OwnedCard[] = starter
     ? [
         {
-          definitionId: starterCard.id,
+          definitionId: starter.id,
           level: 1,
-          experience: 0,
+          soulShards: 0,
+          awakened: false,
           placedInCrypt: true,
           lastCollected: Date.now(),
           accumulatedEssence: 0,
@@ -93,17 +279,13 @@ function createInitialState(config: GameConfig): GameState {
     : [];
 
   return {
-    currencies: {
-      shadowEssence: 0,
-      soulShards: 0,
-      lunarCrystals: 5,
-      voidEnergy: 0,
-    },
+    currencies: { shadowEssence: 0, lunarCrystals: 5, voidEnergy: 0 },
     ownedCards: starterOwned,
-    cryptSlots: 6,
+    cryptSlots: 3,
+    collectionLevel: 1,
+    collectionLevelPoints: 0,
+    clRewardsClaimed: [],
     playerStats: {
-      level: 1,
-      experience: 0,
       totalEssenceCollected: 0,
       totalPacksOpened: 0,
       totalCardsCollected: starterOwned.length,
@@ -113,115 +295,181 @@ function createInitialState(config: GameConfig): GameState {
       lastLoginDate: new Date().toISOString().split('T')[0],
     },
     activeExpeditions: [],
-    dailyFreePackAvailable: true,
-    lastDailyReset: Date.now(),
-    unlockedFeatures: ['basic-collection', 'pack-opening', 'beast-type'],
+    starterTomeClaimed: false,
+    unlockedFeatures: ['basic-collection'],
+    dailyQuests: [],
+    dailyQuestsLastReset: Date.now(),
+    weeklyQuestCount: 0,
+    weeklyRewardsClaimed: [],
+    tutorialCompleted: false,
+    tutorialStep: 0,
     lastSaved: Date.now(),
     lastTick: Date.now(),
   };
 }
 
-// ---- Reducer ----
+// ============================================================
+// Reducer
+// ============================================================
 
 function createGameReducer(config: GameConfig) {
   return function reducer(state: GameState, action: GameAction): GameState {
     switch (action.type) {
+      // ======================== TICK ========================
       case 'TICK': {
         const { now } = action;
-        const elapsed = (now - state.lastTick) / 1000; // seconds
+        const elapsed = (now - state.lastTick) / 1000;
+        if (elapsed <= 0) return { ...state, lastTick: now };
 
-        // Accumulate essence for placed cards
-        const newCards = state.ownedCards.map((card) => {
+        // --- Accumulate essence for placed cards ---
+        let updatedCards: OwnedCard[] = state.ownedCards.map((card) => {
           if (!card.placedInCrypt || card.isOnExpedition) return card;
+          // Card temporarily lost from expedition risk
+          if (card.expeditionReturnTime && now < card.expeditionReturnTime)
+            return card;
 
           const def = getCardDef(config, card.definitionId);
           if (!def) return card;
 
-          const rate = essenceRateForCard(card, def, config);
-          const synergyBonus = getSynergyBonus(state.ownedCards, def.type, config);
-          const totalRate = rate * (1 + synergyBonus / 100);
-
-          // Essence per second = rate / 60 (rate is per minute)
-          const essenceGained = (totalRate / 60) * elapsed;
+          const rate = cardRatePerSecond(
+            card,
+            def,
+            config,
+            state.ownedCards,
+            now,
+          );
 
           return {
             ...card,
-            accumulatedEssence: card.accumulatedEssence + essenceGained,
+            accumulatedEssence: card.accumulatedEssence + rate * elapsed,
           };
         });
 
-        // Check completed expeditions
-        const completedExpeditions: number[] = [];
-        let newCurrencies = { ...state.currencies };
+        // --- Completed expeditions ---
+        const completedIndices: number[] = [];
+        let currencies = { ...state.currencies };
+        let expCompleted = 0;
+
         state.activeExpeditions.forEach((exp, idx) => {
-          if (now >= exp.completesAt) {
-            completedExpeditions.push(idx);
-            const zone = config.expeditions.find((z) => z.id === exp.zoneId);
-            if (zone) {
-              if (zone.rewards.shadowEssence) {
-                const [min, max] = zone.rewards.shadowEssence;
-                newCurrencies.shadowEssence += min + Math.random() * (max - min);
+          if (now < exp.completesAt) return;
+          completedIndices.push(idx);
+          expCompleted++;
+
+          const zone = config.expeditions.find((z) => z.id === exp.zoneId);
+          if (!zone) return;
+
+          // Currency rewards
+          if (zone.rewards.shadowEssence) {
+            const [min, max] = zone.rewards.shadowEssence;
+            currencies.shadowEssence += min + Math.random() * (max - min);
+          }
+          if (zone.rewards.lunarCrystals) {
+            const [min, max] = zone.rewards.lunarCrystals;
+            currencies.lunarCrystals += Math.floor(
+              min + Math.random() * (max - min),
+            );
+          }
+          if (zone.rewards.voidEnergy) {
+            const [min, max] = zone.rewards.voidEnergy;
+            currencies.voidEnergy += Math.floor(
+              min + Math.random() * (max - min),
+            );
+          }
+
+          // Soul-shard rewards -> expedition cards
+          if (zone.rewards.soulShards) {
+            const [min, max] = zone.rewards.soulShards;
+            const total = Math.floor(min + Math.random() * (max - min));
+            const per = Math.floor(total / exp.cardIds.length);
+            let rem = total - per * exp.cardIds.length;
+            for (const ci of exp.cardIds) {
+              if (!updatedCards[ci]) continue;
+              const bonus = rem > 0 ? 1 : 0;
+              if (rem > 0) rem--;
+              updatedCards[ci] = {
+                ...updatedCards[ci],
+                soulShards: updatedCards[ci].soulShards + per + bonus,
+              };
+            }
+          }
+
+          // Risk effects
+          if (Math.random() * 100 < zone.riskPercent) {
+            const riskEnd = now + zone.riskDuration * 1000;
+            for (const ci of exp.cardIds) {
+              if (!updatedCards[ci]) continue;
+              switch (zone.riskEffect) {
+                case 'fatigue':
+                case 'damage':
+                case 'curse':
+                  updatedCards[ci] = {
+                    ...updatedCards[ci],
+                    fatigueUntil: riskEnd,
+                  };
+                  break;
+                case 'card_loss':
+                  updatedCards[ci] = {
+                    ...updatedCards[ci],
+                    expeditionReturnTime: riskEnd,
+                    placedInCrypt: false,
+                  };
+                  break;
               }
-              if (zone.rewards.soulShards) {
-                const [min, max] = zone.rewards.soulShards;
-                newCurrencies.soulShards += Math.floor(min + Math.random() * (max - min));
-              }
-              if (zone.rewards.lunarCrystals) {
-                const [min, max] = zone.rewards.lunarCrystals;
-                newCurrencies.lunarCrystals += Math.floor(min + Math.random() * (max - min));
-              }
-              if (zone.rewards.voidEnergy) {
-                const [min, max] = zone.rewards.voidEnergy;
-                newCurrencies.voidEnergy += Math.floor(min + Math.random() * (max - min));
-              }
+            }
+          }
+
+          // Return cards (unless temp-lost)
+          for (const ci of exp.cardIds) {
+            if (updatedCards[ci] && !updatedCards[ci].expeditionReturnTime) {
+              updatedCards[ci] = {
+                ...updatedCards[ci],
+                isOnExpedition: false,
+              };
             }
           }
         });
 
-        // Return expedition cards
-        let updatedCards = newCards;
-        if (completedExpeditions.length > 0) {
-          const returnedCardIndices = new Set<number>();
-          completedExpeditions.forEach((expIdx) => {
-            state.activeExpeditions[expIdx].cardIds.forEach((ci) => returnedCardIndices.add(ci));
-          });
-          updatedCards = newCards.map((card, idx) =>
-            returnedCardIndices.has(idx) ? { ...card, isOnExpedition: false } : card
-          );
-        }
-
-        // Daily reset check
-        let dailyFree = state.dailyFreePackAvailable;
-        let lastReset = state.lastDailyReset;
-        const today = new Date(now).toISOString().split('T')[0];
-        const lastResetDay = new Date(lastReset).toISOString().split('T')[0];
-        if (today !== lastResetDay) {
-          dailyFree = true;
-          lastReset = now;
-        }
+        // --- Expire fatigue / expedition-return timers ---
+        updatedCards = updatedCards.map((card) => {
+          let c = card;
+          if (c.fatigueUntil && now >= c.fatigueUntil) {
+            c = { ...c, fatigueUntil: undefined };
+          }
+          if (c.expeditionReturnTime && now >= c.expeditionReturnTime) {
+            c = { ...c, isOnExpedition: false, expeditionReturnTime: undefined };
+          }
+          return c;
+        });
 
         return {
           ...state,
           ownedCards: updatedCards,
-          currencies: newCurrencies,
-          activeExpeditions: state.activeExpeditions.filter((_, i) => !completedExpeditions.includes(i)),
+          currencies,
+          activeExpeditions: state.activeExpeditions.filter(
+            (_, i) => !completedIndices.includes(i),
+          ),
           playerStats: {
             ...state.playerStats,
             playTime: state.playerStats.playTime + elapsed,
             totalExpeditionsCompleted:
-              state.playerStats.totalExpeditionsCompleted + completedExpeditions.length,
+              state.playerStats.totalExpeditionsCompleted + expCompleted,
           },
-          dailyFreePackAvailable: dailyFree,
-          lastDailyReset: lastReset,
           lastTick: now,
         };
       }
 
+      // ======================== COLLECT_CARD ========================
       case 'COLLECT_CARD': {
         const card = state.ownedCards[action.cardIndex];
-        if (!card || card.accumulatedEssence <= 0) return state;
+        if (!card || card.accumulatedEssence < 1) return state;
 
-        const collected = Math.floor(card.accumulatedEssence);
+        const def = getCardDef(config, card.definitionId);
+        if (!def) return state;
+
+        const collected = Math.max(
+          0,
+          Math.floor(applyCollectionEffects(card.accumulatedEssence, def.type)),
+        );
 
         return {
           ...state,
@@ -232,83 +480,94 @@ function createGameReducer(config: GameConfig) {
           ownedCards: state.ownedCards.map((c, i) =>
             i === action.cardIndex
               ? { ...c, accumulatedEssence: 0, lastCollected: Date.now() }
-              : c
+              : c,
           ),
           playerStats: {
             ...state.playerStats,
-            totalEssenceCollected: state.playerStats.totalEssenceCollected + collected,
-            experience:
-              state.playerStats.experience + config.settings.experiencePerCollection,
+            totalEssenceCollected:
+              state.playerStats.totalEssenceCollected + collected,
           },
         };
       }
 
+      // ======================== COLLECT_ALL ========================
       case 'COLLECT_ALL': {
-        let totalCollected = 0;
+        let total = 0;
         const newCards = state.ownedCards.map((card) => {
-          if (card.placedInCrypt && card.accumulatedEssence > 0) {
-            totalCollected += Math.floor(card.accumulatedEssence);
-            return { ...card, accumulatedEssence: 0, lastCollected: Date.now() };
-          }
-          return card;
+          if (!card.placedInCrypt || card.accumulatedEssence < 1) return card;
+          const def = getCardDef(config, card.definitionId);
+          const raw = def
+            ? applyCollectionEffects(card.accumulatedEssence, def.type)
+            : card.accumulatedEssence;
+          const amt = Math.max(0, Math.floor(raw));
+          total += amt;
+          return { ...card, accumulatedEssence: 0, lastCollected: Date.now() };
         });
 
-        if (totalCollected === 0) return state;
+        if (total === 0) return state;
 
         return {
           ...state,
           currencies: {
             ...state.currencies,
-            shadowEssence: state.currencies.shadowEssence + totalCollected,
+            shadowEssence: state.currencies.shadowEssence + total,
           },
           ownedCards: newCards,
           playerStats: {
             ...state.playerStats,
-            totalEssenceCollected: state.playerStats.totalEssenceCollected + totalCollected,
-            experience:
-              state.playerStats.experience + config.settings.experiencePerCollection,
+            totalEssenceCollected:
+              state.playerStats.totalEssenceCollected + total,
           },
         };
       }
 
+      // ======================== PLACE_CARD ========================
       case 'PLACE_CARD': {
-        const placedCount = state.ownedCards.filter((c) => c.placedInCrypt).length;
-        if (placedCount >= state.cryptSlots) return state;
+        const placed = state.ownedCards.filter((c) => c.placedInCrypt).length;
+        if (placed >= state.cryptSlots) return state;
 
         const card = state.ownedCards[action.cardIndex];
         if (!card || card.placedInCrypt || card.isOnExpedition) return state;
+        if (card.expeditionReturnTime && Date.now() < card.expeditionReturnTime)
+          return state;
 
         return {
           ...state,
           ownedCards: state.ownedCards.map((c, i) =>
             i === action.cardIndex
-              ? { ...c, placedInCrypt: true, lastCollected: Date.now(), accumulatedEssence: 0 }
-              : c
+              ? {
+                  ...c,
+                  placedInCrypt: true,
+                  lastCollected: Date.now(),
+                  accumulatedEssence: 0,
+                }
+              : c,
           ),
         };
       }
 
+      // ======================== REMOVE_CARD ========================
       case 'REMOVE_CARD': {
         const card = state.ownedCards[action.cardIndex];
         if (!card || !card.placedInCrypt) return state;
 
-        // Collect any remaining essence before removing
-        const remaining = Math.floor(card.accumulatedEssence);
+        const leftover = Math.floor(card.accumulatedEssence);
 
         return {
           ...state,
           currencies: {
             ...state.currencies,
-            shadowEssence: state.currencies.shadowEssence + remaining,
+            shadowEssence: state.currencies.shadowEssence + leftover,
           },
           ownedCards: state.ownedCards.map((c, i) =>
             i === action.cardIndex
               ? { ...c, placedInCrypt: false, accumulatedEssence: 0 }
-              : c
+              : c,
           ),
         };
       }
 
+      // ======================== LEVEL_UP_CARD ========================
       case 'LEVEL_UP_CARD': {
         const card = state.ownedCards[action.cardIndex];
         if (!card) return state;
@@ -316,45 +575,155 @@ function createGameReducer(config: GameConfig) {
         const def = getCardDef(config, card.definitionId);
         if (!def) return state;
 
-        const maxLevel = { twilight: 20, dusk: 30, midnight: 40, umbral: 60, eternal: 80 }[def.tier];
-        if (card.level >= maxLevel) return state;
+        if (card.level >= TIER_MAX_LEVEL[def.tier]) return state;
 
-        const cost = levelUpCost(card.level, config);
-        if (state.currencies.soulShards < cost) return state;
+        const cost = levelUpCost(card.level, def.tier);
+        if (card.soulShards < cost) return state;
+
+        // CL points: 1 base * tier multiplier
+        const newCLPoints =
+          state.collectionLevelPoints + TIER_CL_MULTIPLIER[def.tier];
+
+        const newCards = state.ownedCards.map((c, i) =>
+          i === action.cardIndex
+            ? { ...c, level: c.level + 1, soulShards: c.soulShards - cost }
+            : c,
+        );
+
+        const clFields = deriveCLFields(
+          newCLPoints,
+          config,
+          state.unlockedFeatures,
+        );
+
+        return {
+          ...state,
+          ownedCards: newCards,
+          collectionLevelPoints: newCLPoints,
+          ...clFields,
+        };
+      }
+
+      // ======================== ASCEND_CARD ========================
+      case 'ASCEND_CARD': {
+        const card = state.ownedCards[action.cardIndex];
+        if (!card) return state;
+
+        const def = getCardDef(config, card.definitionId);
+        if (!def) return state;
+
+        // Must be at tier max level
+        if (card.level < TIER_MAX_LEVEL[def.tier]) return state;
+
+        const tierIdx = TIER_ORDER.indexOf(def.tier);
+        if (tierIdx < 0 || tierIdx >= TIER_ORDER.length - 1) return state;
+        const nextTier = TIER_ORDER[tierIdx + 1];
+
+        const costKey = `${def.tier}->${nextTier}`;
+        const cost = ASCENSION_COSTS[costKey];
+        if (!cost) return state;
+
+        if (card.soulShards < cost.soulShards) return state;
+        if (state.currencies.shadowEssence < cost.shadowEssence) return state;
+        if (state.currencies.lunarCrystals < cost.lunarCrystals) return state;
+
+        // Find next-tier card of the same type (keeps card identity/type)
+        const nextDef = config.cards.find(
+          (c) => c.type === def.type && c.tier === nextTier,
+        );
+        if (!nextDef) return state;
+
+        // Bonus CL points for ascending
+        const newCLPoints =
+          state.collectionLevelPoints + TIER_CL_MULTIPLIER[nextTier] * 5;
+        const clFields = deriveCLFields(
+          newCLPoints,
+          config,
+          state.unlockedFeatures,
+        );
 
         return {
           ...state,
           currencies: {
             ...state.currencies,
-            soulShards: state.currencies.soulShards - cost,
+            shadowEssence:
+              state.currencies.shadowEssence - cost.shadowEssence,
+            lunarCrystals:
+              state.currencies.lunarCrystals - cost.lunarCrystals,
           },
           ownedCards: state.ownedCards.map((c, i) =>
-            i === action.cardIndex ? { ...c, level: c.level + 1 } : c
+            i === action.cardIndex
+              ? {
+                  ...c,
+                  definitionId: nextDef.id,
+                  level: 1,
+                  soulShards: c.soulShards - cost.soulShards,
+                  awakened: false,
+                }
+              : c,
           ),
-          playerStats: {
-            ...state.playerStats,
-            experience:
-              state.playerStats.experience + config.settings.experiencePerLevelUp,
-          },
+          collectionLevelPoints: newCLPoints,
+          ...clFields,
         };
       }
 
+      // ======================== AWAKEN_CARD ========================
+      case 'AWAKEN_CARD': {
+        const card = state.ownedCards[action.cardIndex];
+        if (!card || card.awakened) return state;
+
+        const def = getCardDef(config, card.definitionId);
+        if (!def) return state;
+
+        const info = AWAKENING_INFO[def.tier];
+        if (card.level < info.level) return state;
+        if (card.soulShards < info.soulShards) return state;
+        if (state.currencies.shadowEssence < info.shadowEssence) return state;
+        if (state.currencies.lunarCrystals < info.lunarCrystals) return state;
+
+        return {
+          ...state,
+          currencies: {
+            ...state.currencies,
+            shadowEssence:
+              state.currencies.shadowEssence - info.shadowEssence,
+            lunarCrystals:
+              state.currencies.lunarCrystals - info.lunarCrystals,
+          },
+          ownedCards: state.ownedCards.map((c, i) =>
+            i === action.cardIndex
+              ? {
+                  ...c,
+                  awakened: true,
+                  soulShards: c.soulShards - info.soulShards,
+                }
+              : c,
+          ),
+        };
+      }
+
+      // ======================== OPEN_PACK ========================
       case 'OPEN_PACK': {
-        // action.cards contains the card definitions pulled from the pack
         const newOwned: OwnedCard[] = [];
-        let shardGain = 0;
+        let cards = [...state.ownedCards];
 
         for (const cardDef of action.cards) {
-          // Check if already owned
-          const existing = state.ownedCards.find((c) => c.definitionId === cardDef.id);
-          if (existing) {
-            // Duplicate -> soul shards
-            shardGain += config.settings.duplicateShardValue * (TIER_ORDER.indexOf(cardDef.tier) + 1);
+          const existIdx = cards.findIndex(
+            (c) => c.definitionId === cardDef.id,
+          );
+          if (existIdx >= 0) {
+            // Duplicate -> card-specific soul shards
+            const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
+            cards[existIdx] = {
+              ...cards[existIdx],
+              soulShards: cards[existIdx].soulShards + shards,
+            };
           } else {
             newOwned.push({
               definitionId: cardDef.id,
               level: 1,
-              experience: 0,
+              soulShards: 0,
+              awakened: false,
               placedInCrypt: false,
               lastCollected: Date.now(),
               accumulatedEssence: 0,
@@ -365,24 +734,20 @@ function createGameReducer(config: GameConfig) {
 
         return {
           ...state,
-          currencies: {
-            ...state.currencies,
-            soulShards: state.currencies.soulShards + shardGain,
-          },
-          ownedCards: [...state.ownedCards, ...newOwned],
+          ownedCards: [...cards, ...newOwned],
           playerStats: {
             ...state.playerStats,
             totalPacksOpened: state.playerStats.totalPacksOpened + 1,
-            totalCardsCollected: state.playerStats.totalCardsCollected + newOwned.length,
-            experience:
-              state.playerStats.experience + config.settings.experiencePerPack,
+            totalCardsCollected:
+              state.playerStats.totalCardsCollected + newOwned.length,
           },
         };
       }
 
+      // ======================== PURCHASE_PACK ========================
       case 'PURCHASE_PACK': {
         const pack = config.packs.find((p) => p.id === action.packId);
-        if (!pack) return state;
+        if (!pack || !pack.cost) return state;
 
         const { currency, amount } = pack.cost;
         if (state.currencies[currency] < amount) return state;
@@ -396,20 +761,28 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
-      case 'CLAIM_DAILY_PACK': {
-        if (!state.dailyFreePackAvailable) return state;
-        return { ...state, dailyFreePackAvailable: false };
+      // ======================== CLAIM_STARTER_TOME ========================
+      case 'CLAIM_STARTER_TOME': {
+        if (state.starterTomeClaimed) return state;
+        return { ...state, starterTomeClaimed: true };
       }
 
+      // ======================== START_EXPEDITION ========================
       case 'START_EXPEDITION': {
         const zone = config.expeditions.find((z) => z.id === action.zoneId);
         if (!zone) return state;
+
+        const { duration } = action;
+        if (duration < zone.durationRange[0] || duration > zone.durationRange[1])
+          return state;
 
         const now = Date.now();
         return {
           ...state,
           ownedCards: state.ownedCards.map((c, i) =>
-            action.cardIndices.includes(i) ? { ...c, isOnExpedition: true } : c
+            action.cardIndices.includes(i)
+              ? { ...c, isOnExpedition: true }
+              : c,
           ),
           activeExpeditions: [
             ...state.activeExpeditions,
@@ -417,63 +790,111 @@ function createGameReducer(config: GameConfig) {
               zoneId: zone.id,
               cardIds: action.cardIndices,
               startedAt: now,
-              completesAt: now + zone.duration * 1000,
+              completesAt: now + duration * 1000,
+              chosenDuration: duration,
             },
           ],
         };
       }
 
-      case 'COMPLETE_EXPEDITION': {
-        // Handled in TICK for auto-completion; manual completion if needed
-        return state;
-      }
+      // ======================== COMPLETE_QUEST ========================
+      case 'COMPLETE_QUEST': {
+        const quest = state.dailyQuests[action.questIndex];
+        if (!quest || quest.claimed) return state;
 
-      case 'ADD_CURRENCY': {
-        return {
-          ...state,
-          currencies: {
-            ...state.currencies,
-            [action.currency]: state.currencies[action.currency as keyof Currencies] + action.amount,
-          },
-        };
-      }
+        const qDef = config.dailyQuestPool.find(
+          (q) => q.id === quest.questId,
+        );
+        if (!qDef || quest.progress < qDef.target) return state;
 
-      case 'GAIN_EXPERIENCE': {
-        let newExp = state.playerStats.experience + action.amount;
-        let newLevel = state.playerStats.level;
-        let newUnlocks = [...state.unlockedFeatures];
-        let newSlots = state.cryptSlots;
+        const newCur = { ...state.currencies };
+        if (qDef.rewards.shadowEssence)
+          newCur.shadowEssence += qDef.rewards.shadowEssence;
+        if (qDef.rewards.lunarCrystals)
+          newCur.lunarCrystals += qDef.rewards.lunarCrystals;
 
-        // Level up check
-        while (newExp >= experienceForLevel(newLevel)) {
-          newExp -= experienceForLevel(newLevel);
-          newLevel++;
-          // Unlock features for new level
-          config.featureUnlocks
-            .filter((f) => f.level === newLevel)
-            .forEach((f) => {
-              if (!newUnlocks.includes(f.feature)) {
-                newUnlocks.push(f.feature);
-              }
-            });
-          // Grant extra crypt slot every 5 levels
-          if (newLevel % 5 === 0 && newSlots < config.settings.maxCryptSlots) {
-            newSlots++;
-          }
+        // Quest soul-shard rewards go to a random owned card
+        let newCards = [...state.ownedCards];
+        if (qDef.rewards.soulShards && newCards.length > 0) {
+          const ri = Math.floor(Math.random() * newCards.length);
+          newCards[ri] = {
+            ...newCards[ri],
+            soulShards: newCards[ri].soulShards + qDef.rewards.soulShards,
+          };
         }
 
         return {
           ...state,
-          cryptSlots: newSlots,
-          unlockedFeatures: newUnlocks,
-          playerStats: {
-            ...state.playerStats,
-            level: newLevel,
-            experience: newExp,
-          },
+          currencies: newCur,
+          ownedCards: newCards,
+          dailyQuests: state.dailyQuests.map((q, i) =>
+            i === action.questIndex ? { ...q, claimed: true } : q,
+          ),
+          weeklyQuestCount: state.weeklyQuestCount + 1,
         };
       }
 
+      // ======================== CLAIM_CL_REWARD ========================
+      case 'CLAIM_CL_REWARD': {
+        if (state.clRewardsClaimed.includes(action.cl)) return state;
+        if (state.collectionLevel < action.cl) return state;
+
+        const reward = config.clRewards.find((r) => r.cl === action.cl);
+        if (!reward) return state;
+
+        const newCur = { ...state.currencies };
+        let newCards = [...state.ownedCards];
+
+        switch (reward.type) {
+          case 'shadowEssence':
+            newCur.shadowEssence += reward.amount;
+            break;
+          case 'lunarCrystals':
+            newCur.lunarCrystals += reward.amount;
+            break;
+          case 'soulShards':
+            // Distribute evenly across all owned cards
+            if (newCards.length > 0) {
+              const per = Math.floor(reward.amount / newCards.length);
+              let rem = reward.amount - per * newCards.length;
+              newCards = newCards.map((c) => {
+                const bonus = rem > 0 ? 1 : 0;
+                if (rem > 0) rem--;
+                return { ...c, soulShards: c.soulShards + per + bonus };
+              });
+            }
+            break;
+          // tome / premiumTome / special are handled by the UI layer
+        }
+
+        return {
+          ...state,
+          currencies: newCur,
+          ownedCards: newCards,
+          clRewardsClaimed: [...state.clRewardsClaimed, action.cl],
+        };
+      }
+
+      // ======================== CLAIM_WEEKLY_REWARD ========================
+      case 'CLAIM_WEEKLY_REWARD': {
+        if (state.weeklyRewardsClaimed.includes(action.tier)) return state;
+        return {
+          ...state,
+          weeklyRewardsClaimed: [
+            ...state.weeklyRewardsClaimed,
+            action.tier,
+          ],
+        };
+      }
+
+      // ======================== TUTORIAL ========================
+      case 'SET_TUTORIAL_STEP':
+        return { ...state, tutorialStep: action.step };
+
+      case 'COMPLETE_TUTORIAL':
+        return { ...state, tutorialCompleted: true };
+
+      // ======================== PERSISTENCE ========================
       case 'LOAD_GAME':
         return action.state;
 
@@ -487,7 +908,9 @@ function createGameReducer(config: GameConfig) {
   };
 }
 
-// ---- Hook ----
+// ============================================================
+// Hook
+// ============================================================
 
 export function useGameState(config: GameConfig) {
   const configRef = useRef(config);
@@ -508,17 +931,35 @@ export function useGameState(config: GameConfig) {
             lastTick: Date.now(),
           };
 
-          // Calculate offline essence
-          const offlineSeconds = (Date.now() - parsed.lastTick) / 1000;
-          if (offlineSeconds > 5) {
+          // Offline essence (capped at offlineMaxHours)
+          const maxOffline = cfg.settings.offlineMaxHours * 3600;
+          const offlineSec = Math.min(
+            (Date.now() - parsed.lastTick) / 1000,
+            maxOffline,
+          );
+
+          if (offlineSec > 5) {
             restored.ownedCards = restored.ownedCards.map((card) => {
               if (!card.placedInCrypt || card.isOnExpedition) return card;
+              if (
+                card.expeditionReturnTime &&
+                Date.now() < card.expeditionReturnTime
+              )
+                return card;
+
               const def = getCardDef(cfg, card.definitionId);
               if (!def) return card;
-              const rate = essenceRateForCard(card, def, cfg);
+
+              const amount = getEffectiveGeneration(card, def, cfg);
+              const interval = effectiveInterval(def);
+              const rate = amount / interval;
               const offlineEssence =
-                (rate / 60) * offlineSeconds * cfg.settings.offlineEssenceMultiplier;
-              return { ...card, accumulatedEssence: card.accumulatedEssence + offlineEssence };
+                rate * offlineSec * cfg.settings.offlineEssenceMultiplier;
+
+              return {
+                ...card,
+                accumulatedEssence: card.accumulatedEssence + offlineEssence,
+              };
             });
           }
 
@@ -528,7 +969,7 @@ export function useGameState(config: GameConfig) {
         console.error('Failed to load save:', e);
       }
       return createInitialState(cfg);
-    }
+    },
   );
 
   const lastSaveRef = useRef(Date.now());
@@ -539,16 +980,15 @@ export function useGameState(config: GameConfig) {
       const now = Date.now();
       dispatch({ type: 'TICK', now });
 
-      // Auto-save
-      if (now - lastSaveRef.current > configRef.current.settings.autoSaveInterval) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, lastSaved: now }));
+      if (
+        now - lastSaveRef.current >
+        configRef.current.settings.autoSaveInterval
+      ) {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...state, lastSaved: now }),
+        );
         lastSaveRef.current = now;
-      }
-
-      // Level-up check
-      const expNeeded = experienceForLevel(state.playerStats.level);
-      if (state.playerStats.experience >= expNeeded) {
-        dispatch({ type: 'GAIN_EXPERIENCE', amount: 0 });
       }
     }, configRef.current.settings.tickInterval);
 
@@ -558,65 +998,129 @@ export function useGameState(config: GameConfig) {
   // Save on unmount
   useEffect(() => {
     return () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, lastSaved: Date.now() }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...state, lastSaved: Date.now() }),
+      );
     };
   }, [state]);
 
   // ---- Public API ----
 
-  const collectCard = useCallback((cardIndex: number) => {
-    dispatch({ type: 'COLLECT_CARD', cardIndex });
-  }, []);
+  const collectCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'COLLECT_CARD', cardIndex }),
+    [],
+  );
 
-  const collectAll = useCallback(() => {
-    dispatch({ type: 'COLLECT_ALL' });
-  }, []);
+  const collectAll = useCallback(
+    () => dispatch({ type: 'COLLECT_ALL' }),
+    [],
+  );
 
-  const placeCard = useCallback((cardIndex: number) => {
-    dispatch({ type: 'PLACE_CARD', cardIndex });
-  }, []);
+  const placeCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'PLACE_CARD', cardIndex }),
+    [],
+  );
 
-  const removeCard = useCallback((cardIndex: number) => {
-    dispatch({ type: 'REMOVE_CARD', cardIndex });
-  }, []);
+  const removeCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'REMOVE_CARD', cardIndex }),
+    [],
+  );
 
-  const levelUpCard = useCallback((cardIndex: number) => {
-    dispatch({ type: 'LEVEL_UP_CARD', cardIndex });
-  }, []);
+  const levelUpCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'LEVEL_UP_CARD', cardIndex }),
+    [],
+  );
 
-  const openPack = useCallback((cards: CardDefinition[]) => {
-    dispatch({ type: 'OPEN_PACK', cards });
-  }, []);
+  const ascendCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'ASCEND_CARD', cardIndex }),
+    [],
+  );
 
-  const purchasePack = useCallback((packId: string) => {
-    dispatch({ type: 'PURCHASE_PACK', packId });
-  }, []);
+  const awakenCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'AWAKEN_CARD', cardIndex }),
+    [],
+  );
 
-  const claimDailyPack = useCallback(() => {
-    dispatch({ type: 'CLAIM_DAILY_PACK' });
-  }, []);
+  const openPack = useCallback(
+    (cards: CardDefinition[], packId: string) =>
+      dispatch({ type: 'OPEN_PACK', cards, packId }),
+    [],
+  );
 
-  const startExpedition = useCallback((zoneId: string, cardIndices: number[]) => {
-    dispatch({ type: 'START_EXPEDITION', zoneId, cardIndices });
-  }, []);
+  const purchasePack = useCallback(
+    (packId: string) => dispatch({ type: 'PURCHASE_PACK', packId }),
+    [],
+  );
 
-  const resetGame = useCallback(() => {
-    dispatch({ type: 'RESET_GAME' });
-  }, []);
+  const claimStarterTome = useCallback(
+    () => dispatch({ type: 'CLAIM_STARTER_TOME' }),
+    [],
+  );
+
+  const startExpedition = useCallback(
+    (zoneId: string, cardIndices: number[], duration: number) =>
+      dispatch({ type: 'START_EXPEDITION', zoneId, cardIndices, duration }),
+    [],
+  );
+
+  const completeQuest = useCallback(
+    (questIndex: number) =>
+      dispatch({ type: 'COMPLETE_QUEST', questIndex }),
+    [],
+  );
+
+  const claimCLReward = useCallback(
+    (cl: number) => dispatch({ type: 'CLAIM_CL_REWARD', cl }),
+    [],
+  );
+
+  const claimWeeklyReward = useCallback(
+    (tier: number) => dispatch({ type: 'CLAIM_WEEKLY_REWARD', tier }),
+    [],
+  );
+
+  const setTutorialStep = useCallback(
+    (step: number) => dispatch({ type: 'SET_TUTORIAL_STEP', step }),
+    [],
+  );
+
+  const completeTutorial = useCallback(
+    () => dispatch({ type: 'COMPLETE_TUTORIAL' }),
+    [],
+  );
+
+  const loadGame = useCallback(
+    (gameState: GameState) =>
+      dispatch({ type: 'LOAD_GAME', state: gameState }),
+    [],
+  );
+
+  const resetGame = useCallback(
+    () => dispatch({ type: 'RESET_GAME' }),
+    [],
+  );
 
   return {
     state,
+    dispatch,
     collectCard,
     collectAll,
     placeCard,
     removeCard,
     levelUpCard,
+    ascendCard,
+    awakenCard,
     openPack,
     purchasePack,
-    claimDailyPack,
+    claimStarterTome,
     startExpedition,
+    completeQuest,
+    claimCLReward,
+    claimWeeklyReward,
+    setTutorialStep,
+    completeTutorial,
+    loadGame,
     resetGame,
   };
 }
-
-export { levelUpCost, experienceForLevel, essenceRateForCard, getSynergyBonus, getPlacedCardTypes };

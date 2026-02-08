@@ -6,8 +6,9 @@ import { CardComponent } from './CardComponent';
 interface ExpeditionPanelProps {
   ownedCards: OwnedCard[];
   config: GameConfig;
+  collectionLevel: number;
   activeExpeditions: ActiveExpedition[];
-  onStartExpedition: (zoneId: string, cardIndices: number[]) => void;
+  onStartExpedition: (zoneId: string, cardIndices: number[], duration: number) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -20,23 +21,35 @@ function formatDuration(seconds: number): string {
   return `${s}s`;
 }
 
+function formatDurationRange(range: [number, number]): string {
+  return `${formatDuration(range[0])} - ${formatDuration(range[1])}`;
+}
+
+const RISK_LABELS: Record<string, { label: string; color: string }> = {
+  fatigue: { label: 'Fatigue', color: 'text-yellow-400' },
+  damage: { label: 'Damage', color: 'text-orange-400' },
+  card_loss: { label: 'Temp Loss', color: 'text-red-400' },
+  curse: { label: 'Curse', color: 'text-purple-400' },
+};
+
 export function ExpeditionPanel({
   ownedCards,
   config,
+  collectionLevel,
   activeExpeditions,
   onStartExpedition,
 }: ExpeditionPanelProps) {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
+  const [chosenDuration, setChosenDuration] = useState<number>(0);
 
   const zone = selectedZone ? config.expeditions.find((z) => z.id === selectedZone) : null;
 
-  // Available cards (not on expedition, not needed in crypt)
   const availableCards = ownedCards
     .map((card, index) => ({ card, index }))
-    .filter(({ card }) => !card.isOnExpedition);
+    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil);
 
-  const canStart = zone && selectedCards.size >= zone.requirements.minCards;
+  const canStart = zone && selectedCards.size >= zone.requirements.minCards && chosenDuration > 0;
 
   const handleToggleCard = (index: number) => {
     setSelectedCards((prev) => {
@@ -50,9 +63,16 @@ export function ExpeditionPanel({
     });
   };
 
+  const handleSelectZone = (zoneId: string) => {
+    const z = config.expeditions.find((e) => e.id === zoneId);
+    setSelectedZone(zoneId);
+    setSelectedCards(new Set());
+    if (z) setChosenDuration(z.durationRange[0]);
+  };
+
   const handleStart = () => {
     if (!zone || !canStart) return;
-    onStartExpedition(zone.id, Array.from(selectedCards));
+    onStartExpedition(zone.id, Array.from(selectedCards), chosenDuration);
     setSelectedZone(null);
     setSelectedCards(new Set());
   };
@@ -72,7 +92,8 @@ export function ExpeditionPanel({
           {activeExpeditions.map((exp, i) => {
             const expZone = config.expeditions.find((z) => z.id === exp.zoneId);
             const remaining = Math.max(0, (exp.completesAt - now) / 1000);
-            const progress = 1 - remaining / ((exp.completesAt - exp.startedAt) / 1000);
+            const total = (exp.completesAt - exp.startedAt) / 1000;
+            const progress = 1 - remaining / total;
 
             return (
               <div
@@ -105,15 +126,15 @@ export function ExpeditionPanel({
         <div className="space-y-2">
           <h3 className="font-semibold text-surface-300 text-sm">Available Zones</h3>
           {config.expeditions.map((expZone) => {
-            const req = expZone.requirements;
-            const meetsLevel = ownedCards.some((c) => c.level >= req.minLevel);
-            const meetsCards = availableCards.length >= req.minCards;
-            const isAvailable = meetsLevel && meetsCards;
+            const unlocked = collectionLevel >= expZone.unlockCL;
+            const meetsCards = availableCards.length >= expZone.requirements.minCards;
+            const isAvailable = unlocked && meetsCards;
+            const risk = RISK_LABELS[expZone.riskEffect];
 
             return (
               <button
                 key={expZone.id}
-                onClick={() => isAvailable && setSelectedZone(expZone.id)}
+                onClick={() => isAvailable && handleSelectZone(expZone.id)}
                 disabled={!isAvailable}
                 className={`w-full text-left p-4 rounded-xl border transition-all ${
                   isAvailable
@@ -126,16 +147,21 @@ export function ExpeditionPanel({
                     <h4 className="font-bold text-sm">{expZone.name}</h4>
                     <p className="text-xs text-surface-400 mt-0.5">{expZone.description}</p>
                   </div>
-                  <span className="text-xs text-surface-500">
-                    {formatDuration(expZone.duration)}
-                  </span>
+                  {!unlocked && (
+                    <span className="text-xs text-surface-500 bg-surface-800 px-2 py-1 rounded">
+                      CL {expZone.unlockCL}
+                    </span>
+                  )}
                 </div>
-                <div className="flex gap-3 mt-2 text-xs text-surface-500">
-                  <span>Min {req.minCards} cards</span>
-                  <span>Lv.{req.minLevel}+</span>
-                  {req.requiredTypes?.map((t) => (
+                <div className="flex gap-3 mt-2 text-xs text-surface-500 flex-wrap">
+                  <span>Min {expZone.requirements.minCards} cards</span>
+                  <span>{formatDurationRange(expZone.durationRange)}</span>
+                  {expZone.requirements.requiredTypes?.map((t) => (
                     <span key={t} className="text-purple-400">Needs {t}</span>
                   ))}
+                  <span className={risk.color}>
+                    {expZone.riskPercent}% {risk.label}
+                  </span>
                 </div>
                 {/* Rewards preview */}
                 <div className="flex gap-2 mt-2 text-xs">
@@ -147,6 +173,9 @@ export function ExpeditionPanel({
                   )}
                   {expZone.rewards.lunarCrystals && (
                     <span>🌙 {expZone.rewards.lunarCrystals[0]}-{expZone.rewards.lunarCrystals[1]}</span>
+                  )}
+                  {expZone.rewards.voidEnergy && (
+                    <span>🔮 {expZone.rewards.voidEnergy[0]}-{expZone.rewards.voidEnergy[1]}</span>
                   )}
                 </div>
               </button>
@@ -174,6 +203,28 @@ export function ExpeditionPanel({
             </button>
           </div>
 
+          {/* Duration slider */}
+          {zone && (
+            <div className="p-3 bg-surface-800/50 rounded-lg">
+              <label className="text-xs text-surface-400 block mb-1">
+                Duration: {formatDuration(chosenDuration)}
+              </label>
+              <input
+                type="range"
+                min={zone.durationRange[0]}
+                max={zone.durationRange[1]}
+                step={300}
+                value={chosenDuration}
+                onChange={(e) => setChosenDuration(Number(e.target.value))}
+                className="w-full accent-purple-500"
+              />
+              <div className="flex justify-between text-xs text-surface-500 mt-1">
+                <span>{formatDuration(zone.durationRange[0])}</span>
+                <span>{formatDuration(zone.durationRange[1])}</span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5 max-h-60 overflow-y-auto">
             {availableCards.map(({ card, index }) => {
               const def = config.cards.find((c) => c.id === card.definitionId);
@@ -198,7 +249,6 @@ export function ExpeditionPanel({
                   <CardComponent
                     card={card}
                     definition={def}
-                    index={index}
                     compact
                   />
                 </button>
@@ -215,7 +265,7 @@ export function ExpeditionPanel({
                 : 'bg-surface-800 text-surface-500 cursor-not-allowed'
             }`}
           >
-            Start Expedition ({selectedCards.size}/{zone?.requirements.minCards} cards)
+            Start Expedition ({selectedCards.size}/{zone?.requirements.minCards} cards, {formatDuration(chosenDuration)})
           </button>
         </div>
       )}

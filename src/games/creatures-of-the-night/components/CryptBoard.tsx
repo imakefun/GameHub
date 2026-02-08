@@ -72,7 +72,6 @@ export function CryptBoard({
                 <CardComponent
                   card={card}
                   definition={def}
-                  index={index}
                   showEssence
                   onCollect={() => onCollect(index)}
                 />

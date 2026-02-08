@@ -10,14 +10,9 @@ interface SheetsCache {
 const DEFAULT_SETTINGS: GameSettings = {
   tickInterval: 1000,
   autoSaveInterval: 10000,
-  maxCryptSlots: 12,
-  essencePerLevelMultiplier: 0.08,
-  levelUpBaseCost: 10,
-  levelUpCostMultiplier: 1.15,
-  experiencePerCollection: 5,
-  experiencePerPack: 25,
-  experiencePerLevelUp: 15,
-  duplicateShardValue: 5,
+  maxCryptSlots: 7,
+  essencePerLevelPercent: 0.05,
+  offlineMaxHours: 8,
   offlineEssenceMultiplier: 0.5,
 };
 
@@ -50,8 +45,8 @@ function parseCards(rows: Record<string, string>[]): CardDefinition[] {
       name: row['name'] || '',
       type: (row['type'] || 'beast') as CardType,
       tier: (row['tier'] || 'twilight') as CardTier,
-      baseEssenceRate: parseFloat(row['baseEssenceRate'] || row['essencerate'] || '1'),
-      baseInterval: parseInt(row['baseInterval'] || row['interval'] || '15'),
+      baseGenerationAmount: parseFloat(row['baseGenerationAmount'] || row['baseEssenceRate'] || '1'),
+      baseInterval: parseInt(row['baseInterval'] || row['interval'] || '30'),
       description: row['description'] || '',
       flavorText: row['flavorText'] || row['flavor'] || '',
       artUrl: row['artUrl'] || row['art'] || undefined,
