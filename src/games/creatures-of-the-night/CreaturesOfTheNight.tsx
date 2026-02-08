@@ -30,6 +30,7 @@ function CreaturesGame() {
     collectCard,
     collectAll,
     placeCard,
+    swapCard,
     removeCard,
     levelUpCard,
     ascendCard,
@@ -268,7 +269,9 @@ function CreaturesGame() {
               <CollectionPanel
                 ownedCards={state.ownedCards}
                 config={config}
+                cryptSlots={state.cryptSlots}
                 onPlaceCard={placeCard}
+                onSwapCard={swapCard}
                 onRemoveCard={removeCard}
                 onLevelUp={levelUpCard}
                 onAscend={ascendCard}

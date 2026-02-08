@@ -750,6 +750,24 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      // ======================== SWAP_CARD ========================
+      case 'SWAP_CARD': {
+        const toRemove = state.ownedCards[action.removeIndex];
+        const toPlace = state.ownedCards[action.placeIndex];
+        if (!toRemove || !toRemove.placedInCrypt) return state;
+        if (!toPlace || toPlace.placedInCrypt || toPlace.isOnExpedition) return state;
+
+        return {
+          ...state,
+          ownedCards: state.ownedCards.map((c, i) => {
+            if (i === action.removeIndex) return { ...c, placedInCrypt: false };
+            if (i === action.placeIndex)
+              return { ...c, placedInCrypt: true, lastCollected: Date.now(), accumulatedEssence: 0 };
+            return c;
+          }),
+        };
+      }
+
       // ======================== REMOVE_CARD ========================
       case 'REMOVE_CARD': {
         const card = state.ownedCards[action.cardIndex];
@@ -1385,6 +1403,12 @@ export function useGameState(config: GameConfig) {
     [],
   );
 
+  const swapCard = useCallback(
+    (removeIndex: number, placeIndex: number) =>
+      dispatch({ type: 'SWAP_CARD', removeIndex, placeIndex }),
+    [],
+  );
+
   const removeCard = useCallback(
     (cardIndex: number) => dispatch({ type: 'REMOVE_CARD', cardIndex }),
     [],
@@ -1492,6 +1516,7 @@ export function useGameState(config: GameConfig) {
     collectCard,
     collectAll,
     placeCard,
+    swapCard,
     removeCard,
     levelUpCard,
     ascendCard,

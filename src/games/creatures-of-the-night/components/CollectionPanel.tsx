@@ -8,7 +8,9 @@ import { levelUpCost } from '../hooks/useGameState';
 interface CollectionPanelProps {
   ownedCards: OwnedCard[];
   config: GameConfig;
+  cryptSlots: number;
   onPlaceCard: (index: number) => void;
+  onSwapCard: (removeIndex: number, placeIndex: number) => void;
   onRemoveCard: (index: number) => void;
   onLevelUp: (index: number) => void;
   onAscend: (index: number) => void;
@@ -21,7 +23,9 @@ type SortType = 'type' | 'tier' | 'level';
 export function CollectionPanel({
   ownedCards,
   config,
+  cryptSlots,
   onPlaceCard,
+  onSwapCard,
   onRemoveCard,
   onLevelUp,
   onAscend,
@@ -30,6 +34,9 @@ export function CollectionPanel({
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('tier');
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
+  const [swapPickerCardIndex, setSwapPickerCardIndex] = useState<number | null>(null);
+
+  const cryptIsFull = ownedCards.filter((c) => c.placedInCrypt).length >= cryptSlots;
 
   const filteredCards = ownedCards
     .map((card, index) => {
@@ -275,12 +282,16 @@ export function CollectionPanel({
                     ) : (
                       <button
                         onClick={() => {
-                          onPlaceCard(index);
-                          setSelectedCard(null);
+                          if (cryptIsFull) {
+                            setSwapPickerCardIndex(index);
+                          } else {
+                            onPlaceCard(index);
+                            setSelectedCard(null);
+                          }
                         }}
                         className="w-full py-2.5 rounded-lg text-sm font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors"
                       >
-                        Place in Crypt
+                        {cryptIsFull ? 'Swap into Crypt' : 'Place in Crypt'}
                       </button>
                     )
                   )}
@@ -291,6 +302,142 @@ export function CollectionPanel({
                   className="w-full py-2 bg-surface-700 hover:bg-surface-600 rounded-lg transition-colors text-sm"
                 >
                   Close
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* Swap picker modal */}
+      <AnimatePresence>
+        {swapPickerCardIndex !== null && (() => {
+          const newCard = ownedCards[swapPickerCardIndex];
+          const newDef = newCard
+            ? config.cards.find((c) => c.id === newCard.definitionId)
+            : null;
+          if (!newCard || !newDef) return null;
+
+          const placedCards = ownedCards
+            .map((card, idx) => ({
+              card,
+              idx,
+              def: config.cards.find((c) => c.id === card.definitionId),
+            }))
+            .filter(
+              (item): item is typeof item & { def: NonNullable<typeof item.def> } =>
+                !!item.def && item.card.placedInCrypt,
+            );
+
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[52] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              onClick={() => setSwapPickerCardIndex(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-sm rounded-2xl border border-purple-500/30 p-5 max-h-[85vh] overflow-y-auto"
+                style={{ background: 'linear-gradient(180deg, #1a0533 0%, #0a0015 100%)' }}
+              >
+                <h3 className="text-lg font-bold text-center mb-1">Crypt Full</h3>
+                <p className="text-sm text-surface-400 text-center mb-4">
+                  Choose a card to replace
+                </p>
+
+                {/* New card being placed */}
+                <div
+                  className="flex items-center gap-3 p-3 rounded-xl border mb-4"
+                  style={{
+                    borderColor: `${TIER_COLORS[newDef.tier]}50`,
+                    background: `linear-gradient(135deg, ${TIER_COLORS[newDef.tier]}15, transparent)`,
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
+                    style={{ background: `${TIER_COLORS[newDef.tier]}20` }}
+                  >
+                    {newDef.artUrl ? (
+                      <img src={newDef.artUrl} alt={newDef.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl">{CARD_TYPE_INFO[newDef.type].emoji}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{newDef.name}</p>
+                    <p className="text-xs" style={{ color: TIER_COLORS[newDef.tier] }}>
+                      {TIER_LABELS[newDef.tier]} Lv.{newCard.level}
+                    </p>
+                    <p className="text-xs text-surface-400">
+                      {CARD_TYPE_INFO[newDef.type].emoji} {CARD_TYPE_INFO[newDef.type].label}
+                      {' \u2022 '}{newDef.baseGenerationAmount} SE / {newDef.baseInterval}s
+                    </p>
+                  </div>
+                  <span className="text-xs text-green-400 font-semibold flex-shrink-0">IN</span>
+                </div>
+
+                <p className="text-xs text-surface-500 mb-2 uppercase tracking-wider">
+                  Currently in Crypt
+                </p>
+
+                {/* Placed cards list */}
+                <div className="space-y-2">
+                  {placedCards.map(({ card: placed, idx, def: placedDef }) => {
+                    const hasEssence = placed.accumulatedEssence >= 1;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          onSwapCard(idx, swapPickerCardIndex);
+                          setSwapPickerCardIndex(null);
+                          setSelectedCard(null);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-red-500/50 hover:bg-red-500/5 text-left"
+                        style={{
+                          borderColor: `${TIER_COLORS[placedDef.tier]}30`,
+                          background: `linear-gradient(135deg, ${TIER_COLORS[placedDef.tier]}08, transparent)`,
+                        }}
+                      >
+                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
+                          style={{ background: `${TIER_COLORS[placedDef.tier]}20` }}
+                        >
+                          {placedDef.artUrl ? (
+                            <img src={placedDef.artUrl} alt={placedDef.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl">{CARD_TYPE_INFO[placedDef.type].emoji}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm truncate">{placedDef.name}</p>
+                          <p className="text-xs" style={{ color: TIER_COLORS[placedDef.tier] }}>
+                            {TIER_LABELS[placedDef.tier]} Lv.{placed.level}
+                            {placed.awakened && ' \u2605'}
+                          </p>
+                          <p className="text-xs text-surface-400">
+                            {CARD_TYPE_INFO[placedDef.type].emoji} {CARD_TYPE_INFO[placedDef.type].label}
+                            {' \u2022 '}{placedDef.baseGenerationAmount} SE / {placedDef.baseInterval}s
+                          </p>
+                          {hasEssence && (
+                            <p className="text-xs text-amber-400 mt-0.5">
+                              {Math.floor(placed.accumulatedEssence)} SE pending
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs text-red-400 font-semibold flex-shrink-0">OUT</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setSwapPickerCardIndex(null)}
+                  className="w-full mt-4 py-2 bg-surface-700 hover:bg-surface-600 rounded-lg transition-colors text-sm"
+                >
+                  Cancel
                 </button>
               </motion.div>
             </motion.div>
