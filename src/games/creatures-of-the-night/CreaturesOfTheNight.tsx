@@ -17,6 +17,7 @@ import { CollectionPanel } from './components/CollectionPanel';
 import { ShopPanel } from './components/ShopPanel';
 import { ExpeditionPanel } from './components/ExpeditionPanel';
 import { GrimoirePanel } from './components/GrimoirePanel';
+import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
 import { isNightTime } from './hooks/useGameState';
 
 type Tab = 'crypt' | 'collection' | 'shop' | 'expeditions' | 'grimoire';
@@ -39,6 +40,8 @@ function CreaturesGame() {
     completeQuest,
     claimCLReward,
     claimWeeklyReward,
+    setTutorialStep,
+    completeTutorial,
     resetGame,
   } = useGameState(config);
 
@@ -229,6 +232,7 @@ function CreaturesGame() {
                 currencies={state.currencies}
                 config={config}
                 ownedCards={state.ownedCards}
+                collectionLevel={state.collectionLevel}
                 starterTomeClaimed={state.starterTomeClaimed}
                 onPurchasePack={purchasePack}
                 onOpenPack={openPack}
@@ -256,6 +260,21 @@ function CreaturesGame() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Tutorial Overlay */}
+      {!state.tutorialCompleted && (
+        <TutorialOverlay
+          step={state.tutorialStep}
+          onNext={() => {
+            if (state.tutorialStep >= TUTORIAL_STEP_COUNT - 1) {
+              completeTutorial();
+            } else {
+              setTutorialStep(state.tutorialStep + 1);
+            }
+          }}
+          onSkip={completeTutorial}
+        />
+      )}
 
       {/* Settings Modal */}
       <AnimatePresence>

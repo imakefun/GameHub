@@ -8,6 +8,7 @@ interface ShopPanelProps {
   currencies: Currencies;
   config: GameConfig;
   ownedCards: OwnedCard[];
+  collectionLevel: number;
   starterTomeClaimed: boolean;
   onPurchasePack: (packId: string) => void;
   onOpenPack: (cards: CardDefinition[], packId: string) => void;
@@ -30,6 +31,7 @@ export function ShopPanel({
   currencies,
   config,
   ownedCards,
+  collectionLevel,
   starterTomeClaimed,
   onPurchasePack,
   onOpenPack,
@@ -155,6 +157,7 @@ export function ShopPanel({
           <PackOpening
             config={config}
             ownedCards={ownedCards}
+            collectionLevel={collectionLevel}
             packId={openingPackId}
             onClose={() => setOpeningPackId(null)}
             onConfirm={(cards) => onOpenPack(cards, openingPackId)}

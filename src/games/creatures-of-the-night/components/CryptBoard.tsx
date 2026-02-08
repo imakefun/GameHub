@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import type { OwnedCard, GameConfig } from '../types';
+import type { OwnedCard, GameConfig, CardType } from '../types';
+import { CARD_TYPE_INFO } from '../types';
 import { CardComponent } from './CardComponent';
 
 interface CryptBoardProps {
@@ -32,6 +33,26 @@ export function CryptBoard({
     .filter((c) => c.placedInCrypt)
     .reduce((sum, c) => sum + c.accumulatedEssence, 0);
 
+  // Compute active synergies for the crypt summary
+  const typeCounts: Partial<Record<CardType, number>> = {};
+  placedCards.forEach(({ card }) => {
+    const def = config.cards.find((c) => c.id === card.definitionId);
+    if (def) typeCounts[def.type] = (typeCounts[def.type] || 0) + 1;
+  });
+
+  const activeTypeSynergies = config.typeSynergies
+    .map((syn) => {
+      const count = typeCounts[syn.type] || 0;
+      const active = syn.thresholds.filter((t) => count >= t.count);
+      if (active.length === 0) return null;
+      return { type: syn.type, bonus: active[active.length - 1].bonus };
+    })
+    .filter(Boolean) as { type: CardType; bonus: number }[];
+
+  const activeCrossSynergies = config.crossTypeSynergies.filter(
+    (syn) => (typeCounts[syn.type1] || 0) >= 1 && (typeCounts[syn.type2] || 0) >= 1
+  );
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -54,6 +75,33 @@ export function CryptBoard({
           </motion.button>
         )}
       </div>
+
+      {/* Active synergies ribbon */}
+      {(activeTypeSynergies.length > 0 || activeCrossSynergies.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {activeTypeSynergies.map((syn) => (
+            <div
+              key={syn.type}
+              className="flex items-center gap-1 px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs"
+            >
+              <span>{CARD_TYPE_INFO[syn.type].emoji}</span>
+              <span className="text-cyan-400">+{syn.bonus}%</span>
+            </div>
+          ))}
+          {activeCrossSynergies.map((syn) => (
+            <div
+              key={syn.id}
+              className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs"
+              title={`${syn.name}: ${syn.primaryEffect}`}
+            >
+              <span>{CARD_TYPE_INFO[syn.type1].emoji}</span>
+              <span className="text-surface-500">+</span>
+              <span>{CARD_TYPE_INFO[syn.type2].emoji}</span>
+              <span className="text-purple-400">+{syn.productionBonus}%</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Card Grid */}
       {placedCards.length === 0 ? (

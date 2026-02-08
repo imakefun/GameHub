@@ -1,5 +1,6 @@
-import type { GameState, GameConfig } from '../types';
-import { isNightTime } from '../hooks/useGameState';
+import type { GameState, GameConfig, CardType } from '../types';
+import { CARD_TYPE_INFO } from '../types';
+import { isNightTime, getLunarPhase, WEEKLY_MILESTONES } from '../hooks/useGameState';
 
 interface GrimoirePanelProps {
   state: GameState;
@@ -20,6 +21,26 @@ function pointsForLevel(level: number): number {
   return (x * x - 25) / 20;
 }
 
+const LUNAR_DISPLAY: Record<string, { emoji: string; label: string; effect: string }> = {
+  new_moon: { emoji: '🌑', label: 'New Moon', effect: 'Shadow/Cursed +75%' },
+  waxing: { emoji: '🌒', label: 'Waxing', effect: 'No special bonus' },
+  full_moon: { emoji: '🌕', label: 'Full Moon', effect: 'All +10%, Lycanthrope +100%' },
+  waning: { emoji: '🌘', label: 'Waning', effect: 'No special bonus' },
+  blood_moon: { emoji: '🔴', label: 'Blood Moon', effect: 'All types +50%!' },
+  none: { emoji: '🌙', label: 'Normal', effect: '' },
+};
+
+function formatWeeklyReward(rewards: { shadowEssence?: number; soulShards?: number; lunarCrystals?: number; tome?: string }): string {
+  const parts: string[] = [];
+  if (rewards.tome) {
+    const tomeNames: Record<string, string> = { 'standard-tome': 'Standard Tome', 'enhanced-tome': 'Enhanced Tome', 'premium-tome': 'Premium Tome' };
+    parts.push(`📦 ${tomeNames[rewards.tome] || rewards.tome}`);
+  }
+  if (rewards.soulShards) parts.push(`💎 ${rewards.soulShards}`);
+  if (rewards.lunarCrystals) parts.push(`🌙 ${rewards.lunarCrystals}`);
+  return parts.join(' + ');
+}
+
 export function GrimoirePanel({
   state,
   config,
@@ -28,6 +49,9 @@ export function GrimoirePanel({
   onClaimWeeklyReward,
 }: GrimoirePanelProps) {
   const night = isNightTime();
+  const lunarPhase = getLunarPhase();
+  const lunar = LUNAR_DISPLAY[lunarPhase] || LUNAR_DISPLAY.none;
+
   const currentFloor = pointsForLevel(state.collectionLevel);
   const nextFloor = pointsForLevel(state.collectionLevel + 1);
   const progressInLevel = state.collectionLevelPoints - currentFloor;
@@ -38,8 +62,31 @@ export function GrimoirePanel({
     (r) => r.cl <= state.collectionLevel && !state.clRewardsClaimed.includes(r.cl)
   );
 
-  // Weekly milestones
-  const weeklyTiers = [3, 7, 10];
+  // Compute active synergies from crypt cards
+  const cryptCards = state.ownedCards.filter((c) => c.placedInCrypt);
+  const typeCounts: Partial<Record<CardType, number>> = {};
+  cryptCards.forEach((c) => {
+    const def = config.cards.find((d) => d.id === c.definitionId);
+    if (def) typeCounts[def.type] = (typeCounts[def.type] || 0) + 1;
+  });
+
+  // Active type synergies
+  const activeTypeSynergies = config.typeSynergies
+    .map((syn) => {
+      const count = typeCounts[syn.type] || 0;
+      const activeThresholds = syn.thresholds.filter((t) => count >= t.count);
+      if (activeThresholds.length === 0) return null;
+      const best = activeThresholds[activeThresholds.length - 1];
+      return { type: syn.type, count, bonus: best.bonus, thresholds: syn.thresholds };
+    })
+    .filter(Boolean) as { type: CardType; count: number; bonus: number; thresholds: { count: number; bonus: number }[] }[];
+
+  // Active cross-type synergies
+  const activeCrossSynergies = config.crossTypeSynergies.filter(
+    (syn) => (typeCounts[syn.type1] || 0) >= 1 && (typeCounts[syn.type2] || 0) >= 1
+  );
+
+  const maxWeekly = WEEKLY_MILESTONES[WEEKLY_MILESTONES.length - 1]?.quests || 25;
 
   return (
     <div className="space-y-6">
@@ -59,7 +106,7 @@ export function GrimoirePanel({
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600'
                   : 'bg-gradient-to-r from-amber-400 to-orange-500'
               }`}
-              style={{ width: night ? '100%' : '100%' }}
+              style={{ width: '100%' }}
             />
           </div>
           <div className={`text-3xl ${!night ? 'opacity-30' : ''}`}>🌙</div>
@@ -71,7 +118,70 @@ export function GrimoirePanel({
             <>Day: Beast/Stone/Magic +20%, Shadow/Lycanthrope/Undead -10%</>
           )}
         </p>
+
+        {/* Lunar Phase */}
+        <div className="mt-3 pt-3 border-t border-purple-500/10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{lunar.emoji}</span>
+            <div>
+              <p className="text-sm font-medium">{lunar.label}</p>
+              {lunar.effect && (
+                <p className="text-xs text-surface-400">{lunar.effect}</p>
+              )}
+            </div>
+          </div>
+          <span className="text-xs text-surface-500">Lunar Phase</span>
+        </div>
       </div>
+
+      {/* Active Synergies */}
+      {(activeTypeSynergies.length > 0 || activeCrossSynergies.length > 0) && (
+        <div className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5">
+          <h3 className="font-semibold text-sm mb-3">Active Synergies</h3>
+
+          {activeTypeSynergies.length > 0 && (
+            <div className="space-y-2 mb-3">
+              <p className="text-xs text-surface-400 font-medium">Type Synergies</p>
+              {activeTypeSynergies.map((syn) => (
+                <div
+                  key={syn.type}
+                  className="flex items-center justify-between p-2 rounded-lg bg-cyan-500/10"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>{CARD_TYPE_INFO[syn.type].emoji}</span>
+                    <span className="font-medium">{CARD_TYPE_INFO[syn.type].label}</span>
+                    <span className="text-surface-400">({syn.count} in crypt)</span>
+                  </div>
+                  <span className="text-xs text-cyan-400 font-medium">+{syn.bonus}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeCrossSynergies.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-surface-400 font-medium">Cross-Type Synergies</p>
+              {activeCrossSynergies.map((syn) => (
+                <div
+                  key={syn.id}
+                  className="p-2 rounded-lg bg-cyan-500/10"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span>{CARD_TYPE_INFO[syn.type1].emoji}</span>
+                      <span>+</span>
+                      <span>{CARD_TYPE_INFO[syn.type2].emoji}</span>
+                      <span className="font-medium ml-1">{syn.name}</span>
+                    </div>
+                    <span className="text-cyan-400 font-medium">+{syn.productionBonus}%</span>
+                  </div>
+                  <p className="text-[10px] text-surface-400 mt-0.5">{syn.primaryEffect}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Collection Level Progress */}
       <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
@@ -173,20 +283,15 @@ export function GrimoirePanel({
 
       {/* Weekly Progress */}
       <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5">
-        <h3 className="font-semibold text-sm mb-2">Weekly Quests ({state.weeklyQuestCount}/10)</h3>
+        <h3 className="font-semibold text-sm mb-2">Weekly Quests ({state.weeklyQuestCount}/{maxWeekly})</h3>
         <div className="space-y-2">
-          {weeklyTiers.map((tier) => {
-            const claimed = state.weeklyRewardsClaimed.includes(tier);
-            const reached = state.weeklyQuestCount >= tier;
-            const rewards: Record<number, string> = {
-              3: '🌑 500 SE',
-              7: '🌑 1000 SE + 🌙 2 LC',
-              10: '🌑 2000 SE + 🌙 5 LC',
-            };
+          {WEEKLY_MILESTONES.map((milestone) => {
+            const claimed = state.weeklyRewardsClaimed.includes(milestone.quests);
+            const reached = state.weeklyQuestCount >= milestone.quests;
 
             return (
               <div
-                key={tier}
+                key={milestone.quests}
                 className={`flex items-center justify-between p-2 rounded-lg ${
                   claimed ? 'bg-surface-800/30 opacity-50' : reached ? 'bg-blue-500/10' : 'bg-surface-800/30'
                 }`}
@@ -195,13 +300,13 @@ export function GrimoirePanel({
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                     reached ? 'bg-blue-500 text-white' : 'bg-surface-700 text-surface-400'
                   }`}>
-                    {tier}
+                    {milestone.quests}
                   </span>
-                  <span>{rewards[tier]}</span>
+                  <span>{formatWeeklyReward(milestone.rewards)}</span>
                 </div>
                 {reached && !claimed && (
                   <button
-                    onClick={() => onClaimWeeklyReward(tier)}
+                    onClick={() => onClaimWeeklyReward(milestone.quests)}
                     className="text-xs text-blue-400 font-medium hover:text-blue-300"
                   >
                     Claim
@@ -233,6 +338,14 @@ export function GrimoirePanel({
           <div className="bg-surface-800/30 rounded-lg p-2">
             <p className="text-surface-500">Expeditions</p>
             <p className="font-semibold">{state.playerStats.totalExpeditionsCompleted}</p>
+          </div>
+          <div className="bg-surface-800/30 rounded-lg p-2">
+            <p className="text-surface-500">Login Streak</p>
+            <p className="font-semibold">{state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="bg-surface-800/30 rounded-lg p-2">
+            <p className="text-surface-500">Crypt Cards</p>
+            <p className="font-semibold">{cryptCards.length}/{state.cryptSlots}</p>
           </div>
         </div>
       </div>

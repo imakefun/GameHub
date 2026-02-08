@@ -1,19 +1,25 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { CardDefinition, GameConfig, OwnedCard } from '../types';
-import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER } from '../types';
+import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER, TYPE_UNLOCK_CL } from '../types';
 
 interface PackOpeningProps {
   config: GameConfig;
   ownedCards: OwnedCard[];
+  collectionLevel: number;
   onClose: () => void;
   onConfirm: (cards: CardDefinition[]) => void;
   packId: string;
 }
 
-function rollCards(config: GameConfig, packId: string): CardDefinition[] {
+function rollCards(config: GameConfig, packId: string, collectionLevel: number): CardDefinition[] {
   const pack = config.packs.find((p) => p.id === packId);
   if (!pack) return [];
+
+  // Filter cards to only include types the player has unlocked via CL
+  const unlockedCards = config.cards.filter(
+    (c) => collectionLevel >= (TYPE_UNLOCK_CL[c.type] ?? 1)
+  );
 
   const results: CardDefinition[] = [];
   const tierWeights = pack.tierWeights;
@@ -34,10 +40,16 @@ function rollCards(config: GameConfig, packId: string): CardDefinition[] {
       }
     }
 
-    // Pick card from tier
-    const tierCards = config.cards.filter((c) => c.tier === selectedTier);
+    // Pick card from tier, respecting CL-unlocked types
+    const tierCards = unlockedCards.filter((c) => c.tier === selectedTier);
     if (tierCards.length > 0) {
       results.push(tierCards[Math.floor(Math.random() * tierCards.length)]);
+    } else {
+      // Fallback: if no unlocked cards at this tier, pick from any unlocked card
+      const fallback = unlockedCards.length > 0
+        ? unlockedCards[Math.floor(Math.random() * unlockedCards.length)]
+        : config.cards[Math.floor(Math.random() * config.cards.length)];
+      results.push(fallback);
     }
   }
 
@@ -46,7 +58,7 @@ function rollCards(config: GameConfig, packId: string): CardDefinition[] {
     const guaranteedTier = tiers[tiers.length - 1][0]; // highest tier in pack
     const hasTier = results.some((c) => c.tier === guaranteedTier);
     if (!hasTier) {
-      const tierCards = config.cards.filter((c) => c.tier === guaranteedTier);
+      const tierCards = unlockedCards.filter((c) => c.tier === guaranteedTier);
       if (tierCards.length > 0) {
         results[results.length - 1] = tierCards[Math.floor(Math.random() * tierCards.length)];
       }
@@ -56,7 +68,7 @@ function rollCards(config: GameConfig, packId: string): CardDefinition[] {
   return results;
 }
 
-export function PackOpening({ config, ownedCards, onClose, onConfirm, packId }: PackOpeningProps) {
+export function PackOpening({ config, ownedCards, collectionLevel, onClose, onConfirm, packId }: PackOpeningProps) {
   const [phase, setPhase] = useState<'sealed' | 'revealing' | 'done'>('sealed');
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -64,7 +76,7 @@ export function PackOpening({ config, ownedCards, onClose, onConfirm, packId }: 
   const pack = config.packs.find((p) => p.id === packId);
 
   const handleOpen = () => {
-    const rolled = rollCards(config, packId);
+    const rolled = rollCards(config, packId, collectionLevel);
     // Sort by tier (highest last for drama)
     rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
     setCards(rolled);

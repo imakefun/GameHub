@@ -8,6 +8,7 @@ import type {
   CardTier,
   CardType,
   CosmicPhase,
+  LunarPhase,
 } from '../types';
 import {
   TIER_ORDER,
@@ -29,6 +30,20 @@ const CRYPT_SLOT_UNLOCKS: { cl: number; slot: number }[] = [
   { cl: 75, slot: 7 },
 ];
 
+// Weekly milestone tiers per the spec: 5/10/15/20/25 quests
+const WEEKLY_MILESTONES: {
+  quests: number;
+  rewards: { shadowEssence?: number; soulShards?: number; lunarCrystals?: number; tome?: string };
+}[] = [
+  { quests: 5, rewards: { tome: 'standard-tome' } },
+  { quests: 10, rewards: { soulShards: 100, tome: 'standard-tome' } },
+  { quests: 15, rewards: { soulShards: 200, tome: 'enhanced-tome' } },
+  { quests: 20, rewards: { lunarCrystals: 3, tome: 'premium-tome' } },
+  { quests: 25, rewards: { lunarCrystals: 5, tome: 'premium-tome' } },
+];
+
+export { WEEKLY_MILESTONES };
+
 // ============================================================
 // Exported Helpers
 // ============================================================
@@ -45,38 +60,70 @@ export function getCosmicPhase(): CosmicPhase {
 }
 
 /**
+ * Approximate lunar phase based on a known new moon reference date.
+ * Lunar cycle ≈ 29.53 days.
+ */
+export function getLunarPhase(): LunarPhase {
+  const SYNODIC_MONTH = 29.53059;
+  // Known new moon: Jan 29, 2025 12:36 UTC
+  const KNOWN_NEW_MOON = new Date('2025-01-29T12:36:00Z').getTime();
+  const now = Date.now();
+  const daysSinceNew = ((now - KNOWN_NEW_MOON) / 86_400_000) % SYNODIC_MONTH;
+  const phase = daysSinceNew / SYNODIC_MONTH; // 0..1
+
+  if (phase < 0.034 || phase >= 0.966) return 'new_moon';   // ~1 day
+  if (phase < 0.466) return 'waxing';
+  if (phase < 0.534) return 'full_moon';                     // ~2 days
+  return 'waning';
+  // blood_moon is a special event, not triggered by calendar
+}
+
+/**
+ * Lunar bonus for a card type (fractional, additive with cosmic bonus).
+ * New Moon: Shadow +75%, Cursed +75%
+ * Full Moon: Lycanthrope +100%, all cards +10%
+ */
+export function getLunarBonus(type: CardType): number {
+  const phase = getLunarPhase();
+  let bonus = 0;
+
+  if (phase === 'full_moon') {
+    bonus += 0.1; // all cards
+    if (type === 'lycanthrope') bonus += 1.0;
+  } else if (phase === 'new_moon') {
+    if (type === 'shadow') bonus += 0.75;
+    if (type === 'cursed') bonus += 0.75;
+  }
+
+  return bonus;
+}
+
+/**
  * Cosmic-cycle production bonus for a card type (fractional).
- *
- *  Day  (6 AM - 6 PM): Beast / Stone / Magic  +20 %
- *                       Shadow / Lycanthrope / Undead  -10 %
- *  Night (6 PM - 6 AM): Shadow / Lycanthrope / Undead / Infernal  +30 %
- *                        Beast  -10 %
+ * Includes both solar (day/night) and lunar bonuses.
  */
 export function getCosmicBonus(type: CardType): number {
+  let bonus = 0;
+
+  // Solar cycle
   if (isNightTime()) {
-    if (
-      type === 'shadow' ||
-      type === 'lycanthrope' ||
-      type === 'undead' ||
-      type === 'infernal'
-    )
-      return 0.3;
-    if (type === 'beast') return -0.1;
+    if (type === 'shadow' || type === 'lycanthrope' || type === 'undead' || type === 'infernal')
+      bonus += 0.3;
+    if (type === 'beast') bonus -= 0.1;
   } else {
-    if (type === 'beast' || type === 'stone' || type === 'magic') return 0.2;
+    if (type === 'beast' || type === 'stone' || type === 'magic') bonus += 0.2;
     if (type === 'shadow' || type === 'lycanthrope' || type === 'undead')
-      return -0.1;
+      bonus -= 0.1;
   }
-  return 0;
+
+  // Lunar cycle
+  bonus += getLunarBonus(type);
+
+  return bonus;
 }
 
 /**
  * Soul-shard cost to go from `level` to `level + 1`.
- *
- * Formula: ceil(2 * tierMult * (1 + (level - 1) * 0.1))
- *   tierMult: twilight=1  dusk=2  midnight=4  umbral=8  eternal=20
- *
- * Examples: Twilight 1->2 = 2,  Twilight 29->30 = 8,  Eternal 1->2 = 40
  */
 export function levelUpCost(level: number, tier: CardTier): number {
   const tierMult: Record<CardTier, number> = {
@@ -92,11 +139,6 @@ export function levelUpCost(level: number, tier: CardTier): number {
 /**
  * Effective generation *amount* per collection event
  * (before cosmic / synergy / fatigue).
- *
- *   baseGenerationAmount
- *     * (1 + (level - 1) * essencePerLevelPercent)
- *     * typeSpec.amountMultiplier
- *     * (awakened ? 1.25 : 1)
  */
 export function getEffectiveGeneration(
   card: OwnedCard,
@@ -112,9 +154,6 @@ export function getEffectiveGeneration(
 
 /**
  * Derive Collection Level from accumulated CL points.
- *
- * Points required to reach CL n  =  5 * (n - 1) * n
- *   CL 1 = 0 pts,  CL 2 = 10 pts,  CL 3 = 30 pts,  CL 4 = 60 pts ...
  */
 export function collectionLevelForPoints(points: number): number {
   if (points <= 0) return 1;
@@ -258,6 +297,79 @@ function applyCollectionEffects(amount: number, type: CardType): number {
 }
 
 // ============================================================
+// Daily Quest Helpers
+// ============================================================
+
+/** Get the start of today (midnight local time) as a timestamp. */
+function getTodayMidnight(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** Pick random daily quests from the pool: 4 easy + 2 hard. */
+function assignDailyQuests(
+  pool: GameConfig['dailyQuestPool'],
+): GameState['dailyQuests'] {
+  const easy = pool.filter((q) => q.difficulty === 'easy');
+  const hard = pool.filter((q) => q.difficulty === 'hard');
+
+  const shuffled = <T>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const picked = [
+    ...shuffled(easy).slice(0, 4),
+    ...shuffled(hard).slice(0, 2),
+  ];
+
+  return picked.map((q) => ({
+    questId: q.id,
+    progress: 0,
+    completed: false,
+    claimed: false,
+  }));
+}
+
+/** Increment progress for quests that match the given trigger. */
+function trackQuestProgress(
+  quests: GameState['dailyQuests'],
+  pool: GameConfig['dailyQuestPool'],
+  trigger: string,
+  amount: number = 1,
+): GameState['dailyQuests'] {
+  return quests.map((q) => {
+    if (q.claimed || q.completed) return q;
+
+    const def = pool.find((p) => p.id === q.questId);
+    if (!def) return q;
+
+    // Match quest triggers by id pattern
+    let matches = false;
+    if (trigger === 'collect_card' && def.id.includes('collect')) matches = true;
+    if (trigger === 'level_up' && def.id.includes('level')) matches = true;
+    if (trigger === 'open_pack' && def.id.includes('pack')) matches = true;
+    if (trigger === 'expedition' && def.id.includes('expedition')) matches = true;
+    if (trigger === 'essence' && def.id.includes('essence')) matches = true;
+    if (trigger === 'login_night' && def.id.includes('night')) matches = true;
+
+    if (!matches) return q;
+
+    const newProgress = Math.min(q.progress + amount, def.target);
+    return {
+      ...q,
+      progress: newProgress,
+      completed: newProgress >= def.target,
+    };
+  });
+}
+
+// ============================================================
 // Initial State
 // ============================================================
 
@@ -297,8 +409,8 @@ function createInitialState(config: GameConfig): GameState {
     activeExpeditions: [],
     starterTomeClaimed: false,
     unlockedFeatures: ['basic-collection'],
-    dailyQuests: [],
-    dailyQuestsLastReset: Date.now(),
+    dailyQuests: assignDailyQuests(config.dailyQuestPool),
+    dailyQuestsLastReset: getTodayMidnight(),
     weeklyQuestCount: 0,
     weeklyRewardsClaimed: [],
     tutorialCompleted: false,
@@ -321,10 +433,33 @@ function createGameReducer(config: GameConfig) {
         const elapsed = (now - state.lastTick) / 1000;
         if (elapsed <= 0) return { ...state, lastTick: now };
 
+        // --- Daily quest reset at midnight ---
+        let dailyQuests = state.dailyQuests;
+        let dailyQuestsLastReset = state.dailyQuestsLastReset;
+        let weeklyQuestCount = state.weeklyQuestCount;
+        let weeklyRewardsClaimed = state.weeklyRewardsClaimed;
+
+        const todayMidnight = getTodayMidnight();
+        if (todayMidnight > dailyQuestsLastReset) {
+          dailyQuests = assignDailyQuests(config.dailyQuestPool);
+          dailyQuestsLastReset = todayMidnight;
+
+          // Reset weekly counts on Monday
+          const dayOfWeek = new Date(now).getDay();
+          if (dayOfWeek === 1 && new Date(state.dailyQuestsLastReset).getDay() !== 1) {
+            weeklyQuestCount = 0;
+            weeklyRewardsClaimed = [];
+          }
+        }
+
+        // --- Track night login quest ---
+        if (isNightTime()) {
+          dailyQuests = trackQuestProgress(dailyQuests, config.dailyQuestPool, 'login_night');
+        }
+
         // --- Accumulate essence for placed cards ---
         let updatedCards: OwnedCard[] = state.ownedCards.map((card) => {
           if (!card.placedInCrypt || card.isOnExpedition) return card;
-          // Card temporarily lost from expedition risk
           if (card.expeditionReturnTime && now < card.expeditionReturnTime)
             return card;
 
@@ -429,6 +564,13 @@ function createGameReducer(config: GameConfig) {
           }
         });
 
+        // Track expedition completion quests
+        if (expCompleted > 0) {
+          dailyQuests = trackQuestProgress(
+            dailyQuests, config.dailyQuestPool, 'expedition', expCompleted
+          );
+        }
+
         // --- Expire fatigue / expedition-return timers ---
         updatedCards = updatedCards.map((card) => {
           let c = card;
@@ -448,6 +590,10 @@ function createGameReducer(config: GameConfig) {
           activeExpeditions: state.activeExpeditions.filter(
             (_, i) => !completedIndices.includes(i),
           ),
+          dailyQuests,
+          dailyQuestsLastReset,
+          weeklyQuestCount,
+          weeklyRewardsClaimed,
           playerStats: {
             ...state.playerStats,
             playTime: state.playerStats.playTime + elapsed,
@@ -471,6 +617,10 @@ function createGameReducer(config: GameConfig) {
           Math.floor(applyCollectionEffects(card.accumulatedEssence, def.type)),
         );
 
+        // Track quest progress
+        let dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'collect_card');
+        dq = trackQuestProgress(dq, config.dailyQuestPool, 'essence', collected);
+
         return {
           ...state,
           currencies: {
@@ -482,6 +632,7 @@ function createGameReducer(config: GameConfig) {
               ? { ...c, accumulatedEssence: 0, lastCollected: Date.now() }
               : c,
           ),
+          dailyQuests: dq,
           playerStats: {
             ...state.playerStats,
             totalEssenceCollected:
@@ -493,6 +644,7 @@ function createGameReducer(config: GameConfig) {
       // ======================== COLLECT_ALL ========================
       case 'COLLECT_ALL': {
         let total = 0;
+        let cardsCollected = 0;
         const newCards = state.ownedCards.map((card) => {
           if (!card.placedInCrypt || card.accumulatedEssence < 1) return card;
           const def = getCardDef(config, card.definitionId);
@@ -501,10 +653,15 @@ function createGameReducer(config: GameConfig) {
             : card.accumulatedEssence;
           const amt = Math.max(0, Math.floor(raw));
           total += amt;
+          cardsCollected++;
           return { ...card, accumulatedEssence: 0, lastCollected: Date.now() };
         });
 
         if (total === 0) return state;
+
+        // Track quest progress
+        let dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'collect_card', cardsCollected);
+        dq = trackQuestProgress(dq, config.dailyQuestPool, 'essence', total);
 
         return {
           ...state,
@@ -513,6 +670,7 @@ function createGameReducer(config: GameConfig) {
             shadowEssence: state.currencies.shadowEssence + total,
           },
           ownedCards: newCards,
+          dailyQuests: dq,
           playerStats: {
             ...state.playerStats,
             totalEssenceCollected:
@@ -596,10 +754,14 @@ function createGameReducer(config: GameConfig) {
           state.unlockedFeatures,
         );
 
+        // Track quest progress
+        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'level_up');
+
         return {
           ...state,
           ownedCards: newCards,
           collectionLevelPoints: newCLPoints,
+          dailyQuests: dq,
           ...clFields,
         };
       }
@@ -612,7 +774,6 @@ function createGameReducer(config: GameConfig) {
         const def = getCardDef(config, card.definitionId);
         if (!def) return state;
 
-        // Must be at tier max level
         if (card.level < TIER_MAX_LEVEL[def.tier]) return state;
 
         const tierIdx = TIER_ORDER.indexOf(def.tier);
@@ -627,13 +788,11 @@ function createGameReducer(config: GameConfig) {
         if (state.currencies.shadowEssence < cost.shadowEssence) return state;
         if (state.currencies.lunarCrystals < cost.lunarCrystals) return state;
 
-        // Find next-tier card of the same type (keeps card identity/type)
         const nextDef = config.cards.find(
           (c) => c.type === def.type && c.tier === nextTier,
         );
         if (!nextDef) return state;
 
-        // Bonus CL points for ascending
         const newCLPoints =
           state.collectionLevelPoints + TIER_CL_MULTIPLIER[nextTier] * 5;
         const clFields = deriveCLFields(
@@ -712,7 +871,6 @@ function createGameReducer(config: GameConfig) {
             (c) => c.definitionId === cardDef.id,
           );
           if (existIdx >= 0) {
-            // Duplicate -> card-specific soul shards
             const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
             cards[existIdx] = {
               ...cards[existIdx],
@@ -732,9 +890,13 @@ function createGameReducer(config: GameConfig) {
           }
         }
 
+        // Track quest progress
+        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'open_pack');
+
         return {
           ...state,
           ownedCards: [...cards, ...newOwned],
+          dailyQuests: dq,
           playerStats: {
             ...state.playerStats,
             totalPacksOpened: state.playerStats.totalPacksOpened + 1,
@@ -776,6 +938,9 @@ function createGameReducer(config: GameConfig) {
         if (duration < zone.durationRange[0] || duration > zone.durationRange[1])
           return state;
 
+        // Track quest progress
+        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'expedition');
+
         const now = Date.now();
         return {
           ...state,
@@ -794,6 +959,7 @@ function createGameReducer(config: GameConfig) {
               chosenDuration: duration,
             },
           ],
+          dailyQuests: dq,
         };
       }
 
@@ -853,7 +1019,6 @@ function createGameReducer(config: GameConfig) {
             newCur.lunarCrystals += reward.amount;
             break;
           case 'soulShards':
-            // Distribute evenly across all owned cards
             if (newCards.length > 0) {
               const per = Math.floor(reward.amount / newCards.length);
               let rem = reward.amount - per * newCards.length;
@@ -878,8 +1043,31 @@ function createGameReducer(config: GameConfig) {
       // ======================== CLAIM_WEEKLY_REWARD ========================
       case 'CLAIM_WEEKLY_REWARD': {
         if (state.weeklyRewardsClaimed.includes(action.tier)) return state;
+
+        const milestone = WEEKLY_MILESTONES[action.tier];
+        if (!milestone || state.weeklyQuestCount < milestone.quests) return state;
+
+        const newCur = { ...state.currencies };
+        let newCards = [...state.ownedCards];
+
+        if (milestone.rewards.shadowEssence)
+          newCur.shadowEssence += milestone.rewards.shadowEssence;
+        if (milestone.rewards.lunarCrystals)
+          newCur.lunarCrystals += milestone.rewards.lunarCrystals;
+        if (milestone.rewards.soulShards && newCards.length > 0) {
+          const per = Math.floor(milestone.rewards.soulShards / newCards.length);
+          let rem = milestone.rewards.soulShards - per * newCards.length;
+          newCards = newCards.map((c) => {
+            const bonus = rem > 0 ? 1 : 0;
+            if (rem > 0) rem--;
+            return { ...c, soulShards: c.soulShards + per + bonus };
+          });
+        }
+
         return {
           ...state,
+          currencies: newCur,
+          ownedCards: newCards,
           weeklyRewardsClaimed: [
             ...state.weeklyRewardsClaimed,
             action.tier,
@@ -930,6 +1118,36 @@ export function useGameState(config: GameConfig) {
             ...parsed,
             lastTick: Date.now(),
           };
+
+          // Login streak tracking
+          const today = new Date().toISOString().split('T')[0];
+          const lastLogin = parsed.playerStats?.lastLoginDate || '';
+          if (lastLogin !== today) {
+            const yesterday = new Date(Date.now() - 86_400_000)
+              .toISOString()
+              .split('T')[0];
+            restored.playerStats = {
+              ...restored.playerStats,
+              lastLoginDate: today,
+              loginStreak:
+                lastLogin === yesterday
+                  ? (restored.playerStats.loginStreak || 1) + 1
+                  : 1,
+            };
+          }
+
+          // Daily quest reset if needed
+          const todayMidnight = getTodayMidnight();
+          if (todayMidnight > restored.dailyQuestsLastReset) {
+            restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool);
+            restored.dailyQuestsLastReset = todayMidnight;
+          }
+
+          // Ensure quests exist (migration from old saves)
+          if (!restored.dailyQuests || restored.dailyQuests.length === 0) {
+            restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool);
+            restored.dailyQuestsLastReset = todayMidnight;
+          }
 
           // Offline essence (capped at offlineMaxHours)
           const maxOffline = cfg.settings.offlineMaxHours * 3600;
