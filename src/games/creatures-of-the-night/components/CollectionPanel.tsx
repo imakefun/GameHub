@@ -120,7 +120,7 @@ export function CollectionPanel({
           <p>No cards found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-tutorial="collection-grid">
           {filteredCards.map(({ card, def, index }) => (
             <CardComponent
               key={`${def.id}-${index}`}
