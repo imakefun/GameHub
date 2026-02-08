@@ -9,6 +9,7 @@ import type {
   FeatureUnlock,
   CLReward,
   DailyQuest,
+  LevelCostConfig,
   GameConfig,
   GameSettings,
 } from '../types';
@@ -25,6 +26,7 @@ import {
   clRewards as localCLRewards,
   dailyQuestPool as localDailyQuestPool,
 } from '../data/synergies';
+import { levelCosts as localLevelCosts } from '../data/levelCosts';
 
 interface GameDataContextType {
   config: GameConfig;
@@ -45,6 +47,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [featureUnlocks] = useState<FeatureUnlock[]>(localFeatureUnlocks);
   const [clRewards] = useState<CLReward[]>(localCLRewards);
   const [dailyQuestPool, setDailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
+  const [levelCosts, setLevelCosts] = useState<LevelCostConfig[]>(localLevelCosts);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,9 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
       if (data.dailyQuests && data.dailyQuests.length > 0) {
         setDailyQuestPool(data.dailyQuests);
       }
+      if (data.levelCosts && data.levelCosts.length > 0) {
+        setLevelCosts(data.levelCosts);
+      }
       setSettings(data.settings);
       setIsUsingSheets(true);
     } catch (err) {
@@ -109,6 +115,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     featureUnlocks,
     clRewards,
     dailyQuestPool,
+    levelCosts,
     settings,
   };
 

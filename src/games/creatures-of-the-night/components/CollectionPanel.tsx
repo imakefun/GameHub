@@ -137,7 +137,7 @@ export function CollectionPanel({
         {selectedItem && (() => {
           const { card, def, index } = selectedItem;
           const maxLevel = TIER_MAX_LEVEL[def.tier];
-          const cost = levelUpCost(card.level, def.tier);
+          const cost = levelUpCost(card.level, def.tier, config);
           const canLevelUp = card.soulShards >= cost && card.level < maxLevel;
           const atMaxLevel = card.level >= maxLevel;
           const tierIdx = TIER_ORDER.indexOf(def.tier);

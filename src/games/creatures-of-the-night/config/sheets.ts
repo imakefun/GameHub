@@ -8,6 +8,7 @@ export const SHEETS_CONFIG = {
     typeSynergies: 'TypeSynergies',
     crossTypeSynergies: 'CrossTypeSynergies',
     dailyQuests: 'DailyQuests',
+    levelCosts: 'LevelCosts',
     settings: 'Settings',
   },
 

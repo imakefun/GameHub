@@ -9,6 +9,7 @@ import type {
   CrossTypeSynergy,
   DailyQuest,
   GameSettings,
+  LevelCostConfig,
 } from '../types';
 
 // ============================================================
@@ -22,6 +23,7 @@ interface SheetsCache {
   typeSynergies: TypeSynergy[] | null;
   crossTypeSynergies: CrossTypeSynergy[] | null;
   dailyQuests: DailyQuest[] | null;
+  levelCosts: LevelCostConfig[] | null;
   settings: GameSettings | null;
   lastFetch: number;
 }
@@ -42,6 +44,7 @@ const cache: SheetsCache = {
   typeSynergies: null,
   crossTypeSynergies: null,
   dailyQuests: null,
+  levelCosts: null,
   settings: null,
   lastFetch: 0,
 };
@@ -222,6 +225,16 @@ function parseSettings(rows: Record<string, string>[]): GameSettings {
   return settings;
 }
 
+function parseLevelCosts(rows: Record<string, string>[]): LevelCostConfig[] {
+  return rows
+    .map((row) => ({
+      tier: (row['tier'] || '') as CardTier,
+      baseCost: parseFloat(row['baseCost'] || '2'),
+      scalingPower: parseFloat(row['scalingPower'] || '1'),
+    }))
+    .filter((c) => c.tier);
+}
+
 // ============================================================
 // Public API
 // ============================================================
@@ -233,6 +246,7 @@ export interface GameSheetData {
   typeSynergies: TypeSynergy[] | null;
   crossTypeSynergies: CrossTypeSynergy[] | null;
   dailyQuests: DailyQuest[] | null;
+  levelCosts: LevelCostConfig[] | null;
   settings: GameSettings;
 }
 
@@ -250,6 +264,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       typeSynergies: cache.typeSynergies,
       crossTypeSynergies: cache.crossTypeSynergies,
       dailyQuests: cache.dailyQuests,
+      levelCosts: cache.levelCosts,
       settings: cache.settings,
     };
   }
@@ -266,6 +281,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       typeSynergyRows,
       crossTypeSynergyRows,
       dailyQuestRows,
+      levelCostRows,
       settingsRows,
     ] = await Promise.all([
       fetchSheet(SHEETS_CONFIG.sheets.cards),
@@ -274,6 +290,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       fetchSheet(SHEETS_CONFIG.sheets.typeSynergies).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.crossTypeSynergies).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.dailyQuests).catch(() => []),
+      fetchSheet(SHEETS_CONFIG.sheets.levelCosts).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.settings).catch(() => []),
     ]);
 
@@ -283,6 +300,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
     const typeSynergies = typeSynergyRows.length > 0 ? parseTypeSynergies(typeSynergyRows) : null;
     const crossTypeSynergies = crossTypeSynergyRows.length > 0 ? parseCrossTypeSynergies(crossTypeSynergyRows) : null;
     const dailyQuests = dailyQuestRows.length > 0 ? parseDailyQuests(dailyQuestRows) : null;
+    const levelCosts = levelCostRows.length > 0 ? parseLevelCosts(levelCostRows) : null;
     const settings = parseSettings(settingsRows);
 
     cache.cards = cards;
@@ -291,11 +309,12 @@ export async function fetchGameData(): Promise<GameSheetData> {
     cache.typeSynergies = typeSynergies;
     cache.crossTypeSynergies = crossTypeSynergies;
     cache.dailyQuests = dailyQuests;
+    cache.levelCosts = levelCosts;
     cache.settings = settings;
     cache.lastFetch = now;
 
     console.log(`[Creatures] Loaded from Sheets: ${cards.length} cards, ${packs?.length ?? 0} packs, ${expeditions?.length ?? 0} expeditions`);
-    return { cards, packs, expeditions, typeSynergies, crossTypeSynergies, dailyQuests, settings };
+    return { cards, packs, expeditions, typeSynergies, crossTypeSynergies, dailyQuests, levelCosts, settings };
   } catch (error) {
     console.error('[Creatures] Failed to fetch from Sheets:', error);
     throw error;
@@ -309,6 +328,7 @@ export function clearCache(): void {
   cache.typeSynergies = null;
   cache.crossTypeSynergies = null;
   cache.dailyQuests = null;
+  cache.levelCosts = null;
   cache.settings = null;
   cache.lastFetch = 0;
 }

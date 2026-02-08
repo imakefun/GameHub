@@ -141,18 +141,25 @@ export function getCosmicBonus(type: CardType): number {
   return bonus;
 }
 
+// Hardcoded fallback if config isn't available yet
+const DEFAULT_LEVEL_COST_PARAMS: Record<CardTier, { baseCost: number; scalingPower: number }> = {
+  twilight:  { baseCost: 2,     scalingPower: 1.076 },
+  dusk:      { baseCost: 4.23,  scalingPower: 1.076 },
+  midnight:  { baseCost: 8.94,  scalingPower: 1.076 },
+  umbral:    { baseCost: 18.92, scalingPower: 1.076 },
+  eternal:   { baseCost: 40,    scalingPower: 1.172 },
+};
+
 /**
  * Soul-shard cost to go from `level` to `level + 1`.
+ * Uses config-driven per-tier parameters: cost = ceil(baseCost * level^scalingPower)
  */
-export function levelUpCost(level: number, tier: CardTier): number {
-  const tierMult: Record<CardTier, number> = {
-    twilight: 1,
-    dusk: 2,
-    midnight: 4,
-    umbral: 8,
-    eternal: 20,
-  };
-  return Math.ceil(2 * tierMult[tier] * (1 + (level - 1) * 0.1));
+export function levelUpCost(level: number, tier: CardTier, config?: GameConfig): number {
+  const configEntry = config?.levelCosts?.find((c) => c.tier === tier);
+  const params = configEntry
+    ? { baseCost: configEntry.baseCost, scalingPower: configEntry.scalingPower }
+    : DEFAULT_LEVEL_COST_PARAMS[tier];
+  return Math.ceil(params.baseCost * Math.pow(level, params.scalingPower));
 }
 
 /**
@@ -762,7 +769,7 @@ function createGameReducer(config: GameConfig) {
 
         if (card.level >= TIER_MAX_LEVEL[def.tier]) return state;
 
-        const cost = levelUpCost(card.level, def.tier);
+        const cost = levelUpCost(card.level, def.tier, config);
         if (card.soulShards < cost) return state;
 
         // CL points: 1 base * tier multiplier

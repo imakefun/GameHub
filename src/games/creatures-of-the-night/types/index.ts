@@ -330,6 +330,13 @@ export type GameAction =
   | { type: 'LOAD_GAME'; state: GameState }
   | { type: 'RESET_GAME' };
 
+// --- Level-Up Cost Config (per tier, from sheets) ---
+export interface LevelCostConfig {
+  tier: CardTier;
+  baseCost: number;       // cost at level 1→2
+  scalingPower: number;   // cost = ceil(baseCost * level^scalingPower)
+}
+
 // --- Game Config (provided by context) ---
 export interface GameConfig {
   cards: CardDefinition[];
@@ -340,6 +347,7 @@ export interface GameConfig {
   featureUnlocks: FeatureUnlock[];
   clRewards: CLReward[];
   dailyQuestPool: DailyQuest[];
+  levelCosts: LevelCostConfig[];
   settings: GameSettings;
 }
 
