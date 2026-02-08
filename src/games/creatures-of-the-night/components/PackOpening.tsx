@@ -123,7 +123,6 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
   const [phase, setPhase] = useState<'sealed' | 'revealing' | 'done'>('sealed');
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
 
   const pack = config.packs.find((p) => p.id === packId);
 
@@ -133,27 +132,19 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
     rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
     setCards(rolled);
     setCurrentIndex(0);
-    setFlipped(false);
     setPhase('revealing');
   };
 
   const handleTap = useCallback(() => {
     if (phase !== 'revealing') return;
 
-    if (!flipped) {
-      // First tap: flip the card face-up
-      setFlipped(true);
-      return;
-    }
-
-    // Card is already shown — advance to next card or finish
+    // Advance to next card or finish
     if (currentIndex < cards.length - 1) {
       setCurrentIndex((i) => i + 1);
-      setFlipped(false);
     } else {
       setPhase('done');
     }
-  }, [phase, flipped, currentIndex, cards.length]);
+  }, [phase, currentIndex, cards.length]);
 
   const handleConfirm = () => {
     onConfirm(cards);
@@ -242,7 +233,7 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
             </div>
 
             {/* Card reveal area */}
-            <div className="relative w-full" style={{ perspective: 1000 }}>
+            <div className="relative w-full">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentIndex}
@@ -252,44 +243,20 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
                   transition={{ duration: 0.25 }}
                   className="w-full"
                 >
-                  {!flipped ? (
-                    /* Card back */
-                    <motion.div
-                      initial={{ rotateY: 0 }}
-                      className="w-full aspect-[3/4] rounded-2xl border-2 border-purple-500/40 flex items-center justify-center cursor-pointer"
-                      style={{
-                        background: 'linear-gradient(135deg, #1a0533 0%, #2d1b69 50%, #1a0533 100%)',
-                        boxShadow: '0 0 30px rgba(147, 51, 234, 0.25)',
-                      }}
-                    >
-                      <motion.div
-                        animate={{ scale: [1, 1.1, 1] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="text-center"
-                      >
-                        <p className="text-6xl mb-3">{'\u2728'}</p>
-                        <p className="text-purple-300 text-sm">Tap to reveal</p>
-                      </motion.div>
-                    </motion.div>
-                  ) : (
-                    /* Card face */
-                    <RevealedCard card={currentCard} isNew={isNewCard(currentCard)} />
-                  )}
+                  <RevealedCard card={currentCard} isNew={isNewCard(currentCard)} />
                 </motion.div>
               </AnimatePresence>
             </div>
 
             {/* Tap hint */}
-            {flipped && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="text-surface-500 text-sm mt-4 animate-pulse"
-              >
-                {currentIndex < cards.length - 1 ? 'Tap for next card' : 'Tap to finish'}
-              </motion.p>
-            )}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-surface-500 text-sm mt-4 animate-pulse"
+            >
+              {currentIndex < cards.length - 1 ? 'Tap for next card' : 'Tap to finish'}
+            </motion.p>
           </div>
         )}
 
@@ -369,9 +336,6 @@ function RevealedCard({ card, isNew }: { card: CardDefinition; isNew: boolean })
 
   return (
     <motion.div
-      initial={{ rotateY: 90, opacity: 0 }}
-      animate={{ rotateY: 0, opacity: 1 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
       className="w-full rounded-2xl border-2 overflow-hidden cursor-pointer"
       style={{
         borderColor: `${tierColor}70`,
