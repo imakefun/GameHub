@@ -5,7 +5,6 @@ import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO } from '../types';
 interface CardComponentProps {
   card: OwnedCard;
   definition: CardDefinition;
-  index: number;
   compact?: boolean;
   showEssence?: boolean;
   onClick?: () => void;
@@ -28,6 +27,7 @@ export function CardComponent({
   const tierColor = TIER_COLORS[definition.tier];
   const typeInfo = CARD_TYPE_INFO[definition.type];
   const hasEssence = card.accumulatedEssence >= 1;
+  const isFatigued = card.fatigueUntil && Date.now() < card.fatigueUntil;
 
   if (compact) {
     return (
@@ -54,11 +54,17 @@ export function CardComponent({
           <p className="text-sm font-medium truncate">{definition.name}</p>
           <p className="text-xs" style={{ color: tierColor }}>
             {TIER_LABELS[definition.tier]} Lv.{card.level}
+            {card.awakened && ' ★'}
           </p>
         </div>
         {card.isOnExpedition && (
           <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">
             Expedition
+          </span>
+        )}
+        {isFatigued && (
+          <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
+            Fatigued
           </span>
         )}
       </motion.button>
@@ -69,7 +75,7 @@ export function CardComponent({
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{ opacity: isFatigued ? 0.6 : 1, scale: 1 }}
       className="relative rounded-xl border overflow-hidden"
       style={{
         borderColor: `${tierColor}50`,
@@ -77,7 +83,7 @@ export function CardComponent({
       }}
     >
       {/* Essence glow */}
-      {showEssence && hasEssence && (
+      {showEssence && hasEssence && !isFatigued && (
         <motion.div
           className="absolute inset-0 rounded-xl pointer-events-none"
           animate={{
@@ -89,6 +95,13 @@ export function CardComponent({
           }}
           transition={{ duration: 2, repeat: Infinity }}
         />
+      )}
+
+      {/* Awakened badge */}
+      {card.awakened && (
+        <div className="absolute top-1 left-1 bg-amber-500 text-black text-[9px] font-bold px-1.5 py-0.5 rounded-full z-10">
+          ★ Awakened
+        </div>
       )}
 
       {/* Card header */}
@@ -135,15 +148,29 @@ export function CardComponent({
         </span>
       </div>
 
-      {/* Essence rate */}
-      <div className="px-3 pb-2">
+      {/* Generation info */}
+      <div className="px-3 pb-1 flex items-center justify-between">
         <p className="text-xs text-surface-400">
-          {definition.baseEssenceRate}/min
+          {definition.baseGenerationAmount} SE / {definition.baseInterval}s
         </p>
+        {card.soulShards > 0 && (
+          <p className="text-xs text-blue-400">
+            💎 {card.soulShards}
+          </p>
+        )}
       </div>
 
+      {/* Fatigue indicator */}
+      {isFatigued && (
+        <div className="px-3 pb-2">
+          <div className="text-xs text-red-400 bg-red-500/10 rounded px-2 py-1 text-center">
+            Fatigued
+          </div>
+        </div>
+      )}
+
       {/* Collect button */}
-      {showEssence && card.placedInCrypt && (
+      {showEssence && card.placedInCrypt && !isFatigued && (
         <div className="px-3 pb-3">
           {hasEssence ? (
             <motion.button
@@ -161,8 +188,19 @@ export function CardComponent({
               Collect {formatNumber(card.accumulatedEssence)} 🌑
             </motion.button>
           ) : (
-            <div className="w-full py-2 rounded-lg text-sm text-center text-surface-500 bg-surface-800/50">
-              Generating...
+            <div className="w-full rounded-lg bg-surface-800/50 overflow-hidden">
+              <div className="relative h-8 flex items-center justify-center">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-lg transition-all duration-1000"
+                  style={{
+                    width: `${Math.min(100, card.accumulatedEssence * 100)}%`,
+                    background: `linear-gradient(90deg, ${tierColor}30, ${tierColor}50)`,
+                  }}
+                />
+                <span className="relative text-xs text-surface-400">
+                  Generating... {Math.floor(card.accumulatedEssence * 100)}%
+                </span>
+              </div>
             </div>
           )}
         </div>

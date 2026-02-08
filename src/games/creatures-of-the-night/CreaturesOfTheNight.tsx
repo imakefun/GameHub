@@ -9,15 +9,19 @@ import {
   Cloud,
   Database,
 } from 'lucide-react';
-import { useGameState, experienceForLevel } from './hooks/useGameState';
+import { useGameState } from './hooks/useGameState';
 import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
 import { CryptBoard } from './components/CryptBoard';
 import { CollectionPanel } from './components/CollectionPanel';
 import { ShopPanel } from './components/ShopPanel';
 import { ExpeditionPanel } from './components/ExpeditionPanel';
+import { GrimoirePanel } from './components/GrimoirePanel';
+import { PackOpening } from './components/PackOpening';
+import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
+import { isNightTime, getLunarPhase } from './hooks/useGameState';
 
-type Tab = 'crypt' | 'collection' | 'shop' | 'expeditions';
+type Tab = 'crypt' | 'collection' | 'shop' | 'expeditions' | 'grimoire';
 
 function CreaturesGame() {
   const { config, isLoading, error, isUsingSheets, refresh } = useGameData();
@@ -28,15 +32,32 @@ function CreaturesGame() {
     placeCard,
     removeCard,
     levelUpCard,
+    ascendCard,
+    awakenCard,
     openPack,
     purchasePack,
-    claimDailyPack,
+    claimStarterTome,
     startExpedition,
+    completeQuest,
+    claimCLReward,
+    claimWeeklyReward,
+    rushExpedition,
+    buyCryptSlot,
+    claimLoginStreakReward,
+    dismissPackReward,
+    setTutorialStep,
+    completeTutorial,
     resetGame,
   } = useGameState(config);
 
   const [activeTab, setActiveTab] = useState<Tab>('crypt');
   const [showSettings, setShowSettings] = useState(false);
+
+  const night = isNightTime();
+  const lunarPhase = getLunarPhase();
+  const lunarEmoji: Record<string, string> = {
+    new_moon: '🌑', waxing: '🌒', full_moon: '🌕', waning: '🌘', blood_moon: '🔴', none: '🌙',
+  };
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number }[] = [
     { id: 'crypt', label: 'Crypt', icon: '🏚️' },
@@ -48,15 +69,23 @@ function CreaturesGame() {
     },
     {
       id: 'shop',
-      label: 'Shop',
+      label: 'Market',
       icon: '🏪',
-      badge: state.dailyFreePackAvailable ? 1 : undefined,
+      badge: !state.starterTomeClaimed ? 1 : undefined,
     },
     {
       id: 'expeditions',
-      label: 'Expeditions',
+      label: 'Quests',
       icon: '⚔️',
       badge: state.activeExpeditions.length || undefined,
+    },
+    {
+      id: 'grimoire',
+      label: 'Grimoire',
+      icon: '📖',
+      badge: config.clRewards.filter(
+        (r) => r.cl <= state.collectionLevel && !state.clRewardsClaimed.includes(r.cl)
+      ).length || undefined,
     },
   ];
 
@@ -84,12 +113,13 @@ function CreaturesGame() {
     );
   }
 
-  const expNeeded = experienceForLevel(state.playerStats.level);
-
   return (
     <div
       className="min-h-screen pb-20"
-      style={{ background: 'linear-gradient(180deg, #0a0015 0%, #1a0533 50%, #0a0015 100%)' }}
+      style={{ background: night
+        ? 'linear-gradient(180deg, #050010 0%, #0f0025 50%, #050010 100%)'
+        : 'linear-gradient(180deg, #0a0015 0%, #1a0533 50%, #0a0015 100%)'
+      }}
     >
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-purple-500/20" style={{ background: 'rgba(10, 0, 21, 0.85)', backdropFilter: 'blur(12px)' }}>
@@ -104,7 +134,7 @@ function CreaturesGame() {
               </Link>
               <div>
                 <h1 className="text-lg font-bold flex items-center gap-2">
-                  <span className="text-xl">🌑</span>
+                  <span className="text-xl">{night ? '🌙' : '🌑'}</span>
                   <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                     Creatures of the Night
                   </span>
@@ -114,12 +144,21 @@ function CreaturesGame() {
                 </h1>
               </div>
             </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              <Settings className="w-5 h-5 text-surface-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Cosmic Cycle Indicator */}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-purple-500/20 text-xs">
+                <span title={night ? 'Night Phase' : 'Day Phase'}>{night ? '🌙' : '☀️'}</span>
+                {(lunarPhase === 'new_moon' || lunarPhase === 'full_moon' || lunarPhase === 'blood_moon') && (
+                  <span title={lunarPhase.replace('_', ' ')}>{lunarEmoji[lunarPhase]}</span>
+                )}
+              </div>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <Settings className="w-5 h-5 text-surface-400" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -140,9 +179,8 @@ function CreaturesGame() {
       <div className="max-w-4xl mx-auto px-4 py-4">
         <ResourceBar
           currencies={state.currencies}
-          playerLevel={state.playerStats.level}
-          experience={state.playerStats.experience}
-          experienceNeeded={expNeeded}
+          collectionLevel={state.collectionLevel}
+          collectionLevelPoints={state.collectionLevelPoints}
         />
       </div>
 
@@ -157,7 +195,7 @@ function CreaturesGame() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                   activeTab === tab.id
                     ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                     : 'text-surface-400 hover:text-white hover:bg-white/5'
@@ -191,19 +229,23 @@ function CreaturesGame() {
                 ownedCards={state.ownedCards}
                 cryptSlots={state.cryptSlots}
                 config={config}
+                lunarCrystals={state.currencies.lunarCrystals}
+                purchasedCryptSlots={state.purchasedCryptSlots}
                 onCollect={collectCard}
                 onCollectAll={collectAll}
                 onRemoveCard={removeCard}
+                onBuyCryptSlot={buyCryptSlot}
               />
             )}
             {activeTab === 'collection' && (
               <CollectionPanel
                 ownedCards={state.ownedCards}
                 config={config}
-                soulShards={state.currencies.soulShards}
                 onPlaceCard={placeCard}
                 onRemoveCard={removeCard}
                 onLevelUp={levelUpCard}
+                onAscend={ascendCard}
+                onAwaken={awakenCard}
               />
             )}
             {activeTab === 'shop' && (
@@ -211,23 +253,69 @@ function CreaturesGame() {
                 currencies={state.currencies}
                 config={config}
                 ownedCards={state.ownedCards}
-                dailyFreePackAvailable={state.dailyFreePackAvailable}
+                collectionLevel={state.collectionLevel}
+                starterTomeClaimed={state.starterTomeClaimed}
                 onPurchasePack={purchasePack}
                 onOpenPack={openPack}
-                onClaimDaily={claimDailyPack}
+                onClaimStarterTome={claimStarterTome}
               />
             )}
             {activeTab === 'expeditions' && (
               <ExpeditionPanel
                 ownedCards={state.ownedCards}
                 config={config}
+                collectionLevel={state.collectionLevel}
                 activeExpeditions={state.activeExpeditions}
+                lunarCrystals={state.currencies.lunarCrystals}
                 onStartExpedition={startExpedition}
+                onRushExpedition={rushExpedition}
+              />
+            )}
+            {activeTab === 'grimoire' && (
+              <GrimoirePanel
+                state={state}
+                config={config}
+                onClaimCLReward={claimCLReward}
+                onCompleteQuest={completeQuest}
+                onClaimWeeklyReward={claimWeeklyReward}
+                onClaimLoginStreakReward={claimLoginStreakReward}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Tutorial Overlay */}
+      {!state.tutorialCompleted && (
+        <TutorialOverlay
+          step={state.tutorialStep}
+          onNext={() => {
+            if (state.tutorialStep >= TUTORIAL_STEP_COUNT - 1) {
+              completeTutorial();
+            } else {
+              setTutorialStep(state.tutorialStep + 1);
+            }
+          }}
+          onSkip={completeTutorial}
+        />
+      )}
+
+      {/* Expedition Pack Reward Overlay */}
+      <AnimatePresence>
+        {state.pendingPackRewards.length > 0 && (
+          <PackOpening
+            config={config}
+            ownedCards={state.ownedCards}
+            collectionLevel={state.collectionLevel}
+            packId={state.pendingPackRewards[0]}
+            onClose={() => dismissPackReward(state.pendingPackRewards[0])}
+            onConfirm={(cards) => {
+              openPack(cards, state.pendingPackRewards[0]);
+              dismissPackReward(state.pendingPackRewards[0]);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Settings Modal */}
       <AnimatePresence>
@@ -280,20 +368,20 @@ function CreaturesGame() {
                     <p className="font-semibold">{formatTime(state.playerStats.playTime)}</p>
                   </div>
                   <div className="p-3 bg-surface-800/30 rounded-lg">
+                    <p className="text-surface-500 text-xs">Collection Level</p>
+                    <p className="font-semibold">CL {state.collectionLevel}</p>
+                  </div>
+                  <div className="p-3 bg-surface-800/30 rounded-lg">
                     <p className="text-surface-500 text-xs">Cards Collected</p>
                     <p className="font-semibold">{state.playerStats.totalCardsCollected}</p>
                   </div>
                   <div className="p-3 bg-surface-800/30 rounded-lg">
-                    <p className="text-surface-500 text-xs">Packs Opened</p>
+                    <p className="text-surface-500 text-xs">Tomes Opened</p>
                     <p className="font-semibold">{state.playerStats.totalPacksOpened}</p>
                   </div>
                   <div className="p-3 bg-surface-800/30 rounded-lg">
                     <p className="text-surface-500 text-xs">Essence Collected</p>
                     <p className="font-semibold">{Math.floor(state.playerStats.totalEssenceCollected).toLocaleString()}</p>
-                  </div>
-                  <div className="p-3 bg-surface-800/30 rounded-lg">
-                    <p className="text-surface-500 text-xs">Expeditions</p>
-                    <p className="font-semibold">{state.playerStats.totalExpeditionsCompleted}</p>
                   </div>
                   <div className="p-3 bg-surface-800/30 rounded-lg">
                     <p className="text-surface-500 text-xs">Game Data</p>

@@ -1,62 +1,117 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import type { CardDefinition, GameConfig, OwnedCard } from '../types';
+import type { CardDefinition, CardTier, GameConfig, OwnedCard, PackGuarantee } from '../types';
 import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER } from '../types';
 
 interface PackOpeningProps {
   config: GameConfig;
   ownedCards: OwnedCard[];
+  collectionLevel: number;
   onClose: () => void;
   onConfirm: (cards: CardDefinition[]) => void;
   packId: string;
 }
 
-function rollCards(config: GameConfig, packId: string): CardDefinition[] {
+function tierAtLeast(cardTier: CardTier, minTier: CardTier): boolean {
+  return TIER_ORDER.indexOf(cardTier) >= TIER_ORDER.indexOf(minTier);
+}
+
+function pickRandomFrom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function rollCards(config: GameConfig, packId: string, collectionLevel: number): CardDefinition[] {
   const pack = config.packs.find((p) => p.id === packId);
   if (!pack) return [];
 
+  // Filter cards to only include types the player has unlocked via CL
+  const unlockedCards = config.cards.filter(
+    (c) => collectionLevel >= (config.typeUnlockCL[c.type] ?? 1)
+  );
+  if (unlockedCards.length === 0) return [];
+
   const results: CardDefinition[] = [];
   const tierWeights = pack.tierWeights;
-
-  // Build weighted pool
-  const tiers = Object.entries(tierWeights) as [string, number][];
+  const tiers = Object.entries(tierWeights) as [CardTier, number][];
   const totalWeight = tiers.reduce((sum, [, w]) => sum + w, 0);
 
-  for (let i = 0; i < pack.cardCount; i++) {
-    // Pick tier
-    let roll = Math.random() * totalWeight;
-    let selectedTier = tiers[0][0];
-    for (const [tier, weight] of tiers) {
-      roll -= weight;
-      if (roll <= 0) {
-        selectedTier = tier;
-        break;
-      }
+  // Helper: pick a card from unlocked pool by tier, with optional type boost
+  const pickCard = (forceTier?: CardTier): CardDefinition => {
+    const tier = forceTier ?? pickTier();
+    let pool = unlockedCards.filter((c) => c.tier === tier);
+
+    // Apply type boost: double weight for boosted types
+    if (pack.typeBoost && pack.typeBoost.length > 0 && pool.length > 0) {
+      const boosted = pool.filter((c) => pack.typeBoost!.includes(c.type));
+      const normal = pool.filter((c) => !pack.typeBoost!.includes(c.type));
+      // Weighted pool: boosted cards appear 3x more
+      pool = [...normal, ...boosted, ...boosted, ...boosted];
     }
 
-    // Pick card from tier
-    const tierCards = config.cards.filter((c) => c.tier === selectedTier);
-    if (tierCards.length > 0) {
-      results.push(tierCards[Math.floor(Math.random() * tierCards.length)]);
+    if (pool.length > 0) return pickRandomFrom(pool);
+    // Fallback to any unlocked card
+    return pickRandomFrom(unlockedCards);
+  };
+
+  const pickTier = (): CardTier => {
+    let roll = Math.random() * totalWeight;
+    for (const [tier, weight] of tiers) {
+      roll -= weight;
+      if (roll <= 0) return tier;
+    }
+    return tiers[0][0];
+  };
+
+  // --- Fill guaranteed slots first ---
+  const guarantees = pack.guarantees ?? [];
+  for (const g of guarantees) {
+    for (let n = 0; n < g.count; n++) {
+      const card = pickGuaranteed(g, unlockedCards, pack.typeBoost);
+      if (card) results.push(card);
     }
   }
 
-  // Handle guaranteed pull
-  if (pack.guaranteed && results.length > 0) {
-    const guaranteedTier = tiers[tiers.length - 1][0]; // highest tier in pack
-    const hasTier = results.some((c) => c.tier === guaranteedTier);
-    if (!hasTier) {
-      const tierCards = config.cards.filter((c) => c.tier === guaranteedTier);
-      if (tierCards.length > 0) {
-        results[results.length - 1] = tierCards[Math.floor(Math.random() * tierCards.length)];
-      }
-    }
+  // --- Fill remaining slots randomly ---
+  while (results.length < pack.cardCount) {
+    results.push(pickCard());
   }
 
   return results;
 }
 
-export function PackOpening({ config, ownedCards, onClose, onConfirm, packId }: PackOpeningProps) {
+/** Pick a card that satisfies a guarantee rule */
+function pickGuaranteed(
+  g: PackGuarantee,
+  unlockedCards: CardDefinition[],
+  typeBoost?: string[],
+): CardDefinition | null {
+  let pool = [...unlockedCards];
+
+  if (g.tier) {
+    pool = pool.filter((c) => c.tier === g.tier);
+  }
+  if (g.minTier) {
+    pool = pool.filter((c) => tierAtLeast(c.tier, g.minTier!));
+  }
+  if (g.types && g.types.length > 0) {
+    pool = pool.filter((c) => g.types!.includes(c.type));
+  }
+
+  if (pool.length === 0) return null;
+
+  // Apply type boost to guaranteed pool too
+  if (typeBoost && typeBoost.length > 0) {
+    const boosted = pool.filter((c) => typeBoost.includes(c.type));
+    const normal = pool.filter((c) => !typeBoost.includes(c.type));
+    if (boosted.length > 0) {
+      pool = [...normal, ...boosted, ...boosted, ...boosted];
+    }
+  }
+
+  return pickRandomFrom(pool);
+}
+
+export function PackOpening({ config, ownedCards, collectionLevel, onClose, onConfirm, packId }: PackOpeningProps) {
   const [phase, setPhase] = useState<'sealed' | 'revealing' | 'done'>('sealed');
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -64,7 +119,7 @@ export function PackOpening({ config, ownedCards, onClose, onConfirm, packId }: 
   const pack = config.packs.find((p) => p.id === packId);
 
   const handleOpen = () => {
-    const rolled = rollCards(config, packId);
+    const rolled = rollCards(config, packId, collectionLevel);
     // Sort by tier (highest last for drama)
     rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
     setCards(rolled);

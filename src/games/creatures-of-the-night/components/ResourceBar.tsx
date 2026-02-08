@@ -3,14 +3,12 @@ import type { Currencies } from '../types';
 
 interface ResourceBarProps {
   currencies: Currencies;
-  playerLevel: number;
-  experience: number;
-  experienceNeeded: number;
+  collectionLevel: number;
+  collectionLevelPoints: number;
 }
 
 const resources = [
   { key: 'shadowEssence' as const, label: 'Shadow Essence', icon: '🌑', color: 'from-purple-500 to-indigo-600' },
-  { key: 'soulShards' as const, label: 'Soul Shards', icon: '💎', color: 'from-blue-500 to-cyan-600' },
   { key: 'lunarCrystals' as const, label: 'Lunar Crystals', icon: '🌙', color: 'from-amber-500 to-yellow-500' },
   { key: 'voidEnergy' as const, label: 'Void Energy', icon: '🔮', color: 'from-pink-500 to-purple-600' },
 ];
@@ -21,31 +19,40 @@ function formatNumber(n: number): string {
   return Math.floor(n).toLocaleString();
 }
 
-export function ResourceBar({ currencies, playerLevel, experience, experienceNeeded }: ResourceBarProps) {
-  const expPercent = Math.min(100, (experience / experienceNeeded) * 100);
+function pointsForLevel(level: number): number {
+  const x = 10 * level - 5;
+  return (x * x - 25) / 20;
+}
+
+export function ResourceBar({ currencies, collectionLevel, collectionLevelPoints }: ResourceBarProps) {
+  const currentFloor = pointsForLevel(collectionLevel);
+  const nextFloor = pointsForLevel(collectionLevel + 1);
+  const progressInLevel = collectionLevelPoints - currentFloor;
+  const levelRange = nextFloor - currentFloor;
+  const clPercent = Math.min(100, (progressInLevel / levelRange) * 100);
 
   return (
     <div className="space-y-3">
-      {/* Level bar */}
+      {/* Collection Level bar */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/30 rounded-lg px-3 py-1.5">
-          <span className="text-amber-400 font-bold text-sm">Lv.{playerLevel}</span>
+          <span className="text-amber-400 font-bold text-sm">CL {collectionLevel}</span>
         </div>
         <div className="flex-1 h-2 bg-surface-800 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
             initial={{ width: 0 }}
-            animate={{ width: `${expPercent}%` }}
+            animate={{ width: `${clPercent}%` }}
             transition={{ duration: 0.3 }}
           />
         </div>
         <span className="text-xs text-surface-400 w-20 text-right">
-          {formatNumber(experience)}/{formatNumber(experienceNeeded)}
+          {formatNumber(progressInLevel)}/{formatNumber(levelRange)}
         </span>
       </div>
 
       {/* Currency row */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {resources.map((r) => (
           <div
             key={r.key}

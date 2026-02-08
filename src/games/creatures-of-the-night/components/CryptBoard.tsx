@@ -1,14 +1,18 @@
 import { motion } from 'framer-motion';
-import type { OwnedCard, GameConfig } from '../types';
+import type { OwnedCard, GameConfig, CardType } from '../types';
+import { CARD_TYPE_INFO } from '../types';
 import { CardComponent } from './CardComponent';
 
 interface CryptBoardProps {
   ownedCards: OwnedCard[];
   cryptSlots: number;
   config: GameConfig;
+  lunarCrystals: number;
+  purchasedCryptSlots: number;
   onCollect: (index: number) => void;
   onCollectAll: () => void;
   onRemoveCard: (index: number) => void;
+  onBuyCryptSlot: () => void;
 }
 
 function formatNumber(n: number): string {
@@ -16,13 +20,19 @@ function formatNumber(n: number): string {
   return Math.floor(n).toString();
 }
 
+const MAX_PURCHASED = 3;
+const SLOT_LC_COST = 15;
+
 export function CryptBoard({
   ownedCards,
   cryptSlots,
   config,
+  lunarCrystals,
+  purchasedCryptSlots,
   onCollect,
   onCollectAll,
   onRemoveCard,
+  onBuyCryptSlot,
 }: CryptBoardProps) {
   const placedCards = ownedCards
     .map((card, index) => ({ card, index }))
@@ -31,6 +41,26 @@ export function CryptBoard({
   const totalPending = ownedCards
     .filter((c) => c.placedInCrypt)
     .reduce((sum, c) => sum + c.accumulatedEssence, 0);
+
+  // Compute active synergies for the crypt summary
+  const typeCounts: Partial<Record<CardType, number>> = {};
+  placedCards.forEach(({ card }) => {
+    const def = config.cards.find((c) => c.id === card.definitionId);
+    if (def) typeCounts[def.type] = (typeCounts[def.type] || 0) + 1;
+  });
+
+  const activeTypeSynergies = config.typeSynergies
+    .map((syn) => {
+      const count = typeCounts[syn.type] || 0;
+      const active = syn.thresholds.filter((t) => count >= t.count);
+      if (active.length === 0) return null;
+      return { type: syn.type, bonus: active[active.length - 1].bonus };
+    })
+    .filter(Boolean) as { type: CardType; bonus: number }[];
+
+  const activeCrossSynergies = config.crossTypeSynergies.filter(
+    (syn) => (typeCounts[syn.type1] || 0) >= 1 && (typeCounts[syn.type2] || 0) >= 1
+  );
 
   return (
     <div className="space-y-4">
@@ -55,6 +85,33 @@ export function CryptBoard({
         )}
       </div>
 
+      {/* Active synergies ribbon */}
+      {(activeTypeSynergies.length > 0 || activeCrossSynergies.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {activeTypeSynergies.map((syn) => (
+            <div
+              key={syn.type}
+              className="flex items-center gap-1 px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs"
+            >
+              <span>{CARD_TYPE_INFO[syn.type].emoji}</span>
+              <span className="text-cyan-400">+{syn.bonus}%</span>
+            </div>
+          ))}
+          {activeCrossSynergies.map((syn) => (
+            <div
+              key={syn.id}
+              className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs"
+              title={`${syn.name}: ${syn.primaryEffect}`}
+            >
+              <span>{CARD_TYPE_INFO[syn.type1].emoji}</span>
+              <span className="text-surface-500">+</span>
+              <span>{CARD_TYPE_INFO[syn.type2].emoji}</span>
+              <span className="text-purple-400">+{syn.productionBonus}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Card Grid */}
       {placedCards.length === 0 ? (
         <div className="text-center py-12 text-surface-400">
@@ -72,7 +129,6 @@ export function CryptBoard({
                 <CardComponent
                   card={card}
                   definition={def}
-                  index={index}
                   showEssence
                   onCollect={() => onCollect(index)}
                 />
@@ -100,6 +156,21 @@ export function CryptBoard({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Buy extra crypt slot */}
+      {purchasedCryptSlots < MAX_PURCHASED && (
+        <button
+          onClick={onBuyCryptSlot}
+          disabled={lunarCrystals < SLOT_LC_COST}
+          className={`w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            lunarCrystals >= SLOT_LC_COST
+              ? 'border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300'
+              : 'border-surface-700 bg-surface-800/30 text-surface-500 cursor-not-allowed'
+          }`}
+        >
+          Buy Extra Slot ({SLOT_LC_COST} 🌙) &mdash; {purchasedCryptSlots}/{MAX_PURCHASED} purchased
+        </button>
       )}
     </div>
   );
