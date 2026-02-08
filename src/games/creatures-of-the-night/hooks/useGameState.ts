@@ -736,17 +736,12 @@ function createGameReducer(config: GameConfig) {
         const card = state.ownedCards[action.cardIndex];
         if (!card || !card.placedInCrypt) return state;
 
-        const leftover = Math.floor(card.accumulatedEssence);
-
+        // Preserve accumulated essence on the card (spec: "does NOT lose accumulated resources")
         return {
           ...state,
-          currencies: {
-            ...state.currencies,
-            shadowEssence: state.currencies.shadowEssence + leftover,
-          },
           ownedCards: state.ownedCards.map((c, i) =>
             i === action.cardIndex
-              ? { ...c, placedInCrypt: false, accumulatedEssence: 0 }
+              ? { ...c, placedInCrypt: false }
               : c,
           ),
         };

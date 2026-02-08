@@ -188,8 +188,19 @@ export function CardComponent({
               Collect {formatNumber(card.accumulatedEssence)} 🌑
             </motion.button>
           ) : (
-            <div className="w-full py-2 rounded-lg text-sm text-center text-surface-500 bg-surface-800/50">
-              Generating...
+            <div className="w-full rounded-lg bg-surface-800/50 overflow-hidden">
+              <div className="relative h-8 flex items-center justify-center">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-lg transition-all duration-1000"
+                  style={{
+                    width: `${Math.min(100, card.accumulatedEssence * 100)}%`,
+                    background: `linear-gradient(90deg, ${tierColor}30, ${tierColor}50)`,
+                  }}
+                />
+                <span className="relative text-xs text-surface-400">
+                  Generating... {Math.floor(card.accumulatedEssence * 100)}%
+                </span>
+              </div>
             </div>
           )}
         </div>
