@@ -272,6 +272,7 @@ export const packs: PackDefinition[] = [
     guaranteed: '1 Undead or Stone Umbral+ card',
     guarantees: [{ types: ['undead', 'stone'], minTier: 'umbral', count: 1 }],
     availability: 'expedition',
+    expeditionId: 'ancient-catacombs',
     requiredCL: 100,
   },
   {
@@ -284,6 +285,7 @@ export const packs: PackDefinition[] = [
     guaranteed: '1 Ascended card of any type',
     guarantees: [{ minTier: 'umbral', count: 1 }],
     availability: 'expedition',
+    expeditionId: 'void-nexus',
     requiredCL: 120,
   },
   {
@@ -296,6 +298,7 @@ export const packs: PackDefinition[] = [
     guaranteed: '1 card of each elemental type',
     guarantees: [{ minTier: 'umbral', count: 2 }],
     availability: 'expedition',
+    expeditionId: 'celestial-spire',
     requiredCL: 130,
   },
   {
@@ -308,6 +311,7 @@ export const packs: PackDefinition[] = [
     guaranteed: '1 Prestige card + 1 Eternal of chosen type',
     guarantees: [{ tier: 'eternal', count: 2 }],
     availability: 'expedition',
+    expeditionId: 'primordial-void',
     requiredCL: 150,
   },
 ];

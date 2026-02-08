@@ -184,6 +184,7 @@ export interface ExpeditionZone {
   unlockCL: number;
   requirements: {
     minCards: number;
+    minCardLevel?: number;
     requiredTypes?: CardType[];
     requiredTier?: CardTier;
     requiredTierCount?: number;

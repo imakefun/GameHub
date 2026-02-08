@@ -175,6 +175,7 @@ function parseExpeditions(rows: Record<string, string>[]): ExpeditionZone[] {
         unlockCL: parseInt(row['unlockCL'] || '1'),
         requirements: {
           minCards: parseInt(row['minCards'] || '1'),
+          minCardLevel: row['minCardLevel'] ? parseInt(row['minCardLevel']) : undefined,
           requiredTypes,
           requiredTier: row['requiredTier'] ? (row['requiredTier'] as CardTier) : undefined,
           requiredTierCount: row['requiredTierCount'] ? parseInt(row['requiredTierCount']) : undefined,
