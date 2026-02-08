@@ -150,14 +150,28 @@ export interface Currencies {
 }
 
 // --- Pack Definitions ---
+export type PackAvailability = 'shop' | 'expedition' | 'event' | 'fullMoon' | 'prestige';
+
+export interface PackGuarantee {
+  tier?: CardTier;         // exact tier
+  minTier?: CardTier;      // minimum tier (this or higher)
+  types?: CardType[];      // must be one of these types
+  count: number;           // how many guaranteed cards
+}
+
 export interface PackDefinition {
   id: string;
   name: string;
   description: string;
-  cost: { currency: keyof Currencies; amount: number } | null; // null = free
+  cost: { currency: keyof Currencies; amount: number } | null; // null = free / awarded
   cardCount: number;
   tierWeights: Partial<Record<CardTier, number>>;
-  guaranteed?: string;
+  guaranteed?: string;              // display text
+  guarantees?: PackGuarantee[];     // structured guarantee rules
+  typeBoost?: CardType[];           // increased chance for these types
+  requiredCL?: number;              // minimum CL to purchase / receive
+  availability?: PackAvailability;  // where this pack appears (default: 'shop')
+  expeditionId?: string;            // which expedition awards this pack
   isOneTime?: boolean;
   isPremium?: boolean;
 }
@@ -273,6 +287,8 @@ export interface GameState {
   loginStreakRewardsClaimed: number[];  // streak milestones already claimed (e.g. 7, 30)
   // Extra crypt slots purchased with LC
   purchasedCryptSlots: number;
+  // Expedition pack rewards waiting to be opened
+  pendingPackRewards: string[];  // pack IDs
   // Tutorial
   tutorialCompleted: boolean;
   tutorialStep: number;
@@ -302,6 +318,7 @@ export type GameAction =
   | { type: 'CLAIM_LOGIN_STREAK_REWARD'; milestone: number }
   | { type: 'SET_TUTORIAL_STEP'; step: number }
   | { type: 'COMPLETE_TUTORIAL' }
+  | { type: 'DISMISS_PACK_REWARD'; packId: string }
   | { type: 'LOAD_GAME'; state: GameState }
   | { type: 'RESET_GAME' };
 

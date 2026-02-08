@@ -4,6 +4,8 @@ import type {
   CardTier,
   CardType,
   PackDefinition,
+  PackAvailability,
+  PackGuarantee,
   ExpeditionZone,
   TypeSynergy,
   CrossTypeSynergy,
@@ -119,6 +121,25 @@ function parsePacks(rows: Record<string, string>[]): PackDefinition[] {
         if (w > 0) tierWeights[tier] = w;
       }
 
+      // Parse guarantees from columns: guarantee1_tier, guarantee1_minTier, guarantee1_types, guarantee1_count, etc.
+      const guarantees: PackGuarantee[] = [];
+      for (let i = 1; i <= 5; i++) {
+        const count = parseInt(row[`guarantee${i}_count`] || '0');
+        if (count <= 0) continue;
+        const g: PackGuarantee = { count };
+        if (row[`guarantee${i}_tier`]) g.tier = row[`guarantee${i}_tier`] as CardTier;
+        if (row[`guarantee${i}_minTier`]) g.minTier = row[`guarantee${i}_minTier`] as CardTier;
+        if (row[`guarantee${i}_types`]) {
+          g.types = row[`guarantee${i}_types`].split(',').map((t) => t.trim()) as CardType[];
+        }
+        guarantees.push(g);
+      }
+
+      const typeBoostRaw = row['typeBoost'] || '';
+      const typeBoost = typeBoostRaw
+        ? (typeBoostRaw.split(',').map((t) => t.trim()) as CardType[])
+        : undefined;
+
       return {
         id: row['id'] || '',
         name: row['name'] || '',
@@ -127,6 +148,11 @@ function parsePacks(rows: Record<string, string>[]): PackDefinition[] {
         cardCount: parseInt(row['cardCount'] || '5'),
         tierWeights,
         guaranteed: row['guaranteed'] || undefined,
+        guarantees: guarantees.length > 0 ? guarantees : undefined,
+        typeBoost,
+        requiredCL: row['requiredCL'] ? parseInt(row['requiredCL']) : undefined,
+        availability: (row['availability'] || undefined) as PackAvailability | undefined,
+        expeditionId: row['expeditionId'] || undefined,
         isOneTime: row['isOneTime'] === 'true' || row['isOneTime'] === '1',
         isPremium: row['isPremium'] === 'true' || row['isPremium'] === '1',
       };

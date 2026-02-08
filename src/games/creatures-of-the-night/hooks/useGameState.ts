@@ -440,6 +440,7 @@ function createInitialState(config: GameConfig): GameState {
     weeklyRewardsClaimed: [],
     loginStreakRewardsClaimed: [],
     purchasedCryptSlots: 0,
+    pendingPackRewards: [],
     tutorialCompleted: false,
     tutorialStep: 0,
     lastSaved: Date.now(),
@@ -511,6 +512,7 @@ function createGameReducer(config: GameConfig) {
         const completedIndices: number[] = [];
         let currencies = { ...state.currencies };
         let expCompleted = 0;
+        const newPackRewards: string[] = [];
 
         state.activeExpeditions.forEach((exp, idx) => {
           if (now < exp.completesAt) return;
@@ -553,6 +555,14 @@ function createGameReducer(config: GameConfig) {
                 soulShards: updatedCards[ci].soulShards + per + bonus,
               };
             }
+          }
+
+          // Expedition pack reward
+          const expPack = config.packs.find(
+            (p) => p.availability === 'expedition' && p.expeditionId === exp.zoneId,
+          );
+          if (expPack) {
+            newPackRewards.push(expPack.id);
           }
 
           // Risk effects
@@ -617,6 +627,10 @@ function createGameReducer(config: GameConfig) {
           activeExpeditions: state.activeExpeditions.filter(
             (_, i) => !completedIndices.includes(i),
           ),
+          pendingPackRewards: [
+            ...state.pendingPackRewards,
+            ...newPackRewards,
+          ],
           dailyQuests,
           dailyQuestsLastReset,
           weeklyQuestCount,
@@ -1190,6 +1204,15 @@ function createGameReducer(config: GameConfig) {
       case 'COMPLETE_TUTORIAL':
         return { ...state, tutorialCompleted: true };
 
+      // ======================== DISMISS_PACK_REWARD ========================
+      case 'DISMISS_PACK_REWARD': {
+        const idx = state.pendingPackRewards.indexOf(action.packId);
+        if (idx === -1) return state;
+        const remaining = [...state.pendingPackRewards];
+        remaining.splice(idx, 1);
+        return { ...state, pendingPackRewards: remaining };
+      }
+
       // ======================== PERSISTENCE ========================
       case 'LOAD_GAME':
         return action.state;
@@ -1433,6 +1456,11 @@ export function useGameState(config: GameConfig) {
     [],
   );
 
+  const dismissPackReward = useCallback(
+    (packId: string) => dispatch({ type: 'DISMISS_PACK_REWARD', packId }),
+    [],
+  );
+
   const loadGame = useCallback(
     (gameState: GameState) =>
       dispatch({ type: 'LOAD_GAME', state: gameState }),
@@ -1464,6 +1492,7 @@ export function useGameState(config: GameConfig) {
     rushExpedition,
     buyCryptSlot,
     claimLoginStreakReward,
+    dismissPackReward,
     setTutorialStep,
     completeTutorial,
     loadGame,

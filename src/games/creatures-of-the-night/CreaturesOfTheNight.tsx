@@ -17,6 +17,7 @@ import { CollectionPanel } from './components/CollectionPanel';
 import { ShopPanel } from './components/ShopPanel';
 import { ExpeditionPanel } from './components/ExpeditionPanel';
 import { GrimoirePanel } from './components/GrimoirePanel';
+import { PackOpening } from './components/PackOpening';
 import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
 import { isNightTime } from './hooks/useGameState';
 
@@ -43,6 +44,7 @@ function CreaturesGame() {
     rushExpedition,
     buyCryptSlot,
     claimLoginStreakReward,
+    dismissPackReward,
     setTutorialStep,
     completeTutorial,
     resetGame,
@@ -284,6 +286,23 @@ function CreaturesGame() {
           onSkip={completeTutorial}
         />
       )}
+
+      {/* Expedition Pack Reward Overlay */}
+      <AnimatePresence>
+        {state.pendingPackRewards.length > 0 && (
+          <PackOpening
+            config={config}
+            ownedCards={state.ownedCards}
+            collectionLevel={state.collectionLevel}
+            packId={state.pendingPackRewards[0]}
+            onClose={() => dismissPackReward(state.pendingPackRewards[0])}
+            onConfirm={(cards) => {
+              openPack(cards, state.pendingPackRewards[0]);
+              dismissPackReward(state.pendingPackRewards[0]);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Settings Modal */}
       <AnimatePresence>
