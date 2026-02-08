@@ -142,17 +142,18 @@ export function TutorialOverlay({ step, onNext, onSkip, forceTab }: TutorialOver
 
   const pad = 10;
 
-  // Tooltip positioning relative to the spotlight target
+  // Tooltip positioning — use flexbox centering to avoid transform conflicts with framer-motion
   let tooltipStyle: React.CSSProperties;
   if (hasSpotlight && rect) {
     const viewH = window.innerHeight;
     const isTopHalf = rect.top + rect.height / 2 < viewH / 2;
     tooltipStyle = {
       position: 'fixed',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      maxWidth: 'calc(100vw - 2rem)',
-      width: 384,
+      left: 0,
+      right: 0,
+      display: 'flex',
+      justifyContent: 'center',
+      padding: '0 1rem',
       ...(isTopHalf
         ? { top: Math.min(rect.bottom + pad + 12, viewH - 240) }
         : { bottom: Math.max(viewH - rect.top + pad + 12, 20) }),
@@ -160,11 +161,11 @@ export function TutorialOverlay({ step, onNext, onSkip, forceTab }: TutorialOver
   } else {
     tooltipStyle = {
       position: 'fixed',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      maxWidth: 'calc(100vw - 2rem)',
-      width: 384,
+      inset: 0,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: '0 1rem',
     };
   }
 
@@ -256,11 +257,16 @@ export function TutorialOverlay({ step, onNext, onSkip, forceTab }: TutorialOver
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        style={{ ...tooltipStyle, pointerEvents: 'auto', zIndex: 1 }}
+        style={{ ...tooltipStyle, pointerEvents: 'none', zIndex: 1 }}
       >
         <div
           className="rounded-2xl border border-purple-500/30 p-5 shadow-2xl"
-          style={{ background: 'linear-gradient(180deg, #1a0533 0%, #0a0015 100%)' }}
+          style={{
+            background: 'linear-gradient(180deg, #1a0533 0%, #0a0015 100%)',
+            maxWidth: 384,
+            width: '100%',
+            pointerEvents: 'auto',
+          }}
         >
           {/* Step dots */}
           <div className="flex items-center justify-between mb-3">
