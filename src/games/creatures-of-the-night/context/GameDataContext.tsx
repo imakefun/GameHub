@@ -35,6 +35,28 @@ import {
   typeUnlockCL as localTypeUnlockCL,
   cryptSlotUnlocks as localCryptSlotUnlocks,
 } from '../data/clConfig';
+import cardArtMap from '../data/cardArtMap';
+
+// Eagerly import all card art PNGs – Vite resolves these to hashed asset URLs at build time
+const cardImageModules = import.meta.glob<string>('../assets/cards/*.png', {
+  eager: true,
+  import: 'default',
+});
+
+// Build a lookup: filename stem (e.g. "Owl") → resolved asset URL
+const artByFilename: Record<string, string> = {};
+for (const [path, url] of Object.entries(cardImageModules)) {
+  const stem = path.split('/').pop()?.replace('.png', '');
+  if (stem) artByFilename[stem] = url;
+}
+
+// Enrich local cards with art URLs using the mapping
+const localCardsWithArt: CardDefinition[] = localCards.map((card) => {
+  if (card.artUrl) return card; // already has art (e.g. from Sheets)
+  const filename = cardArtMap[card.id];
+  const url = filename ? artByFilename[filename] : undefined;
+  return url ? { ...card, artUrl: url } : card;
+});
 
 interface GameDataContextType {
   config: GameConfig;
@@ -47,7 +69,7 @@ interface GameDataContextType {
 const GameDataContext = createContext<GameDataContextType | null>(null);
 
 export function GameDataProvider({ children }: { children: ReactNode }) {
-  const [cards, setCards] = useState<CardDefinition[]>(localCards);
+  const [cards, setCards] = useState<CardDefinition[]>(localCardsWithArt);
   const [packs, setPacks] = useState<PackDefinition[]>(localPacks);
   const [expeditions, setExpeditions] = useState<ExpeditionZone[]>(localExpeditions);
   const [typeSynergies, setTypeSynergies] = useState<TypeSynergy[]>(localTypeSynergies);
