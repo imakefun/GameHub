@@ -29,7 +29,7 @@ export const cards: CardDefinition[] = [
   { id: 'spirit-eternity-warden', name: 'Eternity Warden', type: 'spirit', tier: 'eternal', baseGenerationAmount: 170, baseInterval: 13800, description: 'Guardian of the spirit realm', flavorText: 'Time means nothing to the dead.' },
 
   // ============ SHADOW (CL 1) ============
-  { id: 'shadow-shadow-rat', name: 'Shadow Rat', type: 'shadow', tier: 'twilight', baseGenerationAmount: 2, baseInterval: 30, description: 'A small rat touched by darkness', flavorText: 'It gnaws at the veil between worlds.' },
+  { id: 'shadow-shadow-rat', name: 'Umbral Rat', type: 'shadow', tier: 'twilight', baseGenerationAmount: 2, baseInterval: 30, description: 'A rat made of living shadow', flavorText: 'Where it treads, light fades.' },
   { id: 'shadow-dark-imp', name: 'Dark Imp', type: 'shadow', tier: 'twilight', baseGenerationAmount: 1.8, baseInterval: 25, description: 'A tiny creature of living shadow', flavorText: 'Mischief made manifest.' },
   { id: 'shadow-stalker', name: 'Shadow Stalker', type: 'shadow', tier: 'dusk', baseGenerationAmount: 7.2, baseInterval: 75, description: 'A predator born of darkness', flavorText: 'You never see it coming.' },
   { id: 'shadow-nightcrawler', name: 'Nightcrawler', type: 'shadow', tier: 'dusk', baseGenerationAmount: 6.8, baseInterval: 70, description: 'A serpentine shadow being', flavorText: 'It slithers between the cracks of reality.' },

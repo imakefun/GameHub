@@ -90,7 +90,7 @@ export function ShopPanel({
   };
 
   const visiblePacks = config.packs.filter((p) => isPackVisible(p, collectionLevel));
-  const isFullMoon = getLunarPhase() === 'full';
+  const isFullMoon = getLunarPhase() === 'full_moon';
 
   // Separate regular shop packs from full moon packs
   const shopPacks = visiblePacks.filter((p) => (p.availability ?? 'shop') === 'shop');
