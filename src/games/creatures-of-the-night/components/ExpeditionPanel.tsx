@@ -51,7 +51,8 @@ export function ExpeditionPanel({
 
   const availableCards = ownedCards
     .map((card, index) => ({ card, index }))
-    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil);
+    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil)
+    .filter(({ card }) => !zone?.requirements.minCardLevel || card.level >= zone.requirements.minCardLevel);
 
   const canStart = zone && selectedCards.size >= zone.requirements.minCards && chosenDuration > 0;
 
@@ -149,7 +150,11 @@ export function ExpeditionPanel({
           <h3 className="font-semibold text-surface-300 text-sm">Available Zones</h3>
           {config.expeditions.map((expZone) => {
             const unlocked = collectionLevel >= expZone.unlockCL;
-            const meetsCards = availableCards.length >= expZone.requirements.minCards;
+            const eligibleCount = ownedCards.filter(
+              (c) => !c.isOnExpedition && !c.fatigueUntil &&
+                (!expZone.requirements.minCardLevel || c.level >= expZone.requirements.minCardLevel),
+            ).length;
+            const meetsCards = eligibleCount >= expZone.requirements.minCards;
             const isAvailable = unlocked && meetsCards;
             const risk = RISK_LABELS[expZone.riskEffect];
 
@@ -177,6 +182,14 @@ export function ExpeditionPanel({
                 </div>
                 <div className="flex gap-3 mt-2 text-xs text-surface-500 flex-wrap">
                   <span>Min {expZone.requirements.minCards} cards</span>
+                  {expZone.requirements.minCardLevel && (
+                    <span className="text-amber-400">Lvl {expZone.requirements.minCardLevel}+</span>
+                  )}
+                  {expZone.requirements.requiredTier && expZone.requirements.requiredTierCount && (
+                    <span className="text-purple-400">
+                      {expZone.requirements.requiredTierCount} {expZone.requirements.requiredTier}
+                    </span>
+                  )}
                   <span>{formatDurationRange(expZone.durationRange)}</span>
                   {expZone.requirements.requiredTypes?.map((t) => (
                     <span key={t} className="text-purple-400">Needs {t}</span>

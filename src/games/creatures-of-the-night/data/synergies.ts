@@ -161,10 +161,15 @@ export const featureUnlocks: FeatureUnlock[] = [
   { cl: 80, feature: 'blood-temple', description: 'Blood Temple expedition unlocked' },
   // CL 100
   { cl: 100, feature: 'cursed-lands', description: 'Cursed Lands expedition unlocked' },
+  { cl: 100, feature: 'ancient-catacombs', description: 'Ancient Catacombs expedition unlocked' },
   // CL 120
   { cl: 120, feature: 'infernal-depths', description: 'Infernal Depths expedition unlocked' },
+  { cl: 120, feature: 'void-nexus', description: 'Void Nexus expedition unlocked' },
+  // CL 130
+  { cl: 130, feature: 'celestial-spire', description: 'Celestial Spire expedition unlocked' },
   // CL 150
   { cl: 150, feature: 'cosmic-void', description: 'Cosmic Void expedition unlocked' },
+  { cl: 150, feature: 'primordial-void', description: 'Primordial Void expedition unlocked' },
 ];
 
 // ============================================================

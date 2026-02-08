@@ -1102,7 +1102,7 @@ function createGameReducer(config: GameConfig) {
       case 'CLAIM_WEEKLY_REWARD': {
         if (state.weeklyRewardsClaimed.includes(action.tier)) return state;
 
-        const milestone = WEEKLY_MILESTONES[action.tier];
+        const milestone = WEEKLY_MILESTONES.find((m) => m.quests === action.tier);
         if (!milestone || state.weeklyQuestCount < milestone.quests) return state;
 
         const newCur = { ...state.currencies };
