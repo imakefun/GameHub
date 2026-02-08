@@ -303,6 +303,7 @@ export type GameAction =
   | { type: 'COLLECT_CARD'; cardIndex: number }
   | { type: 'COLLECT_ALL' }
   | { type: 'PLACE_CARD'; cardIndex: number }
+  | { type: 'SWAP_CARD'; removeIndex: number; placeIndex: number }
   | { type: 'REMOVE_CARD'; cardIndex: number }
   | { type: 'LEVEL_UP_CARD'; cardIndex: number }
   | { type: 'ASCEND_CARD'; cardIndex: number }
