@@ -1,6 +1,7 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { OwnedCard, GameConfig, CardType } from '../types';
-import { CARD_TYPE_INFO } from '../types';
+import { CARD_TYPE_INFO, TIER_COLORS, TIER_LABELS } from '../types';
 import { CardComponent } from './CardComponent';
 
 interface CryptBoardProps {
@@ -34,6 +35,8 @@ export function CryptBoard({
   onRemoveCard,
   onBuyCryptSlot,
 }: CryptBoardProps) {
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
+
   const placedCards = ownedCards
     .map((card, index) => ({ card, index }))
     .filter(({ card }) => card.placedInCrypt);
@@ -131,14 +134,8 @@ export function CryptBoard({
                   definition={def}
                   showEssence
                   onCollect={() => onCollect(index)}
+                  onClick={() => setSelectedCardIndex(index)}
                 />
-                <button
-                  onClick={() => onRemoveCard(index)}
-                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                  title="Remove from crypt"
-                >
-                  ×
-                </button>
               </div>
             );
           })}
@@ -172,6 +169,120 @@ export function CryptBoard({
           Buy Extra Slot ({SLOT_LC_COST} 🌙) &mdash; {purchasedCryptSlots}/{MAX_PURCHASED} purchased
         </button>
       )}
+
+      {/* Card detail modal */}
+      <AnimatePresence>
+        {selectedCardIndex !== null && (() => {
+          const card = ownedCards[selectedCardIndex];
+          const def = card ? config.cards.find((c) => c.id === card.definitionId) : null;
+          if (!card || !def) return null;
+          const hasEssence = card.accumulatedEssence >= 1;
+
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setSelectedCardIndex(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-sm rounded-2xl border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+                style={{
+                  borderColor: `${TIER_COLORS[def.tier]}40`,
+                  background: `linear-gradient(180deg, ${TIER_COLORS[def.tier]}15, rgba(15,23,42,0.98))`,
+                }}
+              >
+                {/* Card header */}
+                <div className="text-center">
+                  {def.artUrl ? (
+                    <img
+                      src={def.artUrl}
+                      alt={def.name}
+                      className="w-32 h-40 object-cover rounded-lg mx-auto mb-2"
+                    />
+                  ) : (
+                    <div className="text-5xl mb-2">{CARD_TYPE_INFO[def.type].emoji}</div>
+                  )}
+                  <h3 className="text-xl font-bold">{def.name}</h3>
+                  <p className="text-sm" style={{ color: TIER_COLORS[def.tier] }}>
+                    {TIER_LABELS[def.tier]} - Level {card.level}
+                    {card.awakened && ' \u2605 Awakened'}
+                  </p>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="bg-surface-800/60 rounded-lg p-2.5">
+                    <p className="text-surface-400 text-xs">Type</p>
+                    <p className="font-medium">
+                      {CARD_TYPE_INFO[def.type].emoji} {CARD_TYPE_INFO[def.type].label}
+                    </p>
+                  </div>
+                  <div className="bg-surface-800/60 rounded-lg p-2.5">
+                    <p className="text-surface-400 text-xs">Generation</p>
+                    <p className="font-medium">
+                      {def.baseGenerationAmount} SE / {def.baseInterval}s
+                    </p>
+                  </div>
+                  <div className="bg-surface-800/60 rounded-lg p-2.5">
+                    <p className="text-surface-400 text-xs">Soul Shards</p>
+                    <p className="font-medium">{card.soulShards}</p>
+                  </div>
+                  <div className="bg-surface-800/60 rounded-lg p-2.5">
+                    <p className="text-surface-400 text-xs">Pending Essence</p>
+                    <p className="font-medium">{formatNumber(card.accumulatedEssence)}</p>
+                  </div>
+                </div>
+
+                {/* Flavor text */}
+                <p className="text-sm text-surface-300 italic text-center">
+                  &ldquo;{def.flavorText}&rdquo;
+                </p>
+
+                {/* Actions */}
+                <div className="space-y-2">
+                  {hasEssence && (
+                    <button
+                      onClick={() => {
+                        onCollect(selectedCardIndex);
+                        setSelectedCardIndex(null);
+                      }}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold"
+                      style={{
+                        background: `linear-gradient(135deg, ${TIER_COLORS[def.tier]}, ${TIER_COLORS[def.tier]}aa)`,
+                        color: '#000',
+                      }}
+                    >
+                      Collect {formatNumber(card.accumulatedEssence)} Shadow Essence
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      onRemoveCard(selectedCardIndex);
+                      setSelectedCardIndex(null);
+                    }}
+                    className="w-full py-2.5 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                  >
+                    Remove from Crypt
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setSelectedCardIndex(null)}
+                  className="w-full py-2 bg-surface-700 hover:bg-surface-600 rounded-lg transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 }

@@ -76,11 +76,12 @@ export function CardComponent({
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: isFatigued ? 0.6 : 1, scale: 1 }}
-      className="relative rounded-xl border overflow-hidden"
+      className={`relative rounded-xl border overflow-hidden${onClick ? ' cursor-pointer' : ''}`}
       style={{
         borderColor: `${tierColor}50`,
         background: `linear-gradient(180deg, ${tierColor}15 0%, rgba(0,0,0,0.3) 100%)`,
       }}
+      onClick={onClick}
     >
       {/* Essence glow */}
       {showEssence && hasEssence && !isFatigued && (
@@ -210,7 +211,10 @@ export function CardComponent({
       {!card.placedInCrypt && !card.isOnExpedition && onClick && (
         <div className="px-3 pb-3">
           <button
-            onClick={onClick}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
             className="w-full py-2 rounded-lg text-sm font-medium bg-white/10 hover:bg-white/20 transition-colors"
           >
             Place in Crypt
