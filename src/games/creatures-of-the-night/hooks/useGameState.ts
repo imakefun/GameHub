@@ -85,11 +85,12 @@ export function getLunarPhase(): LunarPhase {
  */
 export function getLunarBonus(type: CardType): number {
   const phase = getLunarPhase();
+  const spec = TYPE_SPECIALIZATIONS[type];
   let bonus = 0;
 
   if (phase === 'full_moon') {
-    bonus += 0.1; // all cards
-    if (type === 'lycanthrope') bonus += 1.0;
+    bonus += 0.1; // all cards get +10%
+    if (spec.fullMoonBonus) bonus += spec.fullMoonBonus; // e.g. Lycanthrope +100%
   } else if (phase === 'new_moon') {
     if (type === 'shadow') bonus += 0.75;
     if (type === 'cursed') bonus += 0.75;
@@ -178,7 +179,11 @@ function effectiveInterval(def: CardDefinition): number {
   if (isNightTime() && spec.nightIntervalMultiplier) {
     interval *= spec.nightIntervalMultiplier;
   }
-  return interval;
+  // Cursed-style random interval variance (±50%)
+  if (spec.randomIntervalVariance) {
+    interval *= 1 + (Math.random() * 2 - 1) * spec.randomIntervalVariance;
+  }
+  return Math.max(1, interval); // floor at 1s
 }
 
 function getPlacedTypeCounts(
