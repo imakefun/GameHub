@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { CardDefinition, CardTier, GameConfig, OwnedCard, PackGuarantee } from '../types';
 import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER } from '../types';
@@ -123,19 +123,21 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
     // Sort by tier (highest last for drama)
     rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
     setCards(rolled);
-    setPhase('revealing');
     setRevealedCount(0);
-
-    // Auto-reveal cards one by one
-    rolled.forEach((_, i) => {
-      setTimeout(() => {
-        setRevealedCount(i + 1);
-        if (i === rolled.length - 1) {
-          setTimeout(() => setPhase('done'), 300);
-        }
-      }, (i + 1) * 400);
-    });
+    setPhase('revealing');
   };
+
+  // Reveal cards one at a time via an effect chain – each reveal triggers the next
+  useEffect(() => {
+    if (phase !== 'revealing') return;
+    if (revealedCount < cards.length) {
+      const timer = setTimeout(() => setRevealedCount((n) => n + 1), 500);
+      return () => clearTimeout(timer);
+    }
+    // All revealed – transition to done
+    const doneTimer = setTimeout(() => setPhase('done'), 400);
+    return () => clearTimeout(doneTimer);
+  }, [phase, revealedCount, cards.length]);
 
   const handleConfirm = () => {
     onConfirm(cards);
@@ -233,8 +235,14 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
                             +💎
                           </div>
                         )}
-                        <div className="text-2xl mb-1">
-                          {CARD_TYPE_INFO[card.type].emoji}
+                        <div className="w-full aspect-square rounded-lg overflow-hidden mb-1 flex items-center justify-center"
+                          style={{ background: `linear-gradient(135deg, ${tierColor}15, rgba(0,0,0,0.3))` }}
+                        >
+                          {card.artUrl ? (
+                            <img src={card.artUrl} alt={card.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl">{CARD_TYPE_INFO[card.type].emoji}</span>
+                          )}
                         </div>
                         <p className="text-[10px] font-medium truncate">{card.name}</p>
                         <p
