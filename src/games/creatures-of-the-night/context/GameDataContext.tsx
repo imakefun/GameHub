@@ -38,13 +38,13 @@ const GameDataContext = createContext<GameDataContextType | null>(null);
 
 export function GameDataProvider({ children }: { children: ReactNode }) {
   const [cards, setCards] = useState<CardDefinition[]>(localCards);
-  const [packs] = useState<PackDefinition[]>(localPacks);
-  const [expeditions] = useState<ExpeditionZone[]>(localExpeditions);
-  const [typeSynergies] = useState<TypeSynergy[]>(localTypeSynergies);
-  const [crossTypeSynergies] = useState<CrossTypeSynergy[]>(localCrossSynergies);
+  const [packs, setPacks] = useState<PackDefinition[]>(localPacks);
+  const [expeditions, setExpeditions] = useState<ExpeditionZone[]>(localExpeditions);
+  const [typeSynergies, setTypeSynergies] = useState<TypeSynergy[]>(localTypeSynergies);
+  const [crossTypeSynergies, setCrossTypeSynergies] = useState<CrossTypeSynergy[]>(localCrossSynergies);
   const [featureUnlocks] = useState<FeatureUnlock[]>(localFeatureUnlocks);
   const [clRewards] = useState<CLReward[]>(localCLRewards);
-  const [dailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
+  const [dailyQuestPool, setDailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +64,21 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
       const data = await fetchGameData();
       if (data.cards.length > 0) {
         setCards(data.cards);
+      }
+      if (data.packs && data.packs.length > 0) {
+        setPacks(data.packs);
+      }
+      if (data.expeditions && data.expeditions.length > 0) {
+        setExpeditions(data.expeditions);
+      }
+      if (data.typeSynergies && data.typeSynergies.length > 0) {
+        setTypeSynergies(data.typeSynergies);
+      }
+      if (data.crossTypeSynergies && data.crossTypeSynergies.length > 0) {
+        setCrossTypeSynergies(data.crossTypeSynergies);
+      }
+      if (data.dailyQuests && data.dailyQuests.length > 0) {
+        setDailyQuestPool(data.dailyQuests);
       }
       setSettings(data.settings);
       setIsUsingSheets(true);

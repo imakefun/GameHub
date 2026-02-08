@@ -5,7 +5,9 @@ export const SHEETS_CONFIG = {
     cards: 'Cards',
     packs: 'Packs',
     expeditions: 'Expeditions',
-    synergies: 'Synergies',
+    typeSynergies: 'TypeSynergies',
+    crossTypeSynergies: 'CrossTypeSynergies',
+    dailyQuests: 'DailyQuests',
     settings: 'Settings',
   },
 
