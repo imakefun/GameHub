@@ -7,9 +7,12 @@ interface CryptBoardProps {
   ownedCards: OwnedCard[];
   cryptSlots: number;
   config: GameConfig;
+  lunarCrystals: number;
+  purchasedCryptSlots: number;
   onCollect: (index: number) => void;
   onCollectAll: () => void;
   onRemoveCard: (index: number) => void;
+  onBuyCryptSlot: () => void;
 }
 
 function formatNumber(n: number): string {
@@ -17,13 +20,19 @@ function formatNumber(n: number): string {
   return Math.floor(n).toString();
 }
 
+const MAX_PURCHASED = 3;
+const SLOT_LC_COST = 15;
+
 export function CryptBoard({
   ownedCards,
   cryptSlots,
   config,
+  lunarCrystals,
+  purchasedCryptSlots,
   onCollect,
   onCollectAll,
   onRemoveCard,
+  onBuyCryptSlot,
 }: CryptBoardProps) {
   const placedCards = ownedCards
     .map((card, index) => ({ card, index }))
@@ -147,6 +156,21 @@ export function CryptBoard({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Buy extra crypt slot */}
+      {purchasedCryptSlots < MAX_PURCHASED && (
+        <button
+          onClick={onBuyCryptSlot}
+          disabled={lunarCrystals < SLOT_LC_COST}
+          className={`w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            lunarCrystals >= SLOT_LC_COST
+              ? 'border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300'
+              : 'border-surface-700 bg-surface-800/30 text-surface-500 cursor-not-allowed'
+          }`}
+        >
+          Buy Extra Slot ({SLOT_LC_COST} 🌙) &mdash; {purchasedCryptSlots}/{MAX_PURCHASED} purchased
+        </button>
       )}
     </div>
   );

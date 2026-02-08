@@ -22,13 +22,31 @@ import {
 
 const STORAGE_KEY = 'creatures-of-the-night-save';
 
-// Crypt slot unlock thresholds: start with 3, max 7
+// Crypt slot unlock thresholds: start with 3, max 7 from CL
 const CRYPT_SLOT_UNLOCKS: { cl: number; slot: number }[] = [
   { cl: 15, slot: 4 },
   { cl: 25, slot: 5 },
   { cl: 50, slot: 6 },
   { cl: 75, slot: 7 },
 ];
+
+// LC cost to buy extra crypt slots beyond CL-unlocked ones
+const EXTRA_CRYPT_SLOT_LC_COST = 15;
+const MAX_PURCHASED_CRYPT_SLOTS = 3; // can buy up to 3 extra (max 10 total)
+
+// Login streak milestones that grant Lunar Crystals
+const LOGIN_STREAK_MILESTONES: { days: number; lunarCrystals: number }[] = [
+  { days: 7, lunarCrystals: 5 },
+  { days: 14, lunarCrystals: 5 },
+  { days: 30, lunarCrystals: 15 },
+  { days: 60, lunarCrystals: 20 },
+  { days: 90, lunarCrystals: 30 },
+];
+
+export { LOGIN_STREAK_MILESTONES, EXTRA_CRYPT_SLOT_LC_COST, MAX_PURCHASED_CRYPT_SLOTS };
+
+// Void energy from breaking Eternal duplicates
+const ETERNAL_DUPLICATE_VOID_ENERGY = 10;
 
 // Weekly milestone tiers per the spec: 5/10/15/20/25 quests
 const WEEKLY_MILESTONES: {
@@ -241,9 +259,11 @@ function deriveCLFields(
   clPoints: number,
   config: GameConfig,
   currentUnlocks: string[],
+  purchasedCryptSlots: number = 0,
 ): Pick<GameState, 'collectionLevel' | 'cryptSlots' | 'unlockedFeatures'> {
   const cl = collectionLevelForPoints(clPoints);
-  const slots = cryptSlotsForCL(cl, config.settings.maxCryptSlots);
+  const baseSlots = cryptSlotsForCL(cl, config.settings.maxCryptSlots);
+  const slots = Math.min(baseSlots + purchasedCryptSlots, config.settings.maxCryptSlots + MAX_PURCHASED_CRYPT_SLOTS);
   const unlocks = [...currentUnlocks];
   for (const fu of config.featureUnlocks) {
     if (cl >= fu.cl && !unlocks.includes(fu.feature)) {
@@ -418,6 +438,8 @@ function createInitialState(config: GameConfig): GameState {
     dailyQuestsLastReset: getTodayMidnight(),
     weeklyQuestCount: 0,
     weeklyRewardsClaimed: [],
+    loginStreakRewardsClaimed: [],
+    purchasedCryptSlots: 0,
     tutorialCompleted: false,
     tutorialStep: 0,
     lastSaved: Date.now(),
@@ -757,6 +779,7 @@ function createGameReducer(config: GameConfig) {
           newCLPoints,
           config,
           state.unlockedFeatures,
+          state.purchasedCryptSlots,
         );
 
         // Track quest progress
@@ -804,6 +827,7 @@ function createGameReducer(config: GameConfig) {
           newCLPoints,
           config,
           state.unlockedFeatures,
+          state.purchasedCryptSlots,
         );
 
         return {
@@ -870,17 +894,28 @@ function createGameReducer(config: GameConfig) {
       case 'OPEN_PACK': {
         const newOwned: OwnedCard[] = [];
         let cards = [...state.ownedCards];
+        let voidEnergyGained = 0;
 
         for (const cardDef of action.cards) {
           const existIdx = cards.findIndex(
             (c) => c.definitionId === cardDef.id,
           );
           if (existIdx >= 0) {
-            const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
-            cards[existIdx] = {
-              ...cards[existIdx],
-              soulShards: cards[existIdx].soulShards + shards,
-            };
+            // Eternal duplicates → void energy instead of soul shards
+            if (cardDef.tier === 'eternal') {
+              voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
+              // Still give some soul shards too
+              cards[existIdx] = {
+                ...cards[existIdx],
+                soulShards: cards[existIdx].soulShards + TIER_DUPLICATE_SHARDS[cardDef.tier],
+              };
+            } else {
+              const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
+              cards[existIdx] = {
+                ...cards[existIdx],
+                soulShards: cards[existIdx].soulShards + shards,
+              };
+            }
           } else {
             newOwned.push({
               definitionId: cardDef.id,
@@ -900,6 +935,10 @@ function createGameReducer(config: GameConfig) {
 
         return {
           ...state,
+          currencies: {
+            ...state.currencies,
+            voidEnergy: state.currencies.voidEnergy + voidEnergyGained,
+          },
           ownedCards: [...cards, ...newOwned],
           dailyQuests: dq,
           playerStats: {
@@ -1077,6 +1116,75 @@ function createGameReducer(config: GameConfig) {
             ...state.weeklyRewardsClaimed,
             action.tier,
           ],
+        };
+      }
+
+      // ======================== RUSH_EXPEDITION ========================
+      case 'RUSH_EXPEDITION': {
+        const exp = state.activeExpeditions[action.expeditionIndex];
+        if (!exp) return state;
+
+        // Cost: 1 LC per 10 minutes remaining (minimum 1)
+        const remaining = Math.max(0, (exp.completesAt - Date.now()) / 1000);
+        if (remaining <= 0) return state; // already done
+        const lcCost = Math.max(1, Math.ceil(remaining / 600));
+        if (state.currencies.lunarCrystals < lcCost) return state;
+
+        // Set completesAt to now so TICK picks it up next frame
+        return {
+          ...state,
+          currencies: {
+            ...state.currencies,
+            lunarCrystals: state.currencies.lunarCrystals - lcCost,
+          },
+          activeExpeditions: state.activeExpeditions.map((e, i) =>
+            i === action.expeditionIndex
+              ? { ...e, completesAt: Date.now() }
+              : e,
+          ),
+        };
+      }
+
+      // ======================== BUY_CRYPT_SLOT ========================
+      case 'BUY_CRYPT_SLOT': {
+        if (state.purchasedCryptSlots >= MAX_PURCHASED_CRYPT_SLOTS) return state;
+        if (state.currencies.lunarCrystals < EXTRA_CRYPT_SLOT_LC_COST) return state;
+
+        const newPurchased = state.purchasedCryptSlots + 1;
+        const clFields = deriveCLFields(
+          state.collectionLevelPoints,
+          config,
+          state.unlockedFeatures,
+          newPurchased,
+        );
+
+        return {
+          ...state,
+          currencies: {
+            ...state.currencies,
+            lunarCrystals: state.currencies.lunarCrystals - EXTRA_CRYPT_SLOT_LC_COST,
+          },
+          purchasedCryptSlots: newPurchased,
+          cryptSlots: clFields.cryptSlots,
+        };
+      }
+
+      // ======================== CLAIM_LOGIN_STREAK_REWARD ========================
+      case 'CLAIM_LOGIN_STREAK_REWARD': {
+        const { milestone } = action;
+        if (state.loginStreakRewardsClaimed.includes(milestone)) return state;
+
+        const streakReward = LOGIN_STREAK_MILESTONES.find((m) => m.days === milestone);
+        if (!streakReward) return state;
+        if (state.playerStats.loginStreak < milestone) return state;
+
+        return {
+          ...state,
+          currencies: {
+            ...state.currencies,
+            lunarCrystals: state.currencies.lunarCrystals + streakReward.lunarCrystals,
+          },
+          loginStreakRewardsClaimed: [...state.loginStreakRewardsClaimed, milestone],
         };
       }
 
@@ -1313,6 +1421,23 @@ export function useGameState(config: GameConfig) {
     [],
   );
 
+  const rushExpedition = useCallback(
+    (expeditionIndex: number) =>
+      dispatch({ type: 'RUSH_EXPEDITION', expeditionIndex }),
+    [],
+  );
+
+  const buyCryptSlot = useCallback(
+    () => dispatch({ type: 'BUY_CRYPT_SLOT' }),
+    [],
+  );
+
+  const claimLoginStreakReward = useCallback(
+    (milestone: number) =>
+      dispatch({ type: 'CLAIM_LOGIN_STREAK_REWARD', milestone }),
+    [],
+  );
+
   const loadGame = useCallback(
     (gameState: GameState) =>
       dispatch({ type: 'LOAD_GAME', state: gameState }),
@@ -1341,6 +1466,9 @@ export function useGameState(config: GameConfig) {
     completeQuest,
     claimCLReward,
     claimWeeklyReward,
+    rushExpedition,
+    buyCryptSlot,
+    claimLoginStreakReward,
     setTutorialStep,
     completeTutorial,
     loadGame,

@@ -40,6 +40,9 @@ function CreaturesGame() {
     completeQuest,
     claimCLReward,
     claimWeeklyReward,
+    rushExpedition,
+    buyCryptSlot,
+    claimLoginStreakReward,
     setTutorialStep,
     completeTutorial,
     resetGame,
@@ -211,9 +214,12 @@ function CreaturesGame() {
                 ownedCards={state.ownedCards}
                 cryptSlots={state.cryptSlots}
                 config={config}
+                lunarCrystals={state.currencies.lunarCrystals}
+                purchasedCryptSlots={state.purchasedCryptSlots}
                 onCollect={collectCard}
                 onCollectAll={collectAll}
                 onRemoveCard={removeCard}
+                onBuyCryptSlot={buyCryptSlot}
               />
             )}
             {activeTab === 'collection' && (
@@ -245,7 +251,9 @@ function CreaturesGame() {
                 config={config}
                 collectionLevel={state.collectionLevel}
                 activeExpeditions={state.activeExpeditions}
+                lunarCrystals={state.currencies.lunarCrystals}
                 onStartExpedition={startExpedition}
+                onRushExpedition={rushExpedition}
               />
             )}
             {activeTab === 'grimoire' && (
@@ -255,6 +263,7 @@ function CreaturesGame() {
                 onClaimCLReward={claimCLReward}
                 onCompleteQuest={completeQuest}
                 onClaimWeeklyReward={claimWeeklyReward}
+                onClaimLoginStreakReward={claimLoginStreakReward}
               />
             )}
           </motion.div>

@@ -1,6 +1,6 @@
 import type { GameState, GameConfig, CardType } from '../types';
 import { CARD_TYPE_INFO } from '../types';
-import { isNightTime, getLunarPhase, WEEKLY_MILESTONES } from '../hooks/useGameState';
+import { isNightTime, getLunarPhase, WEEKLY_MILESTONES, LOGIN_STREAK_MILESTONES } from '../hooks/useGameState';
 
 interface GrimoirePanelProps {
   state: GameState;
@@ -8,6 +8,7 @@ interface GrimoirePanelProps {
   onClaimCLReward: (cl: number) => void;
   onCompleteQuest: (questIndex: number) => void;
   onClaimWeeklyReward: (tier: number) => void;
+  onClaimLoginStreakReward: (milestone: number) => void;
 }
 
 function formatNumber(n: number): string {
@@ -47,6 +48,7 @@ export function GrimoirePanel({
   onClaimCLReward,
   onCompleteQuest,
   onClaimWeeklyReward,
+  onClaimLoginStreakReward,
 }: GrimoirePanelProps) {
   const night = isNightTime();
   const lunarPhase = getLunarPhase();
@@ -318,6 +320,47 @@ export function GrimoirePanel({
           })}
         </div>
       </div>
+
+      {/* Login Streak Rewards */}
+      {LOGIN_STREAK_MILESTONES.some((m) => !state.loginStreakRewardsClaimed.includes(m.days)) && (
+        <div className="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5">
+          <h3 className="font-semibold text-sm mb-2">
+            Login Streak: {state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}
+          </h3>
+          <div className="space-y-2">
+            {LOGIN_STREAK_MILESTONES.map((m) => {
+              const claimed = state.loginStreakRewardsClaimed.includes(m.days);
+              const reached = state.playerStats.loginStreak >= m.days;
+              return (
+                <div
+                  key={m.days}
+                  className={`flex items-center justify-between p-2 rounded-lg ${
+                    claimed ? 'bg-surface-800/30 opacity-50' : reached ? 'bg-orange-500/10' : 'bg-surface-800/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      reached ? 'bg-orange-500 text-white' : 'bg-surface-700 text-surface-400'
+                    }`}>
+                      {m.days}
+                    </span>
+                    <span>{m.lunarCrystals} 🌙 Lunar Crystals</span>
+                  </div>
+                  {reached && !claimed && (
+                    <button
+                      onClick={() => onClaimLoginStreakReward(m.days)}
+                      className="text-xs text-orange-400 font-medium hover:text-orange-300"
+                    >
+                      Claim
+                    </button>
+                  )}
+                  {claimed && <span className="text-xs text-surface-500">Claimed</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="p-4 rounded-xl border border-surface-700/50">

@@ -8,7 +8,9 @@ interface ExpeditionPanelProps {
   config: GameConfig;
   collectionLevel: number;
   activeExpeditions: ActiveExpedition[];
+  lunarCrystals: number;
   onStartExpedition: (zoneId: string, cardIndices: number[], duration: number) => void;
+  onRushExpedition: (expeditionIndex: number) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -37,7 +39,9 @@ export function ExpeditionPanel({
   config,
   collectionLevel,
   activeExpeditions,
+  lunarCrystals,
   onStartExpedition,
+  onRushExpedition,
 }: ExpeditionPanelProps) {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
@@ -112,9 +116,27 @@ export function ExpeditionPanel({
                     animate={{ width: `${Math.min(100, progress * 100)}%` }}
                   />
                 </div>
-                <p className="text-xs text-surface-500 mt-1.5">
-                  {exp.cardIds.length} cards deployed
-                </p>
+                <div className="flex items-center justify-between mt-1.5">
+                  <p className="text-xs text-surface-500">
+                    {exp.cardIds.length} cards deployed
+                  </p>
+                  {remaining > 0 && (() => {
+                    const lcCost = Math.max(1, Math.ceil(remaining / 600));
+                    return (
+                      <button
+                        onClick={() => onRushExpedition(i)}
+                        disabled={lunarCrystals < lcCost}
+                        className={`text-xs px-2 py-1 rounded-lg transition-colors ${
+                          lunarCrystals >= lcCost
+                            ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                            : 'bg-surface-800 text-surface-500 cursor-not-allowed'
+                        }`}
+                      >
+                        Rush ({lcCost} 🌙)
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
             );
           })}

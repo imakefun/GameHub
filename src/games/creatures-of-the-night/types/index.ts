@@ -294,6 +294,10 @@ export interface GameState {
   dailyQuestsLastReset: number;
   weeklyQuestCount: number;
   weeklyRewardsClaimed: number[];
+  // Login streak
+  loginStreakRewardsClaimed: number[];  // streak milestones already claimed (e.g. 7, 30)
+  // Extra crypt slots purchased with LC
+  purchasedCryptSlots: number;
   // Tutorial
   tutorialCompleted: boolean;
   tutorialStep: number;
@@ -318,6 +322,9 @@ export type GameAction =
   | { type: 'COMPLETE_QUEST'; questIndex: number }
   | { type: 'CLAIM_CL_REWARD'; cl: number }
   | { type: 'CLAIM_WEEKLY_REWARD'; tier: number }
+  | { type: 'RUSH_EXPEDITION'; expeditionIndex: number }
+  | { type: 'BUY_CRYPT_SLOT' }
+  | { type: 'CLAIM_LOGIN_STREAK_REWARD'; milestone: number }
   | { type: 'SET_TUTORIAL_STEP'; step: number }
   | { type: 'COMPLETE_TUTORIAL' }
   | { type: 'LOAD_GAME'; state: GameState }
