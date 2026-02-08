@@ -105,6 +105,7 @@ export function ShopPanel({
       {/* Starter Tome */}
       {!starterTomeClaimed && (
         <motion.div
+          data-tutorial="starter-tome"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-purple-500/10"

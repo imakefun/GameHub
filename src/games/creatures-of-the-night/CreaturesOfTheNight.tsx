@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -52,6 +52,33 @@ function CreaturesGame() {
 
   const [activeTab, setActiveTab] = useState<Tab>('crypt');
   const [showSettings, setShowSettings] = useState(false);
+
+  // Tutorial: force tab switch from TutorialOverlay
+  const handleTutorialForceTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+  }, []);
+
+  // Tutorial: auto-advance interactive steps when game state conditions are met
+  useEffect(() => {
+    if (state.tutorialCompleted) return;
+    const step = state.tutorialStep;
+
+    // Step 3 (claim tome): advance when starter tome claimed AND cards collected from pack
+    if (step === 3 && state.starterTomeClaimed && state.ownedCards.length > 1) {
+      setTutorialStep(4);
+    }
+
+    // Step 5 (place a card): advance when a second card is placed in crypt
+    if (step === 5 && state.ownedCards.filter((c) => c.placedInCrypt).length >= 2) {
+      setTutorialStep(6);
+    }
+  }, [
+    state.tutorialCompleted,
+    state.tutorialStep,
+    state.starterTomeClaimed,
+    state.ownedCards,
+    setTutorialStep,
+  ]);
 
   const night = isNightTime();
   const lunarPhase = getLunarPhase();
@@ -297,6 +324,7 @@ function CreaturesGame() {
             }
           }}
           onSkip={completeTutorial}
+          forceTab={handleTutorialForceTab}
         />
       )}
 

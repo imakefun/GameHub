@@ -63,7 +63,7 @@ export function CryptBoard({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tutorial="crypt-board">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

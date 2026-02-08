@@ -32,7 +32,7 @@ export function ResourceBar({ currencies, collectionLevel, collectionLevelPoints
   const clPercent = Math.min(100, (progressInLevel / levelRange) * 100);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-tutorial="resource-bar">
       {/* Collection Level bar */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/30 rounded-lg px-3 py-1.5">
