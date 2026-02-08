@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { CardDefinition, CardTier, GameConfig, OwnedCard, PackGuarantee } from '../types';
 import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER } from '../types';
 
@@ -111,10 +111,19 @@ function pickGuaranteed(
   return pickRandomFrom(pool);
 }
 
+const SHARD_RATES: Record<CardTier, number> = {
+  twilight: 5,
+  dusk: 15,
+  midnight: 30,
+  umbral: 60,
+  eternal: 120,
+};
+
 export function PackOpening({ config, ownedCards, collectionLevel, onClose, onConfirm, packId }: PackOpeningProps) {
   const [phase, setPhase] = useState<'sealed' | 'revealing' | 'done'>('sealed');
   const [cards, setCards] = useState<CardDefinition[]>([]);
-  const [revealedCount, setRevealedCount] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
 
   const pack = config.packs.find((p) => p.id === packId);
 
@@ -123,21 +132,28 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
     // Sort by tier (highest last for drama)
     rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
     setCards(rolled);
-    setRevealedCount(0);
+    setCurrentIndex(0);
+    setFlipped(false);
     setPhase('revealing');
   };
 
-  // Reveal cards one at a time via an effect chain – each reveal triggers the next
-  useEffect(() => {
+  const handleTap = useCallback(() => {
     if (phase !== 'revealing') return;
-    if (revealedCount < cards.length) {
-      const timer = setTimeout(() => setRevealedCount((n) => n + 1), 500);
-      return () => clearTimeout(timer);
+
+    if (!flipped) {
+      // First tap: flip the card face-up
+      setFlipped(true);
+      return;
     }
-    // All revealed – transition to done
-    const doneTimer = setTimeout(() => setPhase('done'), 400);
-    return () => clearTimeout(doneTimer);
-  }, [phase, revealedCount, cards.length]);
+
+    // Card is already shown — advance to next card or finish
+    if (currentIndex < cards.length - 1) {
+      setCurrentIndex((i) => i + 1);
+      setFlipped(false);
+    } else {
+      setPhase('done');
+    }
+  }, [phase, flipped, currentIndex, cards.length]);
 
   const handleConfirm = () => {
     onConfirm(cards);
@@ -147,28 +163,28 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
   const isNewCard = (cardDef: CardDefinition) =>
     !ownedCards.some((c) => c.definitionId === cardDef.id);
 
+  const currentCard = cards[currentIndex];
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
       onClick={phase === 'done' ? handleConfirm : undefined}
     >
-      <motion.div
-        initial={{ scale: 0.8 }}
-        animate={{ scale: 1 }}
+      <div
+        className="w-full h-full flex flex-col items-center justify-center px-4"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md"
       >
         {/* Pack name */}
-        <h2 className="text-center text-xl font-bold mb-4">
+        <h2 className="text-center text-xl font-bold mb-4 text-white">
           {pack?.name || 'Card Pack'}
         </h2>
 
+        {/* === SEALED PHASE === */}
         {phase === 'sealed' && (
           <motion.div className="text-center space-y-6">
-            {/* Sealed pack visual */}
             <motion.div
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 2, repeat: Infinity }}
@@ -179,7 +195,7 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
               }}
             >
               <div className="text-center">
-                <p className="text-5xl mb-2">📦</p>
+                <p className="text-5xl mb-2">{'\u{1F4E6}'}</p>
                 <p className="text-purple-300 text-sm font-medium">{pack?.cardCount} Cards</p>
               </div>
             </motion.div>
@@ -193,104 +209,229 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
             >
               Open Pack
             </motion.button>
+
+            <button
+              onClick={onClose}
+              className="block mx-auto mt-2 py-2 text-sm text-surface-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
           </motion.div>
         )}
 
-        {(phase === 'revealing' || phase === 'done') && (
-          <div className="space-y-4">
-            {/* Revealed cards */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              {cards.map((card, i) => {
-                const revealed = i < revealedCount;
-                const isNew = isNewCard(card);
-                const tierColor = TIER_COLORS[card.tier];
-
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ rotateY: 180, opacity: 0 }}
-                    animate={
-                      revealed
-                        ? { rotateY: 0, opacity: 1 }
-                        : { rotateY: 180, opacity: 0.3 }
-                    }
-                    transition={{ duration: 0.3, delay: revealed ? 0 : 0 }}
-                    className="relative rounded-xl border p-2 text-center"
-                    style={{
-                      borderColor: revealed ? `${tierColor}60` : 'rgba(255,255,255,0.1)',
-                      background: revealed
-                        ? `linear-gradient(180deg, ${tierColor}20, rgba(0,0,0,0.4))`
-                        : 'rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    {revealed ? (
-                      <>
-                        {isNew && (
-                          <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                            NEW
-                          </div>
-                        )}
-                        {!isNew && (
-                          <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                            +💎
-                          </div>
-                        )}
-                        <div className="w-full aspect-square rounded-lg overflow-hidden mb-1 flex items-center justify-center"
-                          style={{ background: `linear-gradient(135deg, ${tierColor}15, rgba(0,0,0,0.3))` }}
-                        >
-                          {card.artUrl ? (
-                            <img src={card.artUrl} alt={card.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-2xl">{CARD_TYPE_INFO[card.type].emoji}</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] font-medium truncate">{card.name}</p>
-                        <p
-                          className="text-[9px]"
-                          style={{ color: tierColor }}
-                        >
-                          {TIER_LABELS[card.tier]}
-                        </p>
-                      </>
-                    ) : (
-                      <div className="text-2xl py-2">❓</div>
-                    )}
-                  </motion.div>
-                );
-              })}
+        {/* === REVEALING PHASE — one card at a time === */}
+        {phase === 'revealing' && currentCard && (
+          <div className="flex flex-col items-center w-full max-w-xs" onClick={handleTap}>
+            {/* Progress */}
+            <div className="flex items-center gap-2 mb-4">
+              {cards.map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i < currentIndex
+                      ? 'w-3 bg-purple-400'
+                      : i === currentIndex
+                        ? 'w-5 bg-purple-300'
+                        : 'w-3 bg-surface-700'
+                  }`}
+                />
+              ))}
+              <span className="text-xs text-surface-500 ml-1">
+                {currentIndex + 1}/{cards.length}
+              </span>
             </div>
 
-            {phase === 'done' && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center space-y-3"
-              >
-                {/* Summary */}
-                <div className="text-sm text-surface-400">
-                  {cards.filter((c) => isNewCard(c)).length} new cards,{' '}
-                  {cards.filter((c) => !isNewCard(c)).length} duplicates (converted to Soul Shards)
-                </div>
-                <button
-                  onClick={handleConfirm}
-                  className="px-6 py-2.5 rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 text-white"
+            {/* Card reveal area */}
+            <div className="relative w-full" style={{ perspective: 1000 }}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentIndex}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="w-full"
                 >
-                  Collect Cards
-                </button>
-              </motion.div>
+                  {!flipped ? (
+                    /* Card back */
+                    <motion.div
+                      initial={{ rotateY: 0 }}
+                      className="w-full aspect-[3/4] rounded-2xl border-2 border-purple-500/40 flex items-center justify-center cursor-pointer"
+                      style={{
+                        background: 'linear-gradient(135deg, #1a0533 0%, #2d1b69 50%, #1a0533 100%)',
+                        boxShadow: '0 0 30px rgba(147, 51, 234, 0.25)',
+                      }}
+                    >
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="text-center"
+                      >
+                        <p className="text-6xl mb-3">{'\u2728'}</p>
+                        <p className="text-purple-300 text-sm">Tap to reveal</p>
+                      </motion.div>
+                    </motion.div>
+                  ) : (
+                    /* Card face */
+                    <RevealedCard card={currentCard} isNew={isNewCard(currentCard)} />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Tap hint */}
+            {flipped && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="text-surface-500 text-sm mt-4 animate-pulse"
+              >
+                {currentIndex < cards.length - 1 ? 'Tap for next card' : 'Tap to finish'}
+              </motion.p>
             )}
           </div>
         )}
 
-        {phase === 'sealed' && (
-          <button
-            onClick={onClose}
-            className="mt-4 w-full py-2 text-sm text-surface-400 hover:text-white transition-colors"
+        {/* === DONE PHASE — summary of all cards === */}
+        {phase === 'done' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md space-y-4"
+            onClick={(e) => e.stopPropagation()}
           >
-            Cancel
-          </button>
+            {/* Summary grid — compact thumbnails */}
+            <div className="grid grid-cols-5 gap-2">
+              {cards.map((card, i) => {
+                const isNew = isNewCard(card);
+                const tierColor = TIER_COLORS[card.tier];
+                return (
+                  <div
+                    key={i}
+                    className="relative rounded-xl border overflow-hidden"
+                    style={{
+                      borderColor: `${tierColor}60`,
+                      background: `linear-gradient(180deg, ${tierColor}20, rgba(0,0,0,0.4))`,
+                    }}
+                  >
+                    {isNew ? (
+                      <div className="absolute top-0.5 right-0.5 bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
+                        NEW
+                      </div>
+                    ) : (
+                      <div className="absolute top-0.5 right-0.5 bg-blue-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
+                        +{SHARD_RATES[card.tier]}
+                      </div>
+                    )}
+                    <div className="aspect-square flex items-center justify-center">
+                      {card.artUrl ? (
+                        <img src={card.artUrl} alt={card.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl">{CARD_TYPE_INFO[card.type].emoji}</span>
+                      )}
+                    </div>
+                    <div className="px-1 pb-1">
+                      <p className="text-[9px] font-medium truncate text-center">{card.name}</p>
+                      <p className="text-[8px] text-center" style={{ color: tierColor }}>
+                        {TIER_LABELS[card.tier]}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Summary text */}
+            <div className="text-center text-sm text-surface-400">
+              {cards.filter((c) => isNewCard(c)).length} new cards,{' '}
+              {cards.filter((c) => !isNewCard(c)).length} duplicates (converted to Soul Shards)
+            </div>
+
+            <button
+              onClick={handleConfirm}
+              className="w-full py-3 rounded-xl font-semibold text-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white"
+              style={{ boxShadow: '0 0 20px rgba(147, 51, 234, 0.3)' }}
+            >
+              Collect Cards
+            </button>
+          </motion.div>
         )}
-      </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+/** Large single-card reveal view */
+function RevealedCard({ card, isNew }: { card: CardDefinition; isNew: boolean }) {
+  const tierColor = TIER_COLORS[card.tier];
+  const typeInfo = CARD_TYPE_INFO[card.type];
+
+  return (
+    <motion.div
+      initial={{ rotateY: 90, opacity: 0 }}
+      animate={{ rotateY: 0, opacity: 1 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className="w-full rounded-2xl border-2 overflow-hidden cursor-pointer"
+      style={{
+        borderColor: `${tierColor}70`,
+        background: `linear-gradient(180deg, ${tierColor}20 0%, rgba(0,0,0,0.5) 100%)`,
+        boxShadow: `0 0 40px ${tierColor}30, 0 0 80px ${tierColor}15`,
+      }}
+    >
+      {/* Badge */}
+      <div className="flex justify-between items-start px-4 pt-3">
+        <span
+          className="text-xs font-bold px-2 py-1 rounded-full"
+          style={{ background: `${tierColor}30`, color: tierColor }}
+        >
+          {TIER_LABELS[card.tier]}
+        </span>
+        {isNew ? (
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-500 text-white">
+            NEW CARD
+          </span>
+        ) : (
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-500/90 text-white">
+            +{SHARD_RATES[card.tier]} Shards
+          </span>
+        )}
+      </div>
+
+      {/* Art */}
+      <div className="px-4 py-3">
+        <div
+          className="w-full aspect-[3/4] rounded-xl overflow-hidden border flex items-center justify-center"
+          style={{
+            borderColor: `${tierColor}30`,
+            background: `linear-gradient(135deg, ${tierColor}10, rgba(0,0,0,0.4))`,
+          }}
+        >
+          {card.artUrl ? (
+            <img src={card.artUrl} alt={card.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-7xl">{typeInfo.emoji}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="px-4 pb-4 text-center">
+        <h3 className="text-xl font-bold text-white mb-1">{card.name}</h3>
+        <div className="flex items-center justify-center gap-2 text-sm">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+            style={{ background: `${tierColor}20`, color: tierColor }}
+          >
+            {typeInfo.emoji} {typeInfo.label}
+          </span>
+        </div>
+        {card.flavorText && (
+          <p className="text-xs text-surface-400 italic mt-2">
+            &ldquo;{card.flavorText}&rdquo;
+          </p>
+        )}
+      </div>
     </motion.div>
   );
 }
