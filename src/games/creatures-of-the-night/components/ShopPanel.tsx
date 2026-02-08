@@ -39,7 +39,7 @@ function isPackAvailable(pack: PackDefinition, collectionLevel: number): boolean
 
   // Full moon packs only during full moon
   if (avail === 'fullMoon') {
-    return getLunarPhase() === 'full';
+    return getLunarPhase() === 'full_moon';
   }
 
   // Event/expedition/prestige packs are not directly purchasable in shop

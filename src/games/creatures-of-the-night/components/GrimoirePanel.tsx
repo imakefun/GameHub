@@ -27,7 +27,7 @@ const LUNAR_DISPLAY: Record<string, { emoji: string; label: string; effect: stri
   waxing: { emoji: '🌒', label: 'Waxing', effect: 'No special bonus' },
   full_moon: { emoji: '🌕', label: 'Full Moon', effect: 'All +10%, Lycanthrope +100%' },
   waning: { emoji: '🌘', label: 'Waning', effect: 'No special bonus' },
-  blood_moon: { emoji: '🔴', label: 'Blood Moon', effect: 'All types +50%!' },
+  blood_moon: { emoji: '🔴', label: 'Blood Moon', effect: 'Blood +200%, Lycanthrope +100%, Others +25%' },
   none: { emoji: '🌙', label: 'Normal', effect: '' },
 };
 

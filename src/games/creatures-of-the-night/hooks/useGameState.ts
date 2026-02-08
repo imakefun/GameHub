@@ -93,13 +93,18 @@ export function getLunarPhase(): LunarPhase {
  * Lunar bonus for a card type (fractional, additive with cosmic bonus).
  * New Moon: Shadow +75%, Cursed +75%
  * Full Moon: Lycanthrope +100%, all cards +10%
+ * Blood Moon: Blood +200%, Lycanthrope +100%, all other +25%
  */
 export function getLunarBonus(type: CardType): number {
   const phase = getLunarPhase();
   const spec = TYPE_SPECIALIZATIONS[type];
   let bonus = 0;
 
-  if (phase === 'full_moon') {
+  if (phase === 'blood_moon') {
+    if (type === 'blood') bonus += 2.0;
+    else if (type === 'lycanthrope') bonus += 1.0;
+    else bonus += 0.25;
+  } else if (phase === 'full_moon') {
     bonus += 0.1; // all cards get +10%
     if (spec.fullMoonBonus) bonus += spec.fullMoonBonus; // e.g. Lycanthrope +100%
   } else if (phase === 'new_moon') {

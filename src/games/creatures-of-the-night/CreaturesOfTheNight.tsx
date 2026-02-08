@@ -19,7 +19,7 @@ import { ExpeditionPanel } from './components/ExpeditionPanel';
 import { GrimoirePanel } from './components/GrimoirePanel';
 import { PackOpening } from './components/PackOpening';
 import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
-import { isNightTime } from './hooks/useGameState';
+import { isNightTime, getLunarPhase } from './hooks/useGameState';
 
 type Tab = 'crypt' | 'collection' | 'shop' | 'expeditions' | 'grimoire';
 
@@ -54,6 +54,10 @@ function CreaturesGame() {
   const [showSettings, setShowSettings] = useState(false);
 
   const night = isNightTime();
+  const lunarPhase = getLunarPhase();
+  const lunarEmoji: Record<string, string> = {
+    new_moon: '🌑', waxing: '🌒', full_moon: '🌕', waning: '🌘', blood_moon: '🔴', none: '🌙',
+  };
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number }[] = [
     { id: 'crypt', label: 'Crypt', icon: '🏚️' },
@@ -140,12 +144,21 @@ function CreaturesGame() {
                 </h1>
               </div>
             </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              <Settings className="w-5 h-5 text-surface-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Cosmic Cycle Indicator */}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-purple-500/20 text-xs">
+                <span title={night ? 'Night Phase' : 'Day Phase'}>{night ? '🌙' : '☀️'}</span>
+                {(lunarPhase === 'new_moon' || lunarPhase === 'full_moon' || lunarPhase === 'blood_moon') && (
+                  <span title={lunarPhase.replace('_', ' ')}>{lunarEmoji[lunarPhase]}</span>
+                )}
+              </div>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <Settings className="w-5 h-5 text-surface-400" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
