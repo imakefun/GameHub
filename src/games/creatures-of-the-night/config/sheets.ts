@@ -9,6 +9,9 @@ export const SHEETS_CONFIG = {
     crossTypeSynergies: 'CrossTypeSynergies',
     dailyQuests: 'DailyQuests',
     levelCosts: 'LevelCosts',
+    clRewards: 'CLRewards',
+    featureUnlocks: 'FeatureUnlocks',
+    clConfig: 'CLConfig',
     settings: 'Settings',
   },
 

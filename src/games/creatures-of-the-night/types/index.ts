@@ -31,15 +31,6 @@ export const TIER_COLORS: Record<CardTier, string> = {
   eternal: '#fbbf24',
 };
 
-// Tier multipliers for Collection Level points
-export const TIER_CL_MULTIPLIER: Record<CardTier, number> = {
-  twilight: 1,
-  dusk: 1.5,
-  midnight: 2,
-  umbral: 3,
-  eternal: 5,
-};
-
 // Duplicate → Soul Shard conversion rates
 export const TIER_DUPLICATE_SHARDS: Record<CardTier, number> = {
   twilight: 5,
@@ -122,22 +113,6 @@ export const TYPE_SPECIALIZATIONS: Record<CardType, TypeSpecialization> = {
   undead: { amountMultiplier: 1, intervalMultiplier: 1 },
   stone: { amountMultiplier: 2.5, intervalMultiplier: 3 },
   infernal: { amountMultiplier: 1.25, intervalMultiplier: 1, failChance: 0.05 },
-};
-
-// CL thresholds at which card types unlock in packs
-export const TYPE_UNLOCK_CL: Record<CardType, number> = {
-  beast: 1,
-  shadow: 1,
-  spirit: 1,
-  blood: 10,
-  undead: 10,
-  fae: 20,
-  magic: 20,
-  lycanthrope: 30,
-  necromancy: 30,
-  cursed: 40,
-  stone: 40,
-  infernal: 50,
 };
 
 // --- Card Definition (from data/sheets) ---
@@ -337,6 +312,12 @@ export interface LevelCostConfig {
   scalingPower: number;   // cost = ceil(baseCost * level^scalingPower)
 }
 
+// --- Crypt Slot Unlock ---
+export interface CryptSlotUnlock {
+  cl: number;
+  slot: number;
+}
+
 // --- Game Config (provided by context) ---
 export interface GameConfig {
   cards: CardDefinition[];
@@ -348,6 +329,9 @@ export interface GameConfig {
   clRewards: CLReward[];
   dailyQuestPool: DailyQuest[];
   levelCosts: LevelCostConfig[];
+  clTierMultipliers: Record<CardTier, number>;
+  typeUnlockCL: Record<CardType, number>;
+  cryptSlotUnlocks: CryptSlotUnlock[];
   settings: GameSettings;
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { CardDefinition, GameConfig, OwnedCard } from '../types';
-import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER, TYPE_UNLOCK_CL } from '../types';
+import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER } from '../types';
 
 interface PackOpeningProps {
   config: GameConfig;
@@ -18,7 +18,7 @@ function rollCards(config: GameConfig, packId: string, collectionLevel: number):
 
   // Filter cards to only include types the player has unlocked via CL
   const unlockedCards = config.cards.filter(
-    (c) => collectionLevel >= (TYPE_UNLOCK_CL[c.type] ?? 1)
+    (c) => collectionLevel >= (config.typeUnlockCL[c.type] ?? 1)
   );
 
   const results: CardDefinition[] = [];

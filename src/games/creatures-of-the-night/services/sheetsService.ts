@@ -7,6 +7,9 @@ import type {
   ExpeditionZone,
   TypeSynergy,
   CrossTypeSynergy,
+  CLReward,
+  FeatureUnlock,
+  CryptSlotUnlock,
   DailyQuest,
   GameSettings,
   LevelCostConfig,
@@ -24,6 +27,11 @@ interface SheetsCache {
   crossTypeSynergies: CrossTypeSynergy[] | null;
   dailyQuests: DailyQuest[] | null;
   levelCosts: LevelCostConfig[] | null;
+  clRewards: CLReward[] | null;
+  featureUnlocks: FeatureUnlock[] | null;
+  clTierMultipliers: Record<CardTier, number> | null;
+  typeUnlockCL: Record<CardType, number> | null;
+  cryptSlotUnlocks: CryptSlotUnlock[] | null;
   settings: GameSettings | null;
   lastFetch: number;
 }
@@ -45,6 +53,11 @@ const cache: SheetsCache = {
   crossTypeSynergies: null,
   dailyQuests: null,
   levelCosts: null,
+  clRewards: null,
+  featureUnlocks: null,
+  clTierMultipliers: null,
+  typeUnlockCL: null,
+  cryptSlotUnlocks: null,
   settings: null,
   lastFetch: 0,
 };
@@ -235,6 +248,64 @@ function parseLevelCosts(rows: Record<string, string>[]): LevelCostConfig[] {
     .filter((c) => c.tier);
 }
 
+function parseCLRewards(rows: Record<string, string>[]): CLReward[] {
+  return rows
+    .map((row) => ({
+      cl: parseInt(row['cl'] || '0'),
+      type: (row['type'] || 'shadowEssence') as CLReward['type'],
+      amount: parseInt(row['amount'] || '0'),
+      description: row['description'] || '',
+    }))
+    .filter((r) => r.cl > 0 && r.amount > 0);
+}
+
+function parseFeatureUnlocks(rows: Record<string, string>[]): FeatureUnlock[] {
+  return rows
+    .map((row) => ({
+      cl: parseInt(row['cl'] || '0'),
+      feature: row['feature'] || '',
+      description: row['description'] || '',
+    }))
+    .filter((f) => f.cl > 0 && f.feature);
+}
+
+// CLConfig sheet: key/value rows for tier multipliers, type unlock CLs, crypt slot unlocks
+// Expected rows: category (tierMult|typeUnlock|cryptSlot), key, value
+function parseCLConfig(rows: Record<string, string>[]): {
+  clTierMultipliers: Record<CardTier, number> | null;
+  typeUnlockCL: Record<CardType, number> | null;
+  cryptSlotUnlocks: CryptSlotUnlock[] | null;
+} {
+  const tierMults: Partial<Record<CardTier, number>> = {};
+  const typeUnlocks: Partial<Record<CardType, number>> = {};
+  const slotUnlocks: CryptSlotUnlock[] = [];
+
+  for (const row of rows) {
+    const category = (row['category'] || '').trim().toLowerCase();
+    const key = (row['key'] || '').trim().toLowerCase();
+    const value = parseFloat(row['value'] || '0');
+    if (!category || !key || isNaN(value)) continue;
+
+    if (category === 'tiermult' || category === 'tier_mult') {
+      tierMults[key as CardTier] = value;
+    } else if (category === 'typeunlock' || category === 'type_unlock') {
+      typeUnlocks[key as CardType] = value;
+    } else if (category === 'cryptslot' || category === 'crypt_slot') {
+      slotUnlocks.push({ cl: value, slot: parseInt(key) });
+    }
+  }
+
+  const hasTierMults = Object.keys(tierMults).length > 0;
+  const hasTypeUnlocks = Object.keys(typeUnlocks).length > 0;
+  const hasCryptSlots = slotUnlocks.length > 0;
+
+  return {
+    clTierMultipliers: hasTierMults ? tierMults as Record<CardTier, number> : null,
+    typeUnlockCL: hasTypeUnlocks ? typeUnlocks as Record<CardType, number> : null,
+    cryptSlotUnlocks: hasCryptSlots ? slotUnlocks.sort((a, b) => a.cl - b.cl) : null,
+  };
+}
+
 // ============================================================
 // Public API
 // ============================================================
@@ -247,6 +318,11 @@ export interface GameSheetData {
   crossTypeSynergies: CrossTypeSynergy[] | null;
   dailyQuests: DailyQuest[] | null;
   levelCosts: LevelCostConfig[] | null;
+  clRewards: CLReward[] | null;
+  featureUnlocks: FeatureUnlock[] | null;
+  clTierMultipliers: Record<CardTier, number> | null;
+  typeUnlockCL: Record<CardType, number> | null;
+  cryptSlotUnlocks: CryptSlotUnlock[] | null;
   settings: GameSettings;
 }
 
@@ -265,6 +341,11 @@ export async function fetchGameData(): Promise<GameSheetData> {
       crossTypeSynergies: cache.crossTypeSynergies,
       dailyQuests: cache.dailyQuests,
       levelCosts: cache.levelCosts,
+      clRewards: cache.clRewards,
+      featureUnlocks: cache.featureUnlocks,
+      clTierMultipliers: cache.clTierMultipliers,
+      typeUnlockCL: cache.typeUnlockCL,
+      cryptSlotUnlocks: cache.cryptSlotUnlocks,
       settings: cache.settings,
     };
   }
@@ -282,6 +363,9 @@ export async function fetchGameData(): Promise<GameSheetData> {
       crossTypeSynergyRows,
       dailyQuestRows,
       levelCostRows,
+      clRewardRows,
+      featureUnlockRows,
+      clConfigRows,
       settingsRows,
     ] = await Promise.all([
       fetchSheet(SHEETS_CONFIG.sheets.cards),
@@ -291,6 +375,9 @@ export async function fetchGameData(): Promise<GameSheetData> {
       fetchSheet(SHEETS_CONFIG.sheets.crossTypeSynergies).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.dailyQuests).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.levelCosts).catch(() => []),
+      fetchSheet(SHEETS_CONFIG.sheets.clRewards).catch(() => []),
+      fetchSheet(SHEETS_CONFIG.sheets.featureUnlocks).catch(() => []),
+      fetchSheet(SHEETS_CONFIG.sheets.clConfig).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.settings).catch(() => []),
     ]);
 
@@ -301,6 +388,9 @@ export async function fetchGameData(): Promise<GameSheetData> {
     const crossTypeSynergies = crossTypeSynergyRows.length > 0 ? parseCrossTypeSynergies(crossTypeSynergyRows) : null;
     const dailyQuests = dailyQuestRows.length > 0 ? parseDailyQuests(dailyQuestRows) : null;
     const levelCosts = levelCostRows.length > 0 ? parseLevelCosts(levelCostRows) : null;
+    const clRewards = clRewardRows.length > 0 ? parseCLRewards(clRewardRows) : null;
+    const featureUnlocks = featureUnlockRows.length > 0 ? parseFeatureUnlocks(featureUnlockRows) : null;
+    const clConfig = clConfigRows.length > 0 ? parseCLConfig(clConfigRows) : { clTierMultipliers: null, typeUnlockCL: null, cryptSlotUnlocks: null };
     const settings = parseSettings(settingsRows);
 
     cache.cards = cards;
@@ -310,11 +400,23 @@ export async function fetchGameData(): Promise<GameSheetData> {
     cache.crossTypeSynergies = crossTypeSynergies;
     cache.dailyQuests = dailyQuests;
     cache.levelCosts = levelCosts;
+    cache.clRewards = clRewards;
+    cache.featureUnlocks = featureUnlocks;
+    cache.clTierMultipliers = clConfig.clTierMultipliers;
+    cache.typeUnlockCL = clConfig.typeUnlockCL;
+    cache.cryptSlotUnlocks = clConfig.cryptSlotUnlocks;
     cache.settings = settings;
     cache.lastFetch = now;
 
     console.log(`[Creatures] Loaded from Sheets: ${cards.length} cards, ${packs?.length ?? 0} packs, ${expeditions?.length ?? 0} expeditions`);
-    return { cards, packs, expeditions, typeSynergies, crossTypeSynergies, dailyQuests, levelCosts, settings };
+    return {
+      cards, packs, expeditions, typeSynergies, crossTypeSynergies, dailyQuests, levelCosts,
+      clRewards, featureUnlocks,
+      clTierMultipliers: clConfig.clTierMultipliers,
+      typeUnlockCL: clConfig.typeUnlockCL,
+      cryptSlotUnlocks: clConfig.cryptSlotUnlocks,
+      settings,
+    };
   } catch (error) {
     console.error('[Creatures] Failed to fetch from Sheets:', error);
     throw error;
@@ -329,6 +431,11 @@ export function clearCache(): void {
   cache.crossTypeSynergies = null;
   cache.dailyQuests = null;
   cache.levelCosts = null;
+  cache.clRewards = null;
+  cache.featureUnlocks = null;
+  cache.clTierMultipliers = null;
+  cache.typeUnlockCL = null;
+  cache.cryptSlotUnlocks = null;
   cache.settings = null;
   cache.lastFetch = 0;
 }

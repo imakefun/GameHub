@@ -2,12 +2,15 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
   CardDefinition,
+  CardTier,
+  CardType,
   PackDefinition,
   ExpeditionZone,
   TypeSynergy,
   CrossTypeSynergy,
   FeatureUnlock,
   CLReward,
+  CryptSlotUnlock,
   DailyQuest,
   LevelCostConfig,
   GameConfig,
@@ -27,6 +30,11 @@ import {
   dailyQuestPool as localDailyQuestPool,
 } from '../data/synergies';
 import { levelCosts as localLevelCosts } from '../data/levelCosts';
+import {
+  clTierMultipliers as localCLTierMultipliers,
+  typeUnlockCL as localTypeUnlockCL,
+  cryptSlotUnlocks as localCryptSlotUnlocks,
+} from '../data/clConfig';
 
 interface GameDataContextType {
   config: GameConfig;
@@ -44,10 +52,13 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [expeditions, setExpeditions] = useState<ExpeditionZone[]>(localExpeditions);
   const [typeSynergies, setTypeSynergies] = useState<TypeSynergy[]>(localTypeSynergies);
   const [crossTypeSynergies, setCrossTypeSynergies] = useState<CrossTypeSynergy[]>(localCrossSynergies);
-  const [featureUnlocks] = useState<FeatureUnlock[]>(localFeatureUnlocks);
-  const [clRewards] = useState<CLReward[]>(localCLRewards);
+  const [featureUnlocks, setFeatureUnlocks] = useState<FeatureUnlock[]>(localFeatureUnlocks);
+  const [clRewards, setCLRewards] = useState<CLReward[]>(localCLRewards);
   const [dailyQuestPool, setDailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
   const [levelCosts, setLevelCosts] = useState<LevelCostConfig[]>(localLevelCosts);
+  const [clTierMultipliers, setCLTierMultipliers] = useState<Record<CardTier, number>>(localCLTierMultipliers);
+  const [typeUnlockCL, setTypeUnlockCL] = useState<Record<CardType, number>>(localTypeUnlockCL);
+  const [cryptSlotUnlocks, setCryptSlotUnlocks] = useState<CryptSlotUnlock[]>(localCryptSlotUnlocks);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +97,21 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
       if (data.levelCosts && data.levelCosts.length > 0) {
         setLevelCosts(data.levelCosts);
       }
+      if (data.clRewards && data.clRewards.length > 0) {
+        setCLRewards(data.clRewards);
+      }
+      if (data.featureUnlocks && data.featureUnlocks.length > 0) {
+        setFeatureUnlocks(data.featureUnlocks);
+      }
+      if (data.clTierMultipliers) {
+        setCLTierMultipliers(data.clTierMultipliers);
+      }
+      if (data.typeUnlockCL) {
+        setTypeUnlockCL(data.typeUnlockCL);
+      }
+      if (data.cryptSlotUnlocks) {
+        setCryptSlotUnlocks(data.cryptSlotUnlocks);
+      }
       setSettings(data.settings);
       setIsUsingSheets(true);
     } catch (err) {
@@ -116,6 +142,9 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     clRewards,
     dailyQuestPool,
     levelCosts,
+    clTierMultipliers,
+    typeUnlockCL,
+    cryptSlotUnlocks,
     settings,
   };
 

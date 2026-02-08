@@ -13,7 +13,6 @@ import type {
 import {
   TIER_ORDER,
   TIER_MAX_LEVEL,
-  TIER_CL_MULTIPLIER,
   TIER_DUPLICATE_SHARDS,
   ASCENSION_COSTS,
   AWAKENING_INFO,
@@ -22,13 +21,7 @@ import {
 
 const STORAGE_KEY = 'creatures-of-the-night-save';
 
-// Crypt slot unlock thresholds: start with 3, max 7 from CL
-const CRYPT_SLOT_UNLOCKS: { cl: number; slot: number }[] = [
-  { cl: 15, slot: 4 },
-  { cl: 25, slot: 5 },
-  { cl: 50, slot: 6 },
-  { cl: 75, slot: 7 },
-];
+// (Crypt slot unlock thresholds moved to config.cryptSlotUnlocks)
 
 // LC cost to buy extra crypt slots beyond CL-unlocked ones
 const EXTRA_CRYPT_SLOT_LC_COST = 15;
@@ -253,9 +246,9 @@ function getSynergyBonus(
   return bonus;
 }
 
-function cryptSlotsForCL(cl: number, max: number): number {
+function cryptSlotsForCL(cl: number, max: number, unlocks: GameConfig['cryptSlotUnlocks']): number {
   let slots = 3;
-  for (const u of CRYPT_SLOT_UNLOCKS) {
+  for (const u of unlocks) {
     if (cl >= u.cl) slots = u.slot;
   }
   return Math.min(slots, max);
@@ -269,7 +262,7 @@ function deriveCLFields(
   purchasedCryptSlots: number = 0,
 ): Pick<GameState, 'collectionLevel' | 'cryptSlots' | 'unlockedFeatures'> {
   const cl = collectionLevelForPoints(clPoints);
-  const baseSlots = cryptSlotsForCL(cl, config.settings.maxCryptSlots);
+  const baseSlots = cryptSlotsForCL(cl, config.settings.maxCryptSlots, config.cryptSlotUnlocks);
   const slots = Math.min(baseSlots + purchasedCryptSlots, config.settings.maxCryptSlots + MAX_PURCHASED_CRYPT_SLOTS);
   const unlocks = [...currentUnlocks];
   for (const fu of config.featureUnlocks) {
@@ -774,7 +767,7 @@ function createGameReducer(config: GameConfig) {
 
         // CL points: 1 base * tier multiplier
         const newCLPoints =
-          state.collectionLevelPoints + TIER_CL_MULTIPLIER[def.tier];
+          state.collectionLevelPoints + config.clTierMultipliers[def.tier];
 
         const newCards = state.ownedCards.map((c, i) =>
           i === action.cardIndex
@@ -829,7 +822,7 @@ function createGameReducer(config: GameConfig) {
         if (!nextDef) return state;
 
         const newCLPoints =
-          state.collectionLevelPoints + TIER_CL_MULTIPLIER[nextTier] * 5;
+          state.collectionLevelPoints + config.clTierMultipliers[nextTier] * 5;
         const clFields = deriveCLFields(
           newCLPoints,
           config,
