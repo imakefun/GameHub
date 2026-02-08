@@ -911,25 +911,34 @@ function createGameReducer(config: GameConfig) {
         let voidEnergyGained = 0;
 
         for (const cardDef of action.cards) {
+          // Check existing owned cards AND cards newly added in this pack
           const existIdx = cards.findIndex(
             (c) => c.definitionId === cardDef.id,
           );
+          const newIdx = newOwned.findIndex(
+            (c) => c.definitionId === cardDef.id,
+          );
+
           if (existIdx >= 0) {
-            // Eternal duplicates → void energy instead of soul shards
+            // Duplicate of already-owned card
             if (cardDef.tier === 'eternal') {
               voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
-              // Still give some soul shards too
-              cards[existIdx] = {
-                ...cards[existIdx],
-                soulShards: cards[existIdx].soulShards + TIER_DUPLICATE_SHARDS[cardDef.tier],
-              };
-            } else {
-              const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
-              cards[existIdx] = {
-                ...cards[existIdx],
-                soulShards: cards[existIdx].soulShards + shards,
-              };
             }
+            const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
+            cards[existIdx] = {
+              ...cards[existIdx],
+              soulShards: cards[existIdx].soulShards + shards,
+            };
+          } else if (newIdx >= 0) {
+            // Duplicate within this same pack – convert to shards
+            if (cardDef.tier === 'eternal') {
+              voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
+            }
+            const shards = TIER_DUPLICATE_SHARDS[cardDef.tier];
+            newOwned[newIdx] = {
+              ...newOwned[newIdx],
+              soulShards: newOwned[newIdx].soulShards + shards,
+            };
           } else {
             newOwned.push({
               definitionId: cardDef.id,
