@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { OwnedCard, GameConfig, CardType, CardDefinition, UpgradeTier } from '../types';
 import {
   CARD_TYPE_INFO,
@@ -7,22 +8,23 @@ import {
   UPGRADE_TIER_LABELS,
   UPGRADE_TIER_COLORS,
   UPGRADE_COSTS,
-  UPGRADE_TIER_PRODUCTION_BONUS,
+  LC_ESSENCE_RATE,
+  LC_SHARDS_RATE,
 } from '../types';
 import { UpgradeReveal } from './UpgradeReveal';
-import { getNextUpgradeTier, getEffectiveGeneration } from '../hooks/useGameState';
+import { LunarCrystalConfirm } from './LunarCrystalConfirm';
 
 interface CollectionPanelProps {
   ownedCards: OwnedCard[];
   config: GameConfig;
   cryptSlots: number;
-  currencies: { shadowEssence: number };
+  currencies: { shadowEssence: number; lunarCrystals: number };
   filter: 'all' | CardType;
   sort: 'type' | 'upgrade';
   onPlaceCard: (index: number) => void;
   onSwapCard: (removeIndex: number, placeIndex: number) => void;
   onRemoveCard: (index: number) => void;
-  onUpgrade: (index: number) => void;
+  onUpgrade: (index: number, targetTier?: Exclude<UpgradeTier, 'base'>, useLunarCrystals?: boolean) => void;
 }
 
 function formatNumber(n: number): string {
@@ -38,6 +40,29 @@ function borderStyle(tier: UpgradeTier, color: string) {
   if (idx <= 2) return { borderWidth: 2, borderColor: `${color}60`, boxShadow: `0 0 8px ${color}20` };
   if (idx <= 4) return { borderWidth: 2, borderColor: `${color}80`, boxShadow: `0 0 16px ${color}30` };
   return { borderWidth: 3, borderColor: color, boxShadow: `0 0 24px ${color}40` };
+}
+
+// Compute cumulative costs from currentTier to targetTier
+function getCumulativeCost(currentTier: UpgradeTier, targetTier: UpgradeTier) {
+  const currentIdx = UPGRADE_TIER_ORDER.indexOf(currentTier);
+  const targetIdx = UPGRADE_TIER_ORDER.indexOf(targetTier);
+  let totalEssence = 0;
+  let totalShards = 0;
+  let totalCL = 0;
+  for (let i = currentIdx + 1; i <= targetIdx; i++) {
+    const tier = UPGRADE_TIER_ORDER[i] as Exclude<UpgradeTier, 'base'>;
+    const c = UPGRADE_COSTS[tier];
+    totalEssence += c.shadowEssence;
+    totalShards += c.shards;
+    totalCL += c.clGain;
+  }
+  return { totalEssence, totalShards, totalCL };
+}
+
+// Get all possible target tiers from current tier
+function getAvailableTargetTiers(currentTier: UpgradeTier): Exclude<UpgradeTier, 'base'>[] {
+  const currentIdx = UPGRADE_TIER_ORDER.indexOf(currentTier);
+  return UPGRADE_TIER_ORDER.slice(currentIdx + 1) as Exclude<UpgradeTier, 'base'>[];
 }
 
 export function CollectionPanel({
@@ -59,6 +84,10 @@ export function CollectionPanel({
     fromTier: UpgradeTier;
     toTier: Exclude<UpgradeTier, 'base'>;
   } | null>(null);
+  // Track selected target tier offset (0 = next tier, 1 = 2 tiers up, etc.)
+  const [targetTierOffset, setTargetTierOffset] = useState(0);
+  // LC confirmation popup state
+  const [showLCConfirm, setShowLCConfirm] = useState(false);
 
   const cryptIsFull = ownedCards.filter((c) => c.placedInCrypt).length >= cryptSlots;
 
@@ -107,7 +136,10 @@ export function CollectionPanel({
               <motion.button
                 key={`${def.id}-${index}`}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedCard(selectedCard === index ? null : index)}
+                onClick={() => {
+                  setSelectedCard(selectedCard === index ? null : index);
+                  setTargetTierOffset(0);
+                }}
                 className="relative rounded-xl overflow-hidden transition-all"
                 style={{
                   borderWidth: border.borderWidth,
@@ -174,179 +206,212 @@ export function CollectionPanel({
         </div>
       )}
 
-      {/* Card detail modal */}
+      {/* Card detail / upgrade modal - Marvel Snap style */}
       <AnimatePresence>
         {selectedItem && (() => {
           const { card, def, index } = selectedItem;
-          const nextTier = getNextUpgradeTier(card.upgradeTier);
           const upgradeColor = UPGRADE_TIER_COLORS[card.upgradeTier];
+          const availableTiers = getAvailableTargetTiers(card.upgradeTier);
+          const isMaxed = availableTiers.length === 0;
+          const clampedOffset = Math.min(targetTierOffset, availableTiers.length - 1);
+          const chosenTargetTier = isMaxed ? null : availableTiers[Math.max(0, clampedOffset)];
+          const targetColor = chosenTargetTier ? UPGRADE_TIER_COLORS[chosenTargetTier] : upgradeColor;
+
+          // Cumulative costs for selected target
+          const costs = chosenTargetTier
+            ? getCumulativeCost(card.upgradeTier, chosenTargetTier)
+            : { totalEssence: 0, totalShards: 0, totalCL: 0 };
+
+          // Affordability
+          const canAffordEssence = currencies.shadowEssence >= costs.totalEssence;
+          const canAffordShards = card.soulShards >= costs.totalShards;
+          const canAfford = canAffordEssence && canAffordShards;
+
+          // LC needed to cover shortfalls
+          const essenceShort = Math.max(0, costs.totalEssence - currencies.shadowEssence);
+          const shardsShort = Math.max(0, costs.totalShards - card.soulShards);
+          const lcForEssence = Math.ceil(essenceShort / LC_ESSENCE_RATE);
+          const lcForShards = Math.ceil(shardsShort / LC_SHARDS_RATE);
+          const lcNeeded = lcForEssence + lcForShards;
+          const canAffordWithLC = !canAfford && currencies.lunarCrystals >= lcNeeded;
 
           return (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
               onClick={() => setSelectedCard(null)}
             >
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 40, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-sm rounded-2xl border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+                className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[95vh] overflow-y-auto"
                 style={{
-                  borderColor: `${upgradeColor}40`,
-                  background: `linear-gradient(180deg, ${upgradeColor}15, rgba(15,23,42,0.98))`,
+                  background: `linear-gradient(180deg, ${targetColor}10 0%, rgba(8,0,18,0.98) 40%)`,
                 }}
               >
-                {/* Card header */}
-                <div className="text-center">
-                  {def.artUrl ? (
-                    <div className="w-20 h-20 mx-auto rounded-xl overflow-hidden mb-2">
-                      <img src={def.artUrl} alt={def.name} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="text-5xl mb-2">
-                      {CARD_TYPE_INFO[def.type].emoji}
+                {/* Large card art - hero section */}
+                <div className="relative">
+                  <div
+                    className="aspect-[4/5] flex items-center justify-center relative overflow-hidden"
+                    style={{
+                      background: `linear-gradient(180deg, ${targetColor}20 0%, transparent 100%)`,
+                    }}
+                  >
+                    {def.artUrl ? (
+                      <img
+                        src={def.artUrl}
+                        alt={def.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-8xl">{CARD_TYPE_INFO[def.type].emoji}</span>
+                    )}
+
+                    {/* Upgrade tier colored border frame */}
+                    <div
+                      className="absolute inset-2 rounded-xl pointer-events-none"
+                      style={{
+                        border: `3px solid ${targetColor}60`,
+                        boxShadow: `inset 0 0 30px ${targetColor}15, 0 0 20px ${targetColor}20`,
+                      }}
+                    />
+                  </div>
+
+                  {/* CL gain badge - bottom left over art */}
+                  {chosenTargetTier && costs.totalCL > 0 && (
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/90 text-white font-bold text-sm shadow-lg">
+                      <span className="text-green-200">+{costs.totalCL}</span>
+                      <span className="text-green-100 text-xs font-medium">CL</span>
                     </div>
                   )}
-                  <h3 className="text-xl font-bold">{def.name}</h3>
-                </div>
 
-                {/* Upgrade Tier Progress Bar */}
-                <div>
-                  <div className="flex items-center gap-0.5 mb-1">
-                    {UPGRADE_TIER_ORDER.map((tier) => {
-                      const tierIdx = UPGRADE_TIER_ORDER.indexOf(tier);
-                      const currentIdx = UPGRADE_TIER_ORDER.indexOf(card.upgradeTier);
-                      const isActive = tierIdx <= currentIdx;
-                      const color = UPGRADE_TIER_COLORS[tier];
-
-                      return (
-                        <div
-                          key={tier}
-                          className="flex-1 h-2.5 rounded-sm transition-all relative group"
-                          style={{
-                            background: isActive ? color : 'rgba(255,255,255,0.08)',
-                          }}
-                          title={UPGRADE_TIER_LABELS[tier]}
-                        />
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-center font-medium" style={{ color: upgradeColor }}>
+                  {/* Current tier badge - top right */}
+                  <div
+                    className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold"
+                    style={{ background: `${upgradeColor}80`, color: 'white' }}
+                  >
                     {UPGRADE_TIER_LABELS[card.upgradeTier]}
-                    {nextTier && (
-                      <span className="text-surface-500">
-                        {' → '}{UPGRADE_TIER_LABELS[nextTier]}
-                      </span>
-                    )}
-                  </p>
-                </div>
+                  </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="bg-surface-800/60 rounded-lg p-2.5">
-                    <p className="text-surface-400 text-xs">Type</p>
-                    <p className="font-medium">
-                      {CARD_TYPE_INFO[def.type].emoji}{' '}
-                      {CARD_TYPE_INFO[def.type].label}
-                    </p>
-                  </div>
-                  <div className="bg-surface-800/60 rounded-lg p-2.5">
-                    <p className="text-surface-400 text-xs">Production</p>
-                    <p className="font-medium">{getEffectiveGeneration(card, def).toFixed(1)} SE / {def.baseInterval}s</p>
-                  </div>
-                  <div className="bg-surface-800/60 rounded-lg p-2.5">
-                    <p className="text-surface-400 text-xs">Soul Shards</p>
-                    <p className="font-medium text-blue-400">{card.soulShards}</p>
-                  </div>
-                  <div className="bg-surface-800/60 rounded-lg p-2.5">
-                    <p className="text-surface-400 text-xs">Status</p>
-                    <p className="font-medium">
-                      {card.isOnExpedition
-                        ? 'Expedition'
-                        : card.placedInCrypt
-                        ? 'In Crypt'
-                        : 'Stored'}
-                    </p>
+                  {/* Card name overlay at bottom of art */}
+                  <div
+                    className="absolute bottom-0 left-0 right-0 px-4 pt-10 pb-3 text-center"
+                    style={{
+                      background: 'linear-gradient(transparent, rgba(8,0,18,0.95))',
+                    }}
+                  >
+                    <h3 className="text-2xl font-black tracking-wide text-white drop-shadow-lg uppercase">
+                      {def.name}
+                    </h3>
                   </div>
                 </div>
 
-                {/* Description */}
-                <p className="text-sm text-surface-300 italic text-center">
-                  &ldquo;{def.flavorText}&rdquo;
-                </p>
-
-                {/* Upgrade Action */}
-                <div className="space-y-2">
-                  {nextTier ? (() => {
-                    const cost = UPGRADE_COSTS[nextTier];
-                    const canAffordShards = card.soulShards >= cost.shards;
-                    const canAffordEssence = currencies.shadowEssence >= cost.shadowEssence;
-                    const canUpgrade = canAffordShards && canAffordEssence;
-                    const nextColor = UPGRADE_TIER_COLORS[nextTier];
-
-                    return (
-                      <>
-                        <div
-                          className="p-3 rounded-lg border"
-                          style={{ borderColor: `${nextColor}30`, background: `${nextColor}08` }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium" style={{ color: nextColor }}>
-                              Upgrade to {UPGRADE_TIER_LABELS[nextTier]}
-                            </span>
-                            <span className="text-xs text-amber-400 font-medium">
-                              +{cost.clGain} CL
-                            </span>
+                {/* Upgrade controls section */}
+                <div className="px-5 pb-5 pt-2 space-y-4">
+                  {!isMaxed && chosenTargetTier ? (
+                    <>
+                      {/* "UPGRADE CARD TO:" with +/- tier selector */}
+                      <div className="text-center">
+                        <p className="text-xs text-surface-400 uppercase tracking-widest mb-2 font-medium">
+                          Upgrade Card To:
+                        </p>
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            onClick={() => setTargetTierOffset(Math.max(0, clampedOffset - 1))}
+                            disabled={clampedOffset <= 0}
+                            className="w-10 h-10 rounded-lg flex items-center justify-center transition-all border border-surface-600 disabled:opacity-20 disabled:cursor-not-allowed hover:bg-white/10"
+                            style={{
+                              background: clampedOffset > 0 ? `${targetColor}15` : undefined,
+                              borderColor: clampedOffset > 0 ? `${targetColor}40` : undefined,
+                            }}
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <div className="min-w-[140px] text-center">
+                            <p
+                              className="text-xl font-black uppercase tracking-wide"
+                              style={{ color: targetColor }}
+                            >
+                              {UPGRADE_TIER_LABELS[chosenTargetTier]}
+                            </p>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className={`flex items-center gap-1 ${canAffordEssence ? 'text-white' : 'text-red-400'}`}>
-                              <span>🌑</span>
-                              <span>{formatNumber(cost.shadowEssence)} Essence</span>
-                            </div>
-                            <div className={`flex items-center gap-1 ${canAffordShards ? 'text-white' : 'text-red-400'}`}>
-                              <span>💎</span>
-                              <span>{cost.shards} Shards</span>
-                            </div>
-                          </div>
-                          <p className="text-[10px] text-surface-500 mt-1">
-                            Production bonus: x{UPGRADE_TIER_PRODUCTION_BONUS[card.upgradeTier].toFixed(2)} → x{UPGRADE_TIER_PRODUCTION_BONUS[nextTier].toFixed(2)}
+                          <button
+                            onClick={() => setTargetTierOffset(Math.min(availableTiers.length - 1, clampedOffset + 1))}
+                            disabled={clampedOffset >= availableTiers.length - 1}
+                            className="w-10 h-10 rounded-lg flex items-center justify-center transition-all border border-surface-600 disabled:opacity-20 disabled:cursor-not-allowed hover:bg-white/10"
+                            style={{
+                              background: clampedOffset < availableTiers.length - 1 ? `${targetColor}15` : undefined,
+                              borderColor: clampedOffset < availableTiers.length - 1 ? `${targetColor}40` : undefined,
+                            }}
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Upgrade button with costs */}
+                      <button
+                        onClick={() => {
+                          if (canAfford) {
+                            setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: chosenTargetTier });
+                            onUpgrade(index, chosenTargetTier);
+                            setSelectedCard(null);
+                          } else if (canAffordWithLC) {
+                            setShowLCConfirm(true);
+                          }
+                        }}
+                        disabled={!canAfford && !canAffordWithLC}
+                        className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all ${
+                          !canAfford && !canAffordWithLC ? 'cursor-not-allowed opacity-60' : ''
+                        }`}
+                        style={{
+                          background: canAfford
+                            ? `linear-gradient(135deg, ${targetColor}, ${targetColor}bb)`
+                            : `linear-gradient(135deg, ${targetColor}40, ${targetColor}20)`,
+                          boxShadow: canAfford ? `0 4px 20px ${targetColor}40` : 'none',
+                          border: canAfford ? 'none' : `1px solid ${targetColor}30`,
+                          color: 'white',
+                        }}
+                      >
+                        <div className="flex items-center justify-center gap-4">
+                          <span className={`flex items-center gap-1.5 ${!canAfford && !canAffordEssence ? 'text-red-400' : ''}`}>
+                            <span>🌑</span>
+                            <span>{formatNumber(costs.totalEssence)}</span>
+                          </span>
+                          <span className={`flex items-center gap-1.5 ${!canAfford && !canAffordShards ? 'text-red-400' : ''}`}>
+                            <span>💎</span>
+                            <span>{costs.totalShards}</span>
+                          </span>
+                        </div>
+                      </button>
+                      {!canAfford && !canAffordWithLC && (
+                        <div className="text-center">
+                          <p className="text-xs text-surface-500">
+                            {!canAffordEssence && !canAffordShards
+                              ? `Need ${formatNumber(essenceShort)} more Essence & ${shardsShort} more Shards`
+                              : !canAffordEssence
+                              ? `Need ${formatNumber(essenceShort)} more Essence`
+                              : `Need ${shardsShort} more Shards`}
                           </p>
                         </div>
-                        <button
-                          onClick={() => {
-                            setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: nextTier });
-                            onUpgrade(index);
-                            setSelectedCard(null);
-                          }}
-                          disabled={!canUpgrade}
-                          className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                            canUpgrade
-                              ? 'text-white'
-                              : 'bg-surface-800 text-surface-500 cursor-not-allowed'
-                          }`}
-                          style={canUpgrade ? { background: `linear-gradient(135deg, ${nextColor}, ${nextColor}cc)` } : undefined}
-                        >
-                          {canUpgrade
-                            ? `Upgrade to ${UPGRADE_TIER_LABELS[nextTier]}`
-                            : !canAffordEssence
-                            ? `Need ${formatNumber(cost.shadowEssence - currencies.shadowEssence)} more Essence`
-                            : `Need ${cost.shards - card.soulShards} more Shards`}
-                        </button>
-                      </>
-                    );
-                  })() : (
-                    <div className="text-center py-2">
-                      <span className="text-xs font-medium" style={{ color: UPGRADE_TIER_COLORS.cosmic }}>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-3">
+                      <span
+                        className="text-sm font-bold uppercase tracking-wide"
+                        style={{ color: UPGRADE_TIER_COLORS.cosmic }}
+                      >
                         Maximum Upgrade (Cosmic)
                       </span>
                     </div>
                   )}
 
-                  {/* Place/Remove */}
+                  {/* Place/Remove - secondary actions */}
                   {!card.isOnExpedition && (
                     card.placedInCrypt ? (
                       <button
@@ -354,7 +419,7 @@ export function CollectionPanel({
                           onRemoveCard(index);
                           setSelectedCard(null);
                         }}
-                        className="w-full py-2.5 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                        className="w-full py-2.5 rounded-xl text-sm font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors border border-red-500/20"
                       >
                         Remove from Crypt
                       </button>
@@ -368,22 +433,52 @@ export function CollectionPanel({
                             setSelectedCard(null);
                           }
                         }}
-                        className="w-full py-2.5 rounded-lg text-sm font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors"
+                        className="w-full py-2.5 rounded-xl text-sm font-medium bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 transition-colors border border-purple-500/20"
                       >
                         {cryptIsFull ? 'Swap into Crypt' : 'Place in Crypt'}
                       </button>
                     )
                   )}
-                </div>
 
-                <button
-                  onClick={() => setSelectedCard(null)}
-                  className="w-full py-2 bg-surface-700 hover:bg-surface-600 rounded-lg transition-colors text-sm"
-                >
-                  Close
-                </button>
+                  {/* Cancel button */}
+                  <button
+                    onClick={() => setSelectedCard(null)}
+                    className="w-full py-2.5 rounded-xl text-sm font-medium bg-surface-800/80 hover:bg-surface-700 transition-colors border border-surface-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* LC Confirmation Popup ("So Close!") */}
+      <AnimatePresence>
+        {showLCConfirm && selectedItem && (() => {
+          const { card, def, index } = selectedItem;
+          const availTiers = getAvailableTargetTiers(card.upgradeTier);
+          const offset = Math.min(targetTierOffset, availTiers.length - 1);
+          const target = availTiers[Math.max(0, offset)];
+          if (!target) return null;
+          const cumCosts = getCumulativeCost(card.upgradeTier, target);
+          const eShort = Math.max(0, cumCosts.totalEssence - currencies.shadowEssence);
+          const sShort = Math.max(0, cumCosts.totalShards - card.soulShards);
+          const lcEssence = Math.ceil(eShort / LC_ESSENCE_RATE);
+          const lcShards = Math.ceil(sShort / LC_SHARDS_RATE);
+          return (
+            <LunarCrystalConfirm
+              shortfall={{ essenceShort: eShort, shardsShort: sShort }}
+              lcCost={lcEssence + lcShards}
+              onCancel={() => setShowLCConfirm(false)}
+              onConfirm={() => {
+                setShowLCConfirm(false);
+                setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: target });
+                onUpgrade(index, target, true);
+                setSelectedCard(null);
+              }}
+            />
           );
         })()}
       </AnimatePresence>
