@@ -875,7 +875,9 @@ function createGameReducer(config: GameConfig) {
 
         let newCards = [...state.ownedCards];
         if (qDef.rewards.soulShards && newCards.length > 0) {
-          const ri = Math.floor(Math.random() * newCards.length);
+          const ri = action.shardTargetIndex != null && action.shardTargetIndex < newCards.length
+            ? action.shardTargetIndex
+            : Math.floor(Math.random() * newCards.length);
           newCards[ri] = {
             ...newCards[ri],
             soulShards: newCards[ri].soulShards + qDef.rewards.soulShards,
@@ -913,13 +915,13 @@ function createGameReducer(config: GameConfig) {
             break;
           case 'soulShards':
             if (newCards.length > 0) {
-              const per = Math.floor(reward.amount / newCards.length);
-              let rem = reward.amount - per * newCards.length;
-              newCards = newCards.map((c) => {
-                const bonus = rem > 0 ? 1 : 0;
-                if (rem > 0) rem--;
-                return { ...c, soulShards: c.soulShards + per + bonus };
-              });
+              const shardTarget = action.shardTargetIndex != null && action.shardTargetIndex < newCards.length
+                ? action.shardTargetIndex
+                : Math.floor(Math.random() * newCards.length);
+              newCards[shardTarget] = {
+                ...newCards[shardTarget],
+                soulShards: newCards[shardTarget].soulShards + reward.amount,
+              };
             }
             break;
           case 'card': {
@@ -1401,13 +1403,14 @@ export function useGameState(config: GameConfig) {
   );
 
   const completeQuest = useCallback(
-    (questIndex: number) =>
-      dispatch({ type: 'COMPLETE_QUEST', questIndex }),
+    (questIndex: number, shardTargetIndex?: number) =>
+      dispatch({ type: 'COMPLETE_QUEST', questIndex, shardTargetIndex }),
     [],
   );
 
   const claimCLReward = useCallback(
-    (cl: number) => dispatch({ type: 'CLAIM_CL_REWARD', cl }),
+    (cl: number, shardTargetIndex?: number) =>
+      dispatch({ type: 'CLAIM_CL_REWARD', cl, shardTargetIndex }),
     [],
   );
 

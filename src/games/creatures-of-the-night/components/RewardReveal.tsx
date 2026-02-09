@@ -4,6 +4,7 @@ import type { CLReward } from '../types';
 
 interface RewardRevealProps {
   reward: CLReward;
+  shardTargetCardName?: string;
   onDismiss: () => void;
 }
 
@@ -22,7 +23,7 @@ function formatAmount(n: number): string {
   return n.toLocaleString();
 }
 
-export function RewardReveal({ reward, onDismiss }: RewardRevealProps) {
+export function RewardReveal({ reward, shardTargetCardName, onDismiss }: RewardRevealProps) {
   const display = REWARD_DISPLAY[reward.type] || REWARD_DISPLAY.special;
 
   // Auto-dismiss after 3 seconds
@@ -111,6 +112,16 @@ export function RewardReveal({ reward, onDismiss }: RewardRevealProps) {
           <p className="text-sm font-medium" style={{ color: display.color }}>
             {display.label}
           </p>
+          {reward.type === 'soulShards' && shardTargetCardName && (
+            <motion.p
+              className="text-xs text-blue-300 mt-1"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              &rarr; {shardTargetCardName}
+            </motion.p>
+          )}
         </motion.div>
 
         {/* Description */}
