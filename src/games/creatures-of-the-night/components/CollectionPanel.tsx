@@ -12,6 +12,7 @@ import {
   LC_SHARDS_RATE,
 } from '../types';
 import { UpgradeReveal } from './UpgradeReveal';
+import { LunarCrystalConfirm } from './LunarCrystalConfirm';
 
 interface CollectionPanelProps {
   ownedCards: OwnedCard[];
@@ -85,6 +86,8 @@ export function CollectionPanel({
   } | null>(null);
   // Track selected target tier offset (0 = next tier, 1 = 2 tiers up, etc.)
   const [targetTierOffset, setTargetTierOffset] = useState(0);
+  // LC confirmation popup state
+  const [showLCConfirm, setShowLCConfirm] = useState(false);
 
   const cryptIsFull = ownedCards.filter((c) => c.placedInCrypt).length >= cryptSlots;
 
@@ -351,81 +354,49 @@ export function CollectionPanel({
                       </div>
 
                       {/* Upgrade button with costs */}
-                      {canAfford ? (
-                        <button
-                          onClick={() => {
+                      <button
+                        onClick={() => {
+                          if (canAfford) {
                             setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: chosenTargetTier });
                             onUpgrade(index, chosenTargetTier);
                             setSelectedCard(null);
-                          }}
-                          className="w-full py-3.5 rounded-xl text-sm font-bold transition-all text-white"
-                          style={{
-                            background: `linear-gradient(135deg, ${targetColor}, ${targetColor}bb)`,
-                            boxShadow: `0 4px 20px ${targetColor}40`,
-                          }}
-                        >
-                          <div className="flex items-center justify-center gap-4">
-                            <span className="flex items-center gap-1.5">
-                              <span>🌑</span>
-                              <span>{formatNumber(costs.totalEssence)}</span>
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <span>💎</span>
-                              <span>{costs.totalShards}</span>
-                            </span>
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Costs display with red for unaffordable */}
-                          <div
-                            className="w-full py-3 rounded-xl border"
-                            style={{ borderColor: `${targetColor}30`, background: `${targetColor}08` }}
-                          >
-                            <div className="flex items-center justify-center gap-4 text-sm font-semibold">
-                              <span className={`flex items-center gap-1.5 ${canAffordEssence ? 'text-white' : 'text-red-400'}`}>
-                                <span>🌑</span>
-                                <span>{formatNumber(costs.totalEssence)}</span>
-                              </span>
-                              <span className={`flex items-center gap-1.5 ${canAffordShards ? 'text-white' : 'text-red-400'}`}>
-                                <span>💎</span>
-                                <span>{costs.totalShards}</span>
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* LC fallback button */}
-                          {canAffordWithLC ? (
-                            <button
-                              onClick={() => {
-                                setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: chosenTargetTier });
-                                onUpgrade(index, chosenTargetTier, true);
-                                setSelectedCard(null);
-                              }}
-                              className="w-full py-3 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                              style={{ boxShadow: '0 4px 20px rgba(245,158,11,0.3)' }}
-                            >
-                              <div className="flex items-center justify-center gap-2">
-                                <span>🔮</span>
-                                <span>Spend {lcNeeded} Lunar Crystal{lcNeeded > 1 ? 's' : ''} to cover</span>
-                              </div>
-                            </button>
-                          ) : (
-                            <div className="text-center py-1">
-                              <p className="text-xs text-surface-500">
-                                {!canAffordEssence && !canAffordShards
-                                  ? `Need ${formatNumber(essenceShort)} more Essence & ${shardsShort} more Shards`
-                                  : !canAffordEssence
-                                  ? `Need ${formatNumber(essenceShort)} more Essence`
-                                  : `Need ${shardsShort} more Shards`}
-                              </p>
-                              {lcNeeded > 0 && currencies.lunarCrystals < lcNeeded && (
-                                <p className="text-[10px] text-surface-600 mt-0.5">
-                                  {lcNeeded} LC needed ({currencies.lunarCrystals} available)
-                                </p>
-                              )}
-                            </div>
-                          )}
+                          } else if (canAffordWithLC) {
+                            setShowLCConfirm(true);
+                          }
+                        }}
+                        disabled={!canAfford && !canAffordWithLC}
+                        className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all ${
+                          !canAfford && !canAffordWithLC ? 'cursor-not-allowed opacity-60' : ''
+                        }`}
+                        style={{
+                          background: canAfford
+                            ? `linear-gradient(135deg, ${targetColor}, ${targetColor}bb)`
+                            : `linear-gradient(135deg, ${targetColor}40, ${targetColor}20)`,
+                          boxShadow: canAfford ? `0 4px 20px ${targetColor}40` : 'none',
+                          border: canAfford ? 'none' : `1px solid ${targetColor}30`,
+                          color: 'white',
+                        }}
+                      >
+                        <div className="flex items-center justify-center gap-4">
+                          <span className={`flex items-center gap-1.5 ${!canAfford && !canAffordEssence ? 'text-red-400' : ''}`}>
+                            <span>🌑</span>
+                            <span>{formatNumber(costs.totalEssence)}</span>
+                          </span>
+                          <span className={`flex items-center gap-1.5 ${!canAfford && !canAffordShards ? 'text-red-400' : ''}`}>
+                            <span>💎</span>
+                            <span>{costs.totalShards}</span>
+                          </span>
+                        </div>
+                      </button>
+                      {!canAfford && !canAffordWithLC && (
+                        <div className="text-center">
+                          <p className="text-xs text-surface-500">
+                            {!canAffordEssence && !canAffordShards
+                              ? `Need ${formatNumber(essenceShort)} more Essence & ${shardsShort} more Shards`
+                              : !canAffordEssence
+                              ? `Need ${formatNumber(essenceShort)} more Essence`
+                              : `Need ${shardsShort} more Shards`}
+                          </p>
                         </div>
                       )}
                     </>
@@ -479,6 +450,35 @@ export function CollectionPanel({
                 </div>
               </motion.div>
             </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* LC Confirmation Popup ("So Close!") */}
+      <AnimatePresence>
+        {showLCConfirm && selectedItem && (() => {
+          const { card, def, index } = selectedItem;
+          const availTiers = getAvailableTargetTiers(card.upgradeTier);
+          const offset = Math.min(targetTierOffset, availTiers.length - 1);
+          const target = availTiers[Math.max(0, offset)];
+          if (!target) return null;
+          const cumCosts = getCumulativeCost(card.upgradeTier, target);
+          const eShort = Math.max(0, cumCosts.totalEssence - currencies.shadowEssence);
+          const sShort = Math.max(0, cumCosts.totalShards - card.soulShards);
+          const lcEssence = Math.ceil(eShort / LC_ESSENCE_RATE);
+          const lcShards = Math.ceil(sShort / LC_SHARDS_RATE);
+          return (
+            <LunarCrystalConfirm
+              shortfall={{ essenceShort: eShort, shardsShort: sShort }}
+              lcCost={lcEssence + lcShards}
+              onCancel={() => setShowLCConfirm(false)}
+              onConfirm={() => {
+                setShowLCConfirm(false);
+                setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: target });
+                onUpgrade(index, target, true);
+                setSelectedCard(null);
+              }}
+            />
           );
         })()}
       </AnimatePresence>
