@@ -1,6 +1,16 @@
 import { motion } from 'framer-motion';
-import type { OwnedCard, CardDefinition } from '../types';
-import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS } from '../types';
+import type { OwnedCard, CardDefinition, UpgradeTier } from '../types';
+import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS, UPGRADE_TIER_ORDER } from '../types';
+
+// Higher tiers get thicker, glowing borders
+function borderStyle(tier: UpgradeTier, color: string) {
+  const idx = UPGRADE_TIER_ORDER.indexOf(tier);
+  if (idx <= 0) return { borderWidth: 1, borderColor: `${color}40`, boxShadow: 'none' };
+  if (idx <= 2) return { borderWidth: 2, borderColor: `${color}60`, boxShadow: `0 0 8px ${color}20` };
+  if (idx <= 4) return { borderWidth: 2, borderColor: `${color}80`, boxShadow: `0 0 16px ${color}30, inset 0 0 8px ${color}10` };
+  // cosmic (idx 6)
+  return { borderWidth: 3, borderColor: color, boxShadow: `0 0 24px ${color}40, inset 0 0 12px ${color}15` };
+}
 
 interface CardComponentProps {
   card: OwnedCard;
@@ -30,15 +40,20 @@ export function CardComponent({
   const hasEssence = card.accumulatedEssence >= 1;
   const isFatigued = card.fatigueUntil && Date.now() < card.fatigueUntil;
 
+  const border = borderStyle(card.upgradeTier, upgradeColor);
+
   if (compact) {
     return (
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={onClick}
-        className="flex items-center gap-2 p-2 rounded-lg border transition-all text-left w-full"
+        className="flex items-center gap-2 p-2 rounded-lg transition-all text-left w-full"
         style={{
-          borderColor: `${upgradeColor}40`,
+          borderWidth: border.borderWidth,
+          borderStyle: 'solid',
+          borderColor: border.borderColor,
+          boxShadow: border.boxShadow,
           background: `linear-gradient(135deg, ${upgradeColor}10, transparent)`,
         }}
       >
@@ -76,9 +91,12 @@ export function CardComponent({
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: isFatigued ? 0.6 : 1, scale: 1 }}
-      className={`relative rounded-xl border overflow-hidden${onClick ? ' cursor-pointer' : ''}`}
+      className={`relative rounded-xl overflow-hidden${onClick ? ' cursor-pointer' : ''}`}
       style={{
-        borderColor: `${upgradeColor}50`,
+        borderWidth: border.borderWidth,
+        borderStyle: 'solid',
+        borderColor: border.borderColor,
+        boxShadow: border.boxShadow,
         background: `linear-gradient(180deg, ${upgradeColor}15 0%, rgba(0,0,0,0.3) 100%)`,
       }}
       onClick={onClick}
