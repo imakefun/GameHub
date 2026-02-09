@@ -272,12 +272,18 @@ export function AdminPanel() {
 
   const pushSheet = useCallback(async (sheetTab: string, rows: Record<string, string>[]) => {
     if (!apiUrl) { updatePushState(sheetTab, { status: 'error', message: 'No API URL' }); return false; }
-    updatePushState(sheetTab, { status: 'working' });
+    updatePushState(sheetTab, { status: 'working', message: 'Clearing existing rows...' });
+    const base = apiUrl.replace(/\/$/, '');
     try {
-      const url = `${apiUrl.replace(/\/$/, '')}?sheet=${encodeURIComponent(sheetTab)}`;
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: rows }) });
-      if (!res.ok) { const text = await res.text(); updatePushState(sheetTab, { status: 'error', message: `${res.status}: ${text.slice(0, 200)}` }); return false; }
-      updatePushState(sheetTab, { status: 'success', message: `${rows.length} rows pushed` });
+      // Step 1: Delete all existing rows (keeps header row intact)
+      const delRes = await fetch(`${base}/all?sheet=${encodeURIComponent(sheetTab)}`, { method: 'DELETE' });
+      if (!delRes.ok) { const text = await delRes.text(); updatePushState(sheetTab, { status: 'error', message: `Delete failed ${delRes.status}: ${text.slice(0, 200)}` }); return false; }
+
+      // Step 2: Post new rows
+      updatePushState(sheetTab, { status: 'working', message: `Pushing ${rows.length} rows...` });
+      const postRes = await fetch(`${base}?sheet=${encodeURIComponent(sheetTab)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: rows }) });
+      if (!postRes.ok) { const text = await postRes.text(); updatePushState(sheetTab, { status: 'error', message: `Post failed ${postRes.status}: ${text.slice(0, 200)}` }); return false; }
+      updatePushState(sheetTab, { status: 'success', message: `${rows.length} rows synced` });
       return true;
     } catch (err) { updatePushState(sheetTab, { status: 'error', message: err instanceof Error ? err.message : 'Unknown error' }); return false; }
   }, [apiUrl, updatePushState]);
@@ -494,7 +500,7 @@ export function AdminPanel() {
             Push to SheetDB
           </h2>
           <p className="text-xs text-surface-500 mb-4">
-            Push the current local data files to your spreadsheet. This <strong>appends</strong> rows — clear sheets first to avoid duplicates.
+            Push the current local data files to your spreadsheet. Existing rows are cleared and replaced.
           </p>
 
           <button
