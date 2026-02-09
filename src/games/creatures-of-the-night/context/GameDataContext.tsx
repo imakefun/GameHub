@@ -32,7 +32,6 @@ import {
   cryptSlotUnlocks as localCryptSlotUnlocks,
 } from '../data/clConfig';
 import { settings as localSettings } from '../data/settings';
-import cardArtMap from '../data/cardArtMap';
 
 // Eagerly import all card art PNGs – Vite resolves these to hashed asset URLs at build time
 const cardImageModules = import.meta.glob<string>('../assets/cards/*.png', {
@@ -47,13 +46,16 @@ for (const [path, url] of Object.entries(cardImageModules)) {
   if (stem) artByFilename[stem] = url;
 }
 
-// Enrich local cards with art URLs using the mapping
-const localCardsWithArt: CardDefinition[] = localCards.map((card) => {
-  if (card.artUrl) return card; // already has art (e.g. from Sheets)
-  const filename = cardArtMap[card.id];
-  const url = filename ? artByFilename[filename] : undefined;
-  return url ? { ...card, artUrl: url } : card;
-});
+// Resolve card artUrl stems (e.g. "Rat") to Vite hashed asset URLs
+function enrichArt(cards: CardDefinition[]): CardDefinition[] {
+  return cards.map((card) => {
+    if (!card.artUrl || card.artUrl.startsWith('http') || card.artUrl.startsWith('/')) return card;
+    const url = artByFilename[card.artUrl];
+    return url ? { ...card, artUrl: url } : card;
+  });
+}
+
+const localCardsWithArt: CardDefinition[] = enrichArt(localCards);
 
 interface GameDataContextType {
   config: GameConfig;
@@ -94,7 +96,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     try {
       const data = await fetchGameData();
       if (data.cards.length > 0) {
-        setCards(data.cards);
+        setCards(enrichArt(data.cards));
       }
       if (data.packs && data.packs.length > 0) {
         setPacks(data.packs);
