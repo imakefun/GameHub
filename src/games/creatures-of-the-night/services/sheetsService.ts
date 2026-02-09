@@ -1,4 +1,5 @@
 import { SHEETS_CONFIG, isSheetsConfigured } from '../config/sheets';
+import { settings as localSettings } from '../data/settings';
 import type {
   CardDefinition,
   CardTier,
@@ -35,13 +36,7 @@ interface SheetsCache {
   lastFetch: number;
 }
 
-const DEFAULT_SETTINGS: GameSettings = {
-  tickInterval: 1000,
-  autoSaveInterval: 10000,
-  maxCryptSlots: 7,
-  offlineMaxHours: 8,
-  offlineEssenceMultiplier: 0.5,
-};
+const DEFAULT_SETTINGS: GameSettings = { ...localSettings };
 
 const cache: SheetsCache = {
   cards: null,
@@ -94,6 +89,7 @@ function parseCards(rows: Record<string, string>[]): CardDefinition[] {
       description: row['description'] || '',
       flavorText: row['flavorText'] || row['flavor'] || '',
       artUrl: row['artUrl'] || row['art'] || undefined,
+      set: row['set'] ? parseInt(row['set']) : undefined,
     }))
     .filter((c) => c.id && c.name);
 }
@@ -263,8 +259,9 @@ function parseCLRewards(rows: Record<string, string>[]): CLReward[] {
       type: (row['type'] || 'shadowEssence') as CLReward['type'],
       amount: parseInt(row['amount'] || '0'),
       description: row['description'] || '',
+      cardId: row['cardId'] || undefined,
     }))
-    .filter((r) => r.cl > 0 && r.amount > 0);
+    .filter((r) => r.cl > 0 && (r.amount > 0 || r.type === 'card'));
 }
 
 function parseFeatureUnlocks(rows: Record<string, string>[]): FeatureUnlock[] {
@@ -430,4 +427,3 @@ export function clearCache(): void {
   cache.lastFetch = 0;
 }
 
-export { DEFAULT_SETTINGS };
