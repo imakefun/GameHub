@@ -9,6 +9,7 @@ import {
   Cloud,
   Database,
 } from 'lucide-react';
+import type { CardDefinition } from './types';
 import { useGameState } from './hooks/useGameState';
 import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
@@ -18,6 +19,7 @@ import { ShopPanel } from './components/ShopPanel';
 import { ExpeditionPanel } from './components/ExpeditionPanel';
 import { GrimoirePanel } from './components/GrimoirePanel';
 import { PackOpening } from './components/PackOpening';
+import { NewCardReveal } from './components/NewCardReveal';
 import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
 import { isNightTime, getLunarPhase } from './hooks/useGameState';
 
@@ -51,6 +53,25 @@ function CreaturesGame() {
 
   const [activeTab, setActiveTab] = useState<Tab>('crypt');
   const [showSettings, setShowSettings] = useState(false);
+  const [revealingCard, setRevealingCard] = useState<CardDefinition | null>(null);
+
+  // Wrap claimCLReward: if the reward is a card, show a reveal overlay before claiming
+  const handleClaimCLReward = useCallback(
+    (cl: number) => {
+      const reward = config.clRewards.find((r) => r.cl === cl);
+      if (reward?.type === 'card' && reward.cardId) {
+        const cardDef = config.cards.find((c) => c.id === reward.cardId);
+        if (cardDef) {
+          setRevealingCard(cardDef);
+          // Claim immediately so the state updates; the reveal overlay shows on top
+          claimCLReward(cl);
+          return;
+        }
+      }
+      claimCLReward(cl);
+    },
+    [config.clRewards, config.cards, claimCLReward],
+  );
 
   // Tutorial: force tab switch from TutorialOverlay
   const handleTutorialForceTab = useCallback((tab: Tab) => {
@@ -301,7 +322,7 @@ function CreaturesGame() {
               <GrimoirePanel
                 state={state}
                 config={config}
-                onClaimCLReward={claimCLReward}
+                onClaimCLReward={handleClaimCLReward}
                 onCompleteQuest={completeQuest}
                 onClaimWeeklyReward={claimWeeklyReward}
                 onClaimLoginStreakReward={claimLoginStreakReward}
@@ -340,6 +361,16 @@ function CreaturesGame() {
               openPack(cards, state.pendingPackRewards[0]);
               dismissPackReward(state.pendingPackRewards[0]);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* New Card Reveal Overlay */}
+      <AnimatePresence>
+        {revealingCard && (
+          <NewCardReveal
+            card={revealingCard}
+            onDismiss={() => setRevealingCard(null)}
           />
         )}
       </AnimatePresence>

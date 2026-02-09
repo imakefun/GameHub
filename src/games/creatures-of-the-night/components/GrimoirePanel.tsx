@@ -125,10 +125,10 @@ export function GrimoirePanel({
                   {entry.cl}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-medium ${unlocked ? 'text-white' : 'text-surface-400'}`}>
-                    {entry.cardName}
+                  <p className={`font-medium ${claimed ? 'text-white' : 'text-surface-400'}`}>
+                    {claimed ? entry.cardName : '???'}
                   </p>
-                  <p className="text-surface-500">New Card</p>
+                  <p className="text-surface-500">{claimed ? 'Collected' : 'New Card'}</p>
                 </div>
                 {canClaim && (
                   <button

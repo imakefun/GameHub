@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { OwnedCard, GameConfig, CardType } from '../types';
+import type { OwnedCard, GameConfig, CardType, CardDefinition, UpgradeTier } from '../types';
 import {
   CARD_TYPE_INFO,
   TIER_LABELS,
@@ -13,6 +13,7 @@ import {
   UPGRADE_TIER_PRODUCTION_BONUS,
 } from '../types';
 import { CardComponent } from './CardComponent';
+import { UpgradeReveal } from './UpgradeReveal';
 import { getNextUpgradeTier, getEffectiveGeneration } from '../hooks/useGameState';
 
 interface CollectionPanelProps {
@@ -49,6 +50,11 @@ export function CollectionPanel({
   const [sort, setSort] = useState<SortType>('tier');
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [swapPickerCardIndex, setSwapPickerCardIndex] = useState<number | null>(null);
+  const [upgradeReveal, setUpgradeReveal] = useState<{
+    card: CardDefinition;
+    fromTier: UpgradeTier;
+    toTier: Exclude<UpgradeTier, 'base'>;
+  } | null>(null);
 
   const cryptIsFull = ownedCards.filter((c) => c.placedInCrypt).length >= cryptSlots;
 
@@ -299,7 +305,11 @@ export function CollectionPanel({
                           </p>
                         </div>
                         <button
-                          onClick={() => onUpgrade(index)}
+                          onClick={() => {
+                            setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: nextTier });
+                            onUpgrade(index);
+                            setSelectedCard(null);
+                          }}
                           disabled={!canUpgrade}
                           className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                             canUpgrade
@@ -364,6 +374,18 @@ export function CollectionPanel({
             </motion.div>
           );
         })()}
+      </AnimatePresence>
+
+      {/* Upgrade Reveal Overlay */}
+      <AnimatePresence>
+        {upgradeReveal && (
+          <UpgradeReveal
+            card={upgradeReveal.card}
+            fromTier={upgradeReveal.fromTier}
+            toTier={upgradeReveal.toTier}
+            onDismiss={() => setUpgradeReveal(null)}
+          />
+        )}
       </AnimatePresence>
 
       {/* Swap picker modal */}

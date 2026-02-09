@@ -854,6 +854,13 @@ function createGameReducer(config: GameConfig) {
 
         const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'open_pack');
 
+        // New card discoveries grant +1 CL each
+        const packNewCards = newOwned.length;
+        const packNewCL = state.collectionLevel + packNewCards;
+        const packClFields = packNewCards > 0
+          ? deriveCLFields(packNewCL, config, state.unlockedFeatures, state.purchasedCryptSlots)
+          : {};
+
         return {
           ...state,
           currencies: {
@@ -861,6 +868,8 @@ function createGameReducer(config: GameConfig) {
             voidEnergy: state.currencies.voidEnergy + voidEnergyGained,
           },
           ownedCards: [...cards, ...newOwned],
+          collectionLevel: packNewCL,
+          ...packClFields,
           dailyQuests: dq,
           playerStats: {
             ...state.playerStats,
@@ -1019,11 +1028,20 @@ function createGameReducer(config: GameConfig) {
           // tome / premiumTome / special are handled by the UI layer
         }
 
+        // New card discoveries grant +1 CL each
+        const discoveredCards = reward.type === 'card' ? 1 : 0;
+        const newCLAfterClaim = state.collectionLevel + discoveredCards;
+        const clFieldsClaim = discoveredCards > 0
+          ? deriveCLFields(newCLAfterClaim, config, state.unlockedFeatures, state.purchasedCryptSlots)
+          : {};
+
         return {
           ...state,
           currencies: newCur,
           ownedCards: newCards,
           clRewardsClaimed: [...state.clRewardsClaimed, action.cl],
+          collectionLevel: newCLAfterClaim,
+          ...clFieldsClaim,
           playerStats: {
             ...state.playerStats,
             totalCardsCollected:
