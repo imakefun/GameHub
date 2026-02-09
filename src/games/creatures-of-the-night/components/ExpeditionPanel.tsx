@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { OwnedCard, GameConfig, ActiveExpedition } from '../types';
-import { CardComponent } from './CardComponent';
+import { UPGRADE_TIER_COLORS, UPGRADE_TIER_LABELS, CARD_TYPE_INFO, TIER_COLORS, TIER_LABELS } from '../types';
 
 interface ExpeditionPanelProps {
   ownedCards: OwnedCard[];
@@ -9,7 +9,7 @@ interface ExpeditionPanelProps {
   collectionLevel: number;
   activeExpeditions: ActiveExpedition[];
   lunarCrystals: number;
-  onStartExpedition: (zoneId: string, cardIndices: number[], duration: number) => void;
+  onStartExpedition: (zoneId: string, cardIndices: number[]) => void;
   onRushExpedition: (expeditionIndex: number) => void;
 }
 
@@ -21,10 +21,6 @@ function formatDuration(seconds: number): string {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
-}
-
-function formatDurationRange(range: [number, number]): string {
-  return `${formatDuration(range[0])} - ${formatDuration(range[1])}`;
 }
 
 const RISK_LABELS: Record<string, { label: string; color: string }> = {
@@ -45,15 +41,15 @@ export function ExpeditionPanel({
 }: ExpeditionPanelProps) {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
-  const [chosenDuration, setChosenDuration] = useState<number>(0);
 
   const zone = selectedZone ? config.expeditions.find((z) => z.id === selectedZone) : null;
 
+  // Cards available for expeditions: not on expedition, not fatigued, and NOT placed in crypt
   const availableCards = ownedCards
     .map((card, index) => ({ card, index }))
-    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil);
+    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil && !card.placedInCrypt);
 
-  const canStart = zone && selectedCards.size >= zone.requirements.minCards && chosenDuration > 0;
+  const canStart = zone && selectedCards.size >= zone.requirements.minCards;
 
   const handleToggleCard = (index: number) => {
     setSelectedCards((prev) => {
@@ -68,15 +64,13 @@ export function ExpeditionPanel({
   };
 
   const handleSelectZone = (zoneId: string) => {
-    const z = config.expeditions.find((e) => e.id === zoneId);
     setSelectedZone(zoneId);
     setSelectedCards(new Set());
-    if (z) setChosenDuration(z.durationRange[0]);
   };
 
   const handleStart = () => {
     if (!zone || !canStart) return;
-    onStartExpedition(zone.id, Array.from(selectedCards), chosenDuration);
+    onStartExpedition(zone.id, Array.from(selectedCards));
     setSelectedZone(null);
     setSelectedCards(new Set());
   };
@@ -150,7 +144,7 @@ export function ExpeditionPanel({
           {config.expeditions.map((expZone) => {
             const unlocked = collectionLevel >= expZone.unlockCL;
             const eligibleCount = ownedCards.filter(
-              (c) => !c.isOnExpedition && !c.fatigueUntil,
+              (c) => !c.isOnExpedition && !c.fatigueUntil && !c.placedInCrypt,
             ).length;
             const meetsCards = eligibleCount >= expZone.requirements.minCards;
             const isAvailable = unlocked && meetsCards;
@@ -185,7 +179,7 @@ export function ExpeditionPanel({
                       {expZone.requirements.requiredTierCount} {expZone.requirements.requiredTier}
                     </span>
                   )}
-                  <span>{formatDurationRange(expZone.durationRange)}</span>
+                  <span>{formatDuration(expZone.duration)}</span>
                   {expZone.requirements.requiredTypes?.map((t) => (
                     <span key={t} className="text-purple-400">Needs {t}</span>
                   ))}
@@ -219,7 +213,7 @@ export function ExpeditionPanel({
             <div>
               <h3 className="font-bold">{zone?.name}</h3>
               <p className="text-xs text-surface-400">
-                Select {zone?.requirements.minCards}+ cards to send
+                Select {zone?.requirements.minCards}+ cards &middot; {formatDuration(zone?.duration ?? 0)}
               </p>
             </div>
             <button
@@ -233,58 +227,86 @@ export function ExpeditionPanel({
             </button>
           </div>
 
-          {/* Duration slider */}
-          {zone && (
-            <div className="p-3 bg-surface-800/50 rounded-lg">
-              <label className="text-xs text-surface-400 block mb-1">
-                Duration: {formatDuration(chosenDuration)}
-              </label>
-              <input
-                type="range"
-                min={zone.durationRange[0]}
-                max={zone.durationRange[1]}
-                step={300}
-                value={chosenDuration}
-                onChange={(e) => setChosenDuration(Number(e.target.value))}
-                className="w-full accent-purple-500"
-              />
-              <div className="flex justify-between text-xs text-surface-500 mt-1">
-                <span>{formatDuration(zone.durationRange[0])}</span>
-                <span>{formatDuration(zone.durationRange[1])}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1.5 max-h-60 overflow-y-auto">
+          {/* Card art grid */}
+          <div className="grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
             {availableCards.map(({ card, index }) => {
               const def = config.cards.find((c) => c.id === card.definitionId);
               if (!def) return null;
               const selected = selectedCards.has(index);
+              const upgradeColor = UPGRADE_TIER_COLORS[card.upgradeTier];
+              const tierColor = TIER_COLORS[def.tier];
+              const typeInfo = CARD_TYPE_INFO[def.type];
 
               return (
-                <button
+                <motion.button
                   key={index}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => handleToggleCard(index)}
-                  className={`w-full flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
+                  className={`relative rounded-xl overflow-hidden border-2 transition-all ${
                     selected
-                      ? 'border-purple-500/50 bg-purple-500/10'
-                      : 'border-surface-700/50 hover:border-surface-600'
+                      ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-black'
+                      : 'hover:brightness-110'
                   }`}
+                  style={{
+                    borderColor: selected ? upgradeColor : `${upgradeColor}40`,
+                    background: `linear-gradient(180deg, ${upgradeColor}15 0%, rgba(0,0,0,0.4) 100%)`,
+                  }}
                 >
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                    selected ? 'border-purple-500 bg-purple-500' : 'border-surface-600'
-                  }`}>
-                    {selected && <span className="text-white text-xs">✓</span>}
+                  {/* Selection checkmark */}
+                  {selected && (
+                    <div
+                      className="absolute top-1 right-1 z-20 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: upgradeColor }}
+                    >
+                      <span className="text-black text-xs font-bold">✓</span>
+                    </div>
+                  )}
+
+                  {/* Upgrade tier badge */}
+                  {card.upgradeTier !== 'base' && (
+                    <div
+                      className="absolute top-1 left-1 z-20 text-[8px] font-bold px-1 py-0.5 rounded-full"
+                      style={{ background: `${upgradeColor}40`, color: upgradeColor }}
+                    >
+                      {UPGRADE_TIER_LABELS[card.upgradeTier]}
+                    </div>
+                  )}
+
+                  {/* Card art */}
+                  <div
+                    className="aspect-[3/4] flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${upgradeColor}10, rgba(0,0,0,0.3))`,
+                    }}
+                  >
+                    {def.artUrl ? (
+                      <img
+                        src={def.artUrl}
+                        alt={def.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl">{typeInfo.emoji}</span>
+                    )}
                   </div>
-                  <CardComponent
-                    card={card}
-                    definition={def}
-                    compact
-                  />
-                </button>
+
+                  {/* Card info footer */}
+                  <div className="p-1.5 text-center">
+                    <p className="text-[10px] font-medium truncate">{def.name}</p>
+                    <p className="text-[9px]" style={{ color: tierColor }}>
+                      {TIER_LABELS[def.tier]}
+                    </p>
+                  </div>
+                </motion.button>
               );
             })}
           </div>
+
+          {availableCards.length === 0 && (
+            <div className="text-center py-6 text-surface-500 text-sm">
+              No cards available. Remove cards from the crypt or wait for expeditions to return.
+            </div>
+          )}
 
           <button
             onClick={handleStart}
@@ -295,7 +317,7 @@ export function ExpeditionPanel({
                 : 'bg-surface-800 text-surface-500 cursor-not-allowed'
             }`}
           >
-            Start Expedition ({selectedCards.size}/{zone?.requirements.minCards} cards, {formatDuration(chosenDuration)})
+            Start Expedition ({selectedCards.size}/{zone?.requirements.minCards} cards)
           </button>
         </div>
       )}
