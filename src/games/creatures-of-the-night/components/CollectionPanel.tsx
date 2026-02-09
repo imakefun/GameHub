@@ -9,7 +9,6 @@ import {
   UPGRADE_COSTS,
   UPGRADE_TIER_PRODUCTION_BONUS,
 } from '../types';
-import { CardComponent } from './CardComponent';
 import { UpgradeReveal } from './UpgradeReveal';
 import { getNextUpgradeTier, getEffectiveGeneration } from '../hooks/useGameState';
 
@@ -18,14 +17,13 @@ interface CollectionPanelProps {
   config: GameConfig;
   cryptSlots: number;
   currencies: { shadowEssence: number };
+  filter: 'all' | CardType;
+  sort: 'type' | 'upgrade';
   onPlaceCard: (index: number) => void;
   onSwapCard: (removeIndex: number, placeIndex: number) => void;
   onRemoveCard: (index: number) => void;
   onUpgrade: (index: number) => void;
 }
-
-type FilterType = 'all' | CardType;
-type SortType = 'type' | 'upgrade';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -33,18 +31,27 @@ function formatNumber(n: number): string {
   return Math.floor(n).toLocaleString();
 }
 
+// Higher tiers get thicker, glowing borders
+function borderStyle(tier: UpgradeTier, color: string) {
+  const idx = UPGRADE_TIER_ORDER.indexOf(tier);
+  if (idx <= 0) return { borderWidth: 1, borderColor: `${color}40`, boxShadow: 'none' };
+  if (idx <= 2) return { borderWidth: 2, borderColor: `${color}60`, boxShadow: `0 0 8px ${color}20` };
+  if (idx <= 4) return { borderWidth: 2, borderColor: `${color}80`, boxShadow: `0 0 16px ${color}30` };
+  return { borderWidth: 3, borderColor: color, boxShadow: `0 0 24px ${color}40` };
+}
+
 export function CollectionPanel({
   ownedCards,
   config,
   cryptSlots,
   currencies,
+  filter,
+  sort,
   onPlaceCard,
   onSwapCard,
   onRemoveCard,
   onUpgrade,
 }: CollectionPanelProps) {
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [sort, setSort] = useState<SortType>('upgrade');
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [swapPickerCardIndex, setSwapPickerCardIndex] = useState<number | null>(null);
   const [upgradeReveal, setUpgradeReveal] = useState<{
@@ -76,80 +83,94 @@ export function CollectionPanel({
       }
     });
 
-  const ownedTypes = new Set(
-    ownedCards
-      .map((c) => config.cards.find((d) => d.id === c.definitionId)?.type)
-      .filter(Boolean)
-  );
-
   const selectedItem = selectedCard !== null
     ? filteredCards.find((item) => item.index === selectedCard)
     : null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <span>📚</span> Shadowkeep
-          <span className="text-sm font-normal text-surface-400">
-            ({ownedCards.length} cards)
-          </span>
-        </h2>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortType)}
-          className="bg-surface-800 border border-surface-700 rounded-lg px-2 py-1 text-sm"
-        >
-          <option value="upgrade">Sort: Upgrade</option>
-          <option value="type">Sort: Type</option>
-        </select>
-      </div>
-
-      {/* Type filters */}
-      <div className="flex gap-1.5 flex-wrap">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-            filter === 'all'
-              ? 'bg-purple-500 text-white'
-              : 'bg-surface-800 text-surface-400 hover:bg-surface-700'
-          }`}
-        >
-          All
-        </button>
-        {Object.entries(CARD_TYPE_INFO)
-          .filter(([type]) => ownedTypes.has(type as CardType))
-          .map(([type, info]) => (
-            <button
-              key={type}
-              onClick={() => setFilter(type as FilterType)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                filter === type
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-surface-800 text-surface-400 hover:bg-surface-700'
-              }`}
-            >
-              {info.emoji} {info.label}
-            </button>
-          ))}
-      </div>
-
-      {/* Cards grid */}
+    <div className="space-y-3">
+      {/* Cards grid - Marvel Snap style 4-column art-focused */}
       {filteredCards.length === 0 ? (
-        <div className="text-center py-8 text-surface-400">
+        <div className="text-center py-12 text-surface-400">
           <p className="text-3xl mb-2">📭</p>
           <p>No cards found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-tutorial="collection-grid">
-          {filteredCards.map(({ card, def, index }) => (
-            <CardComponent
-              key={`${def.id}-${index}`}
-              card={card}
-              definition={def}
-              onClick={() => setSelectedCard(selectedCard === index ? null : index)}
-            />
-          ))}
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2" data-tutorial="collection-grid">
+          {filteredCards.map(({ card, def, index }) => {
+            const upgradeColor = UPGRADE_TIER_COLORS[card.upgradeTier];
+            const typeInfo = CARD_TYPE_INFO[def.type];
+            const border = borderStyle(card.upgradeTier, upgradeColor);
+            const isFatigued = card.fatigueUntil && Date.now() < card.fatigueUntil;
+
+            return (
+              <motion.button
+                key={`${def.id}-${index}`}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setSelectedCard(selectedCard === index ? null : index)}
+                className="relative rounded-xl overflow-hidden transition-all"
+                style={{
+                  borderWidth: border.borderWidth,
+                  borderStyle: 'solid',
+                  borderColor: border.borderColor,
+                  boxShadow: border.boxShadow,
+                  opacity: isFatigued ? 0.6 : 1,
+                }}
+              >
+                {/* Card art */}
+                <div
+                  className="aspect-[3/4] flex items-center justify-center"
+                  style={{
+                    background: `linear-gradient(180deg, ${upgradeColor}15 0%, rgba(0,0,0,0.5) 100%)`,
+                  }}
+                >
+                  {def.artUrl ? (
+                    <img
+                      src={def.artUrl}
+                      alt={def.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-4xl">{typeInfo.emoji}</span>
+                  )}
+                </div>
+
+                {/* Upgrade tier indicator - top right */}
+                {card.upgradeTier !== 'base' && (
+                  <div
+                    className="absolute top-1 right-1 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `${upgradeColor}60`, color: upgradeColor }}
+                  >
+                    {UPGRADE_TIER_LABELS[card.upgradeTier]}
+                  </div>
+                )}
+
+                {/* Status badges - top left */}
+                {card.isOnExpedition && (
+                  <div className="absolute top-1 left-1 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/70 text-blue-100">
+                    ⚔️
+                  </div>
+                )}
+                {card.placedInCrypt && !card.isOnExpedition && (
+                  <div className="absolute top-1 left-1 z-10 text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/70 text-purple-100">
+                    🏚️
+                  </div>
+                )}
+
+                {/* Card name overlay at bottom */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 px-1.5 py-1.5 text-center"
+                  style={{
+                    background: 'linear-gradient(transparent, rgba(0,0,0,0.85))',
+                  }}
+                >
+                  <p className="text-[11px] font-semibold leading-tight truncate text-white drop-shadow-lg">
+                    {def.name}
+                  </p>
+                </div>
+              </motion.button>
+            );
+          })}
         </div>
       )}
 
