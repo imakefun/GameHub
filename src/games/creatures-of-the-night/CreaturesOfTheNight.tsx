@@ -40,6 +40,7 @@ function CreaturesGame() {
     purchasePack,
     claimStarterTome,
     startExpedition,
+    collectExpedition,
     completeQuest,
     claimCLReward,
     claimWeeklyReward,
@@ -323,8 +324,10 @@ function CreaturesGame() {
                 config={config}
                 collectionLevel={state.collectionLevel}
                 activeExpeditions={state.activeExpeditions}
+                completedExpeditions={state.completedExpeditions}
                 lunarCrystals={state.currencies.lunarCrystals}
                 onStartExpedition={startExpedition}
+                onCollectExpedition={collectExpedition}
                 onRushExpedition={rushExpedition}
               />
             )}
