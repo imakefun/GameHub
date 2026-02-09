@@ -8,8 +8,10 @@ interface ExpeditionPanelProps {
   config: GameConfig;
   collectionLevel: number;
   activeExpeditions: ActiveExpedition[];
+  completedExpeditions: ActiveExpedition[];
   lunarCrystals: number;
   onStartExpedition: (zoneId: string, cardIndices: number[]) => void;
+  onCollectExpedition: (expeditionIndex: number) => void;
   onRushExpedition: (expeditionIndex: number) => void;
 }
 
@@ -35,8 +37,10 @@ export function ExpeditionPanel({
   config,
   collectionLevel,
   activeExpeditions,
+  completedExpeditions,
   lunarCrystals,
   onStartExpedition,
+  onCollectExpedition,
   onRushExpedition,
 }: ExpeditionPanelProps) {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
@@ -132,6 +136,51 @@ export function ExpeditionPanel({
                   })()}
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Completed expeditions - ready to collect */}
+      {completedExpeditions.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="font-semibold text-emerald-400 text-sm">Ready to Collect</h3>
+          {completedExpeditions.map((exp, i) => {
+            const expZone = config.expeditions.find((z) => z.id === exp.zoneId);
+            if (!expZone) return null;
+
+            return (
+              <motion.div
+                key={`completed-${i}`}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm">{expZone.name}</span>
+                  <span className="text-xs text-emerald-400">Complete!</span>
+                </div>
+                <div className="flex gap-2 text-xs text-surface-400 mb-2 flex-wrap">
+                  {expZone.rewards.shadowEssence && (
+                    <span>🌑 {expZone.rewards.shadowEssence[0]}-{expZone.rewards.shadowEssence[1]}</span>
+                  )}
+                  {expZone.rewards.soulShards && (
+                    <span>💎 {expZone.rewards.soulShards[0]}-{expZone.rewards.soulShards[1]}</span>
+                  )}
+                  {expZone.rewards.lunarCrystals && (
+                    <span>🌙 {expZone.rewards.lunarCrystals[0]}-{expZone.rewards.lunarCrystals[1]}</span>
+                  )}
+                  {expZone.rewards.voidEnergy && (
+                    <span>🔮 {expZone.rewards.voidEnergy[0]}-{expZone.rewards.voidEnergy[1]}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => onCollectExpedition(i)}
+                  className="w-full py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 transition-all"
+                >
+                  Collect Rewards
+                </button>
+              </motion.div>
             );
           })}
         </div>

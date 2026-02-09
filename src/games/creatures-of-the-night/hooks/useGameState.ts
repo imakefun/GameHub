@@ -9,6 +9,7 @@ import type {
   CosmicPhase,
   LunarPhase,
   UpgradeTier,
+  ActiveExpedition,
 } from '../types';
 import {
   TIER_DUPLICATE_SHARDS,
@@ -432,6 +433,7 @@ function createInitialState(config: GameConfig): GameState {
       lastLoginDate: new Date().toISOString().split('T')[0],
     },
     activeExpeditions: [],
+    completedExpeditions: [],
     starterTomeClaimed: false,
     unlockedFeatures: startClFields.unlockedFeatures,
     dailyQuests: assignDailyQuests(config.dailyQuestPool),
@@ -507,99 +509,15 @@ function createGameReducer(config: GameConfig) {
           };
         });
 
-        // --- Completed expeditions ---
-        const completedIndices: number[] = [];
-        let currencies = { ...state.currencies };
-        let expCompleted = 0;
-        const newPackRewards: string[] = [];
+        // --- Move finished expeditions to completedExpeditions (no auto-collect) ---
+        const finishedIndices: number[] = [];
+        const newlyCompleted: ActiveExpedition[] = [];
 
         state.activeExpeditions.forEach((exp, idx) => {
           if (now < exp.completesAt) return;
-          completedIndices.push(idx);
-          expCompleted++;
-
-          const zone = config.expeditions.find((z) => z.id === exp.zoneId);
-          if (!zone) return;
-
-          if (zone.rewards.shadowEssence) {
-            const [min, max] = zone.rewards.shadowEssence;
-            currencies.shadowEssence += min + Math.random() * (max - min);
-          }
-          if (zone.rewards.lunarCrystals) {
-            const [min, max] = zone.rewards.lunarCrystals;
-            currencies.lunarCrystals += Math.floor(
-              min + Math.random() * (max - min),
-            );
-          }
-          if (zone.rewards.voidEnergy) {
-            const [min, max] = zone.rewards.voidEnergy;
-            currencies.voidEnergy += Math.floor(
-              min + Math.random() * (max - min),
-            );
-          }
-
-          if (zone.rewards.soulShards) {
-            const [min, max] = zone.rewards.soulShards;
-            const total = Math.floor(min + Math.random() * (max - min));
-            const per = Math.floor(total / exp.cardIds.length);
-            let rem = total - per * exp.cardIds.length;
-            for (const ci of exp.cardIds) {
-              if (!updatedCards[ci]) continue;
-              const bonus = rem > 0 ? 1 : 0;
-              if (rem > 0) rem--;
-              updatedCards[ci] = {
-                ...updatedCards[ci],
-                soulShards: updatedCards[ci].soulShards + per + bonus,
-              };
-            }
-          }
-
-          const expPack = config.packs.find(
-            (p) => p.availability === 'expedition' && p.expeditionId === exp.zoneId,
-          );
-          if (expPack) {
-            newPackRewards.push(expPack.id);
-          }
-
-          if (Math.random() * 100 < zone.riskPercent) {
-            const riskEnd = now + zone.riskDuration * 1000;
-            for (const ci of exp.cardIds) {
-              if (!updatedCards[ci]) continue;
-              switch (zone.riskEffect) {
-                case 'fatigue':
-                case 'damage':
-                case 'curse':
-                  updatedCards[ci] = {
-                    ...updatedCards[ci],
-                    fatigueUntil: riskEnd,
-                  };
-                  break;
-                case 'card_loss':
-                  updatedCards[ci] = {
-                    ...updatedCards[ci],
-                    expeditionReturnTime: riskEnd,
-                    placedInCrypt: false,
-                  };
-                  break;
-              }
-            }
-          }
-
-          for (const ci of exp.cardIds) {
-            if (updatedCards[ci] && !updatedCards[ci].expeditionReturnTime) {
-              updatedCards[ci] = {
-                ...updatedCards[ci],
-                isOnExpedition: false,
-              };
-            }
-          }
+          finishedIndices.push(idx);
+          newlyCompleted.push(exp);
         });
-
-        if (expCompleted > 0) {
-          dailyQuests = trackQuestProgress(
-            dailyQuests, config.dailyQuestPool, 'expedition', expCompleted
-          );
-        }
 
         // --- Expire fatigue / expedition-return timers ---
         updatedCards = updatedCards.map((card) => {
@@ -616,13 +534,12 @@ function createGameReducer(config: GameConfig) {
         return {
           ...state,
           ownedCards: updatedCards,
-          currencies,
           activeExpeditions: state.activeExpeditions.filter(
-            (_, i) => !completedIndices.includes(i),
+            (_, i) => !finishedIndices.includes(i),
           ),
-          pendingPackRewards: [
-            ...state.pendingPackRewards,
-            ...newPackRewards,
+          completedExpeditions: [
+            ...state.completedExpeditions,
+            ...newlyCompleted,
           ],
           dailyQuests,
           dailyQuestsLastReset,
@@ -631,8 +548,6 @@ function createGameReducer(config: GameConfig) {
           playerStats: {
             ...state.playerStats,
             playTime: state.playerStats.playTime + elapsed,
-            totalExpeditionsCompleted:
-              state.playerStats.totalExpeditionsCompleted + expCompleted,
           },
           lastTick: now,
         };
@@ -1093,6 +1008,105 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
+      // ======================== COLLECT_EXPEDITION ========================
+      case 'COLLECT_EXPEDITION': {
+        const exp = state.completedExpeditions[action.expeditionIndex];
+        if (!exp) return state;
+
+        const zone = config.expeditions.find((z) => z.id === exp.zoneId);
+        if (!zone) return state;
+
+        const now = Date.now();
+        const newCurrencies = { ...state.currencies };
+
+        if (zone.rewards.shadowEssence) {
+          const [min, max] = zone.rewards.shadowEssence;
+          newCurrencies.shadowEssence += min + Math.random() * (max - min);
+        }
+        if (zone.rewards.lunarCrystals) {
+          const [min, max] = zone.rewards.lunarCrystals;
+          newCurrencies.lunarCrystals += Math.floor(min + Math.random() * (max - min));
+        }
+        if (zone.rewards.voidEnergy) {
+          const [min, max] = zone.rewards.voidEnergy;
+          newCurrencies.voidEnergy += Math.floor(min + Math.random() * (max - min));
+        }
+
+        let collectCards = [...state.ownedCards];
+
+        if (zone.rewards.soulShards) {
+          const [min, max] = zone.rewards.soulShards;
+          const total = Math.floor(min + Math.random() * (max - min));
+          const per = Math.floor(total / exp.cardIds.length);
+          let rem = total - per * exp.cardIds.length;
+          for (const ci of exp.cardIds) {
+            if (!collectCards[ci]) continue;
+            const bonus = rem > 0 ? 1 : 0;
+            if (rem > 0) rem--;
+            collectCards[ci] = {
+              ...collectCards[ci],
+              soulShards: collectCards[ci].soulShards + per + bonus,
+            };
+          }
+        }
+
+        const newPackRewards: string[] = [];
+        const expPack = config.packs.find(
+          (p) => p.availability === 'expedition' && p.expeditionId === exp.zoneId,
+        );
+        if (expPack) {
+          newPackRewards.push(expPack.id);
+        }
+
+        // Apply risk effects
+        if (Math.random() * 100 < zone.riskPercent) {
+          const riskEnd = now + zone.riskDuration * 1000;
+          for (const ci of exp.cardIds) {
+            if (!collectCards[ci]) continue;
+            switch (zone.riskEffect) {
+              case 'fatigue':
+              case 'damage':
+              case 'curse':
+                collectCards[ci] = { ...collectCards[ci], fatigueUntil: riskEnd };
+                break;
+              case 'card_loss':
+                collectCards[ci] = {
+                  ...collectCards[ci],
+                  expeditionReturnTime: riskEnd,
+                  placedInCrypt: false,
+                };
+                break;
+            }
+          }
+        }
+
+        // Return cards (unless card_loss)
+        for (const ci of exp.cardIds) {
+          if (collectCards[ci] && !collectCards[ci].expeditionReturnTime) {
+            collectCards[ci] = { ...collectCards[ci], isOnExpedition: false };
+          }
+        }
+
+        const dqCollect = trackQuestProgress(
+          state.dailyQuests, config.dailyQuestPool, 'expedition',
+        );
+
+        return {
+          ...state,
+          ownedCards: collectCards,
+          currencies: newCurrencies,
+          completedExpeditions: state.completedExpeditions.filter(
+            (_, i) => i !== action.expeditionIndex,
+          ),
+          pendingPackRewards: [...state.pendingPackRewards, ...newPackRewards],
+          dailyQuests: dqCollect,
+          playerStats: {
+            ...state.playerStats,
+            totalExpeditionsCompleted: state.playerStats.totalExpeditionsCompleted + 1,
+          },
+        };
+      }
+
       // ======================== RUSH_EXPEDITION ========================
       case 'RUSH_EXPEDITION': {
         const exp = state.activeExpeditions[action.expeditionIndex];
@@ -1412,6 +1426,12 @@ export function useGameState(config: GameConfig) {
     [],
   );
 
+  const collectExpedition = useCallback(
+    (expeditionIndex: number) =>
+      dispatch({ type: 'COLLECT_EXPEDITION', expeditionIndex }),
+    [],
+  );
+
   const rushExpedition = useCallback(
     (expeditionIndex: number) =>
       dispatch({ type: 'RUSH_EXPEDITION', expeditionIndex }),
@@ -1458,6 +1478,7 @@ export function useGameState(config: GameConfig) {
     purchasePack,
     claimStarterTome,
     startExpedition,
+    collectExpedition,
     completeQuest,
     claimCLReward,
     claimWeeklyReward,

@@ -304,6 +304,7 @@ export interface GameState {
     lastLoginDate: string;
   };
   activeExpeditions: ActiveExpedition[];
+  completedExpeditions: ActiveExpedition[];  // finished but not yet collected
   starterTomeClaimed: boolean;
   unlockedFeatures: string[];
   // Daily quests
@@ -340,6 +341,7 @@ export type GameAction =
   | { type: 'COMPLETE_QUEST'; questIndex: number }
   | { type: 'CLAIM_CL_REWARD'; cl: number }
   | { type: 'CLAIM_WEEKLY_REWARD'; tier: number }
+  | { type: 'COLLECT_EXPEDITION'; expeditionIndex: number }
   | { type: 'RUSH_EXPEDITION'; expeditionIndex: number }
   | { type: 'BUY_CRYPT_SLOT' }
   | { type: 'CLAIM_LOGIN_STREAK_REWARD'; milestone: number }
