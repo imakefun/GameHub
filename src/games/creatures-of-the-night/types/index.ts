@@ -217,7 +217,7 @@ export interface ExpeditionZone {
     requiredTier?: CardTier;
     requiredTierCount?: number;
   };
-  durationRange: [number, number]; // [min, max] seconds
+  duration: number; // fixed duration in seconds
   rewards: {
     shadowEssence?: [number, number];
     soulShards?: [number, number];
@@ -274,7 +274,6 @@ export interface ActiveExpedition {
   cardIds: number[];
   startedAt: number;
   completesAt: number;
-  chosenDuration: number;
 }
 
 // --- Feature Unlocks ---
@@ -337,7 +336,7 @@ export type GameAction =
   | { type: 'OPEN_PACK'; cards: CardDefinition[]; packId: string }
   | { type: 'PURCHASE_PACK'; packId: string }
   | { type: 'CLAIM_STARTER_TOME' }
-  | { type: 'START_EXPEDITION'; zoneId: string; cardIndices: number[]; duration: number }
+  | { type: 'START_EXPEDITION'; zoneId: string; cardIndices: number[] }
   | { type: 'COMPLETE_QUEST'; questIndex: number }
   | { type: 'CLAIM_CL_REWARD'; cl: number }
   | { type: 'CLAIM_WEEKLY_REWARD'; tier: number }

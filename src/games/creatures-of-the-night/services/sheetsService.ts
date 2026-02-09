@@ -174,10 +174,7 @@ function parseExpeditions(rows: Record<string, string>[]): ExpeditionZone[] {
           requiredTier: row['requiredTier'] ? (row['requiredTier'] as CardTier) : undefined,
           requiredTierCount: row['requiredTierCount'] ? parseInt(row['requiredTierCount']) : undefined,
         },
-        durationRange: [
-          parseInt(row['durationMin'] || '900'),
-          parseInt(row['durationMax'] || '3600'),
-        ] as [number, number],
+        duration: parseInt(row['duration'] || row['durationMin'] || '900'),
         rewards: {
           shadowEssence: row['rewardSEMin'] ? [parseInt(row['rewardSEMin']), parseInt(row['rewardSEMax'] || row['rewardSEMin'])] as [number, number] : undefined,
           soulShards: row['rewardSSMin'] ? [parseInt(row['rewardSSMin']), parseInt(row['rewardSSMax'] || row['rewardSSMin'])] as [number, number] : undefined,

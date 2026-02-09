@@ -912,9 +912,12 @@ function createGameReducer(config: GameConfig) {
         const zone = config.expeditions.find((z) => z.id === action.zoneId);
         if (!zone) return state;
 
-        const { duration } = action;
-        if (duration < zone.durationRange[0] || duration > zone.durationRange[1])
-          return state;
+        // Prevent sending cards that are placed in the crypt
+        const validIndices = action.cardIndices.filter((i) => {
+          const c = state.ownedCards[i];
+          return c && !c.isOnExpedition && !c.placedInCrypt;
+        });
+        if (validIndices.length < zone.requirements.minCards) return state;
 
         const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'expedition');
 
@@ -922,7 +925,7 @@ function createGameReducer(config: GameConfig) {
         return {
           ...state,
           ownedCards: state.ownedCards.map((c, i) =>
-            action.cardIndices.includes(i)
+            validIndices.includes(i)
               ? { ...c, isOnExpedition: true }
               : c,
           ),
@@ -930,10 +933,9 @@ function createGameReducer(config: GameConfig) {
             ...state.activeExpeditions,
             {
               zoneId: zone.id,
-              cardIds: action.cardIndices,
+              cardIds: validIndices,
               startedAt: now,
-              completesAt: now + duration * 1000,
-              chosenDuration: duration,
+              completesAt: now + zone.duration * 1000,
             },
           ],
           dailyQuests: dq,
@@ -1379,8 +1381,8 @@ export function useGameState(config: GameConfig) {
   );
 
   const startExpedition = useCallback(
-    (zoneId: string, cardIndices: number[], duration: number) =>
-      dispatch({ type: 'START_EXPEDITION', zoneId, cardIndices, duration }),
+    (zoneId: string, cardIndices: number[]) =>
+      dispatch({ type: 'START_EXPEDITION', zoneId, cardIndices }),
     [],
   );
 
