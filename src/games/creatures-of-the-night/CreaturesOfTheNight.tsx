@@ -9,7 +9,7 @@ import {
   Cloud,
   Database,
 } from 'lucide-react';
-import type { CardDefinition, CLReward } from './types';
+import type { CardDefinition, CLReward, DailyQuest } from './types';
 import { useGameState } from './hooks/useGameState';
 import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
@@ -21,6 +21,7 @@ import { GrimoirePanel } from './components/GrimoirePanel';
 import { PackOpening } from './components/PackOpening';
 import { NewCardReveal } from './components/NewCardReveal';
 import { RewardReveal } from './components/RewardReveal';
+import { QuestRewardReveal } from './components/QuestRewardReveal';
 import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
 import { isNightTime, getLunarPhase } from './hooks/useGameState';
 
@@ -57,6 +58,7 @@ function CreaturesGame() {
   const [showSettings, setShowSettings] = useState(false);
   const [revealingCard, setRevealingCard] = useState<CardDefinition | null>(null);
   const [revealingReward, setRevealingReward] = useState<CLReward | null>(null);
+  const [revealingQuestReward, setRevealingQuestReward] = useState<DailyQuest | null>(null);
 
   // Wrap claimCLReward: show a celebration overlay for every reward type
   const handleClaimCLReward = useCallback(
@@ -82,6 +84,22 @@ function CreaturesGame() {
       setRevealingReward(reward);
     },
     [config.clRewards, config.cards, claimCLReward],
+  );
+
+  // Wrap completeQuest: show a celebration overlay for quest rewards
+  const handleCompleteQuest = useCallback(
+    (questIndex: number) => {
+      const quest = state.dailyQuests[questIndex];
+      if (!quest) return;
+      const questDef = config.dailyQuestPool.find((q) => q.id === quest.questId);
+      if (!questDef) {
+        completeQuest(questIndex);
+        return;
+      }
+      completeQuest(questIndex);
+      setRevealingQuestReward(questDef);
+    },
+    [state.dailyQuests, config.dailyQuestPool, completeQuest],
   );
 
   // Tutorial: force tab switch from TutorialOverlay
@@ -336,7 +354,7 @@ function CreaturesGame() {
                 state={state}
                 config={config}
                 onClaimCLReward={handleClaimCLReward}
-                onCompleteQuest={completeQuest}
+                onCompleteQuest={handleCompleteQuest}
                 onClaimWeeklyReward={claimWeeklyReward}
                 onClaimLoginStreakReward={claimLoginStreakReward}
               />
@@ -394,6 +412,17 @@ function CreaturesGame() {
           <RewardReveal
             reward={revealingReward}
             onDismiss={() => setRevealingReward(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Quest Reward Reveal Overlay */}
+      <AnimatePresence>
+        {revealingQuestReward && (
+          <QuestRewardReveal
+            questDescription={revealingQuestReward.description}
+            rewards={revealingQuestReward.rewards}
+            onDismiss={() => setRevealingQuestReward(null)}
           />
         )}
       </AnimatePresence>
