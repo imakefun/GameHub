@@ -17,6 +17,8 @@ import {
   UPGRADE_TIER_ORDER,
   UPGRADE_COSTS,
   UPGRADE_TIER_PRODUCTION_BONUS,
+  LC_ESSENCE_RATE,
+  LC_SHARDS_RATE,
 } from '../types';
 
 const STORAGE_KEY = 'creatures-of-the-night-save';
@@ -689,35 +691,79 @@ function createGameReducer(config: GameConfig) {
         const card = state.ownedCards[action.cardIndex];
         if (!card) return state;
 
-        const nextTier = getNextUpgradeTier(card.upgradeTier);
-        if (!nextTier) return state; // already at cosmic
+        // Determine which tiers to upgrade through
+        const currentIdx = UPGRADE_TIER_ORDER.indexOf(card.upgradeTier);
+        const targetTier = action.targetTier ?? getNextUpgradeTier(card.upgradeTier);
+        if (!targetTier) return state; // already at cosmic
+        const targetIdx = UPGRADE_TIER_ORDER.indexOf(targetTier);
+        if (targetIdx <= currentIdx) return state;
 
-        const cost = UPGRADE_COSTS[nextTier];
-        if (card.soulShards < cost.shards) return state;
-        if (state.currencies.shadowEssence < cost.shadowEssence) return state;
+        // Sum cumulative costs across all tiers being upgraded
+        let totalEssence = 0;
+        let totalShards = 0;
+        let totalCL = 0;
+        for (let i = currentIdx + 1; i <= targetIdx; i++) {
+          const tier = UPGRADE_TIER_ORDER[i] as Exclude<UpgradeTier, 'base'>;
+          const c = UPGRADE_COSTS[tier];
+          totalEssence += c.shadowEssence;
+          totalShards += c.shards;
+          totalCL += c.clGain;
+        }
 
-        const newCL = state.collectionLevel + cost.clGain;
+        // Check affordability — with optional lunar crystal fallback
+        const essenceShort = Math.max(0, totalEssence - state.currencies.shadowEssence);
+        const shardsShort = Math.max(0, totalShards - card.soulShards);
 
+        if (essenceShort > 0 || shardsShort > 0) {
+          if (!action.useLunarCrystals) return state;
+          // Calculate LC needed to cover shortfalls
+          const lcForEssence = Math.ceil(essenceShort / LC_ESSENCE_RATE);
+          const lcForShards = Math.ceil(shardsShort / LC_SHARDS_RATE);
+          const lcNeeded = lcForEssence + lcForShards;
+          if (state.currencies.lunarCrystals < lcNeeded) return state;
+
+          // Spend LC and convert to resources, then deduct costs
+          const essenceFromLC = lcForEssence * LC_ESSENCE_RATE;
+          const shardsFromLC = lcForShards * LC_SHARDS_RATE;
+
+          const newCL = state.collectionLevel + totalCL;
+          const newCards = state.ownedCards.map((c, i) =>
+            i === action.cardIndex
+              ? { ...c, upgradeTier: targetTier, soulShards: c.soulShards + shardsFromLC - totalShards }
+              : c,
+          );
+          const clFields = deriveCLFields(newCL, config, state.unlockedFeatures, state.purchasedCryptSlots);
+          const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'upgrade');
+
+          return {
+            ...state,
+            currencies: {
+              ...state.currencies,
+              shadowEssence: state.currencies.shadowEssence + essenceFromLC - totalEssence,
+              lunarCrystals: state.currencies.lunarCrystals - lcNeeded,
+            },
+            ownedCards: newCards,
+            collectionLevel: newCL,
+            dailyQuests: dq,
+            ...clFields,
+          };
+        }
+
+        // Standard upgrade — can afford everything
+        const newCL = state.collectionLevel + totalCL;
         const newCards = state.ownedCards.map((c, i) =>
           i === action.cardIndex
-            ? { ...c, upgradeTier: nextTier, soulShards: c.soulShards - cost.shards }
+            ? { ...c, upgradeTier: targetTier, soulShards: c.soulShards - totalShards }
             : c,
         );
-
-        const clFields = deriveCLFields(
-          newCL,
-          config,
-          state.unlockedFeatures,
-          state.purchasedCryptSlots,
-        );
-
+        const clFields = deriveCLFields(newCL, config, state.unlockedFeatures, state.purchasedCryptSlots);
         const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'upgrade');
 
         return {
           ...state,
           currencies: {
             ...state.currencies,
-            shadowEssence: state.currencies.shadowEssence - cost.shadowEssence,
+            shadowEssence: state.currencies.shadowEssence - totalEssence,
           },
           ownedCards: newCards,
           collectionLevel: newCL,
@@ -1376,7 +1422,8 @@ export function useGameState(config: GameConfig) {
   );
 
   const upgradeCard = useCallback(
-    (cardIndex: number) => dispatch({ type: 'UPGRADE_CARD', cardIndex }),
+    (cardIndex: number, targetTier?: Exclude<UpgradeTier, 'base'>, useLunarCrystals?: boolean) =>
+      dispatch({ type: 'UPGRADE_CARD', cardIndex, targetTier, useLunarCrystals }),
     [],
   );
 

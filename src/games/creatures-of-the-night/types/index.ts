@@ -74,6 +74,10 @@ export const UPGRADE_COSTS: Record<Exclude<UpgradeTier, 'base'>, UpgradeCost> = 
   cosmic: { shadowEssence: 500, shards: 50, clGain: 10 },
 };
 
+// Lunar Crystal conversion rates for covering upgrade shortfalls
+export const LC_ESSENCE_RATE = 100; // 1 LC = 100 Shadow Essence
+export const LC_SHARDS_RATE = 10;   // 1 LC = 10 Soul Shards
+
 // Production bonus per upgrade tier (modest boost to reward upgrading)
 export const UPGRADE_TIER_PRODUCTION_BONUS: Record<UpgradeTier, number> = {
   base: 1.0,
@@ -333,7 +337,7 @@ export type GameAction =
   | { type: 'PLACE_CARD'; cardIndex: number }
   | { type: 'SWAP_CARD'; removeIndex: number; placeIndex: number }
   | { type: 'REMOVE_CARD'; cardIndex: number }
-  | { type: 'UPGRADE_CARD'; cardIndex: number }
+  | { type: 'UPGRADE_CARD'; cardIndex: number; targetTier?: Exclude<UpgradeTier, 'base'>; useLunarCrystals?: boolean }
   | { type: 'OPEN_PACK'; cards: CardDefinition[]; packId: string }
   | { type: 'PURCHASE_PACK'; packId: string }
   | { type: 'CLAIM_STARTER_TOME' }
