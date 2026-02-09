@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { OwnedCard, GameConfig, CardType } from '../types';
-import { CARD_TYPE_INFO, TIER_COLORS, TIER_LABELS, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS } from '../types';
+import { CARD_TYPE_INFO, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS } from '../types';
 import { CardComponent } from './CardComponent';
 
 interface CryptBoardProps {
@@ -193,8 +193,8 @@ export function CryptBoard({
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-sm rounded-2xl border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
                 style={{
-                  borderColor: `${TIER_COLORS[def.tier]}40`,
-                  background: `linear-gradient(180deg, ${TIER_COLORS[def.tier]}15, rgba(15,23,42,0.98))`,
+                  borderColor: `${UPGRADE_TIER_COLORS[card.upgradeTier]}40`,
+                  background: `linear-gradient(180deg, ${UPGRADE_TIER_COLORS[card.upgradeTier]}15, rgba(15,23,42,0.98))`,
                 }}
               >
                 {/* Card header */}
@@ -209,11 +209,8 @@ export function CryptBoard({
                     <div className="text-5xl mb-2">{CARD_TYPE_INFO[def.type].emoji}</div>
                   )}
                   <h3 className="text-xl font-bold">{def.name}</h3>
-                  <p className="text-sm" style={{ color: TIER_COLORS[def.tier] }}>
-                    {TIER_LABELS[def.tier]} &middot;{' '}
-                    <span style={{ color: UPGRADE_TIER_COLORS[card.upgradeTier] }}>
-                      {UPGRADE_TIER_LABELS[card.upgradeTier]}
-                    </span>
+                  <p className="text-sm" style={{ color: UPGRADE_TIER_COLORS[card.upgradeTier] }}>
+                    {UPGRADE_TIER_LABELS[card.upgradeTier]}
                   </p>
                 </div>
 
@@ -256,7 +253,7 @@ export function CryptBoard({
                       }}
                       className="w-full py-2.5 rounded-lg text-sm font-semibold"
                       style={{
-                        background: `linear-gradient(135deg, ${TIER_COLORS[def.tier]}, ${TIER_COLORS[def.tier]}aa)`,
+                        background: `linear-gradient(135deg, ${UPGRADE_TIER_COLORS[card.upgradeTier]}, ${UPGRADE_TIER_COLORS[card.upgradeTier]}aa)`,
                         color: '#000',
                       }}
                     >

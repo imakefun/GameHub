@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CardDefinition } from '../types';
-import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO } from '../types';
+import { UPGRADE_TIER_COLORS, CARD_TYPE_INFO } from '../types';
 
 interface NewCardRevealProps {
   card: CardDefinition;
@@ -10,7 +10,7 @@ interface NewCardRevealProps {
 
 export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
   const [phase, setPhase] = useState<'intro' | 'reveal'>('intro');
-  const tierColor = TIER_COLORS[card.tier];
+  const baseColor = UPGRADE_TIER_COLORS.base;
   const typeInfo = CARD_TYPE_INFO[card.type];
 
   return (
@@ -35,7 +35,7 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 1 }}
         style={{
-          background: `radial-gradient(ellipse at center, ${tierColor}25 0%, transparent 60%)`,
+          background: `radial-gradient(ellipse at center, ${baseColor}25 0%, transparent 60%)`,
         }}
       />
 
@@ -44,7 +44,7 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
         <motion.div
           key={i}
           className="absolute w-1.5 h-1.5 rounded-full pointer-events-none"
-          style={{ background: tierColor }}
+          style={{ background: baseColor }}
           initial={{
             opacity: 0,
             x: 0,
@@ -86,15 +86,15 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
               <motion.div
                 className="w-24 h-24 mx-auto rounded-2xl border-2 flex items-center justify-center mb-4"
                 style={{
-                  borderColor: `${tierColor}60`,
-                  background: `linear-gradient(135deg, ${tierColor}20, rgba(0,0,0,0.4))`,
-                  boxShadow: `0 0 40px ${tierColor}30`,
+                  borderColor: `${baseColor}60`,
+                  background: `linear-gradient(135deg, ${baseColor}20, rgba(0,0,0,0.4))`,
+                  boxShadow: `0 0 40px ${baseColor}30`,
                 }}
                 animate={{
                   boxShadow: [
-                    `0 0 20px ${tierColor}20`,
-                    `0 0 60px ${tierColor}40`,
-                    `0 0 20px ${tierColor}20`,
+                    `0 0 20px ${baseColor}20`,
+                    `0 0 60px ${baseColor}40`,
+                    `0 0 20px ${baseColor}20`,
                   ],
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -125,9 +125,9 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
             <motion.div
               className="w-full rounded-2xl border-2 overflow-hidden"
               style={{
-                borderColor: `${tierColor}70`,
-                background: `linear-gradient(180deg, ${tierColor}20 0%, rgba(0,0,0,0.5) 100%)`,
-                boxShadow: `0 0 60px ${tierColor}30, 0 0 120px ${tierColor}15`,
+                borderColor: `${baseColor}70`,
+                background: `linear-gradient(180deg, ${baseColor}20 0%, rgba(0,0,0,0.5) 100%)`,
+                boxShadow: `0 0 60px ${baseColor}30, 0 0 120px ${baseColor}15`,
               }}
               initial={{ scale: 0.3, rotateY: 180, opacity: 0 }}
               animate={{ scale: 1, rotateY: 0, opacity: 1 }}
@@ -137,12 +137,12 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
               <div className="flex justify-between items-start px-4 pt-3">
                 <motion.span
                   className="text-xs font-bold px-2 py-1 rounded-full"
-                  style={{ background: `${tierColor}30`, color: tierColor }}
+                  style={{ background: `${baseColor}30`, color: baseColor }}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  {TIER_LABELS[card.tier]}
+                  {typeInfo.emoji} {typeInfo.label}
                 </motion.span>
                 <motion.span
                   className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500 text-black"
@@ -159,8 +159,8 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
                 <motion.div
                   className="w-full aspect-[3/4] rounded-xl overflow-hidden border flex items-center justify-center"
                   style={{
-                    borderColor: `${tierColor}30`,
-                    background: `linear-gradient(135deg, ${tierColor}10, rgba(0,0,0,0.4))`,
+                    borderColor: `${baseColor}30`,
+                    background: `linear-gradient(135deg, ${baseColor}10, rgba(0,0,0,0.4))`,
                   }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -185,7 +185,7 @@ export function NewCardReveal({ card, onDismiss }: NewCardRevealProps) {
                 <div className="flex items-center justify-center gap-2 text-sm mb-2">
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
-                    style={{ background: `${tierColor}20`, color: tierColor }}
+                    style={{ background: `${baseColor}20`, color: baseColor }}
                   >
                     {typeInfo.emoji} {typeInfo.label}
                   </span>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { OwnedCard, GameConfig, ActiveExpedition } from '../types';
-import { UPGRADE_TIER_COLORS, UPGRADE_TIER_LABELS, CARD_TYPE_INFO, TIER_COLORS, TIER_LABELS } from '../types';
+import { UPGRADE_TIER_COLORS, UPGRADE_TIER_LABELS, CARD_TYPE_INFO } from '../types';
 
 interface ExpeditionPanelProps {
   ownedCards: OwnedCard[];
@@ -283,7 +283,6 @@ export function ExpeditionPanel({
               if (!def) return null;
               const selected = selectedCards.has(index);
               const upgradeColor = UPGRADE_TIER_COLORS[card.upgradeTier];
-              const tierColor = TIER_COLORS[def.tier];
               const typeInfo = CARD_TYPE_INFO[def.type];
 
               return (
@@ -342,8 +341,8 @@ export function ExpeditionPanel({
                   {/* Card info footer */}
                   <div className="p-1.5 text-center">
                     <p className="text-[10px] font-medium truncate">{def.name}</p>
-                    <p className="text-[9px]" style={{ color: tierColor }}>
-                      {TIER_LABELS[def.tier]}
+                    <p className="text-[9px]" style={{ color: upgradeColor }}>
+                      {UPGRADE_TIER_LABELS[card.upgradeTier]}
                     </p>
                   </div>
                 </motion.button>

@@ -3,9 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { OwnedCard, GameConfig, CardType, CardDefinition, UpgradeTier } from '../types';
 import {
   CARD_TYPE_INFO,
-  TIER_LABELS,
-  TIER_COLORS,
-  TIER_ORDER,
   UPGRADE_TIER_ORDER,
   UPGRADE_TIER_LABELS,
   UPGRADE_TIER_COLORS,
@@ -28,7 +25,7 @@ interface CollectionPanelProps {
 }
 
 type FilterType = 'all' | CardType;
-type SortType = 'type' | 'tier' | 'upgrade';
+type SortType = 'type' | 'upgrade';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -47,7 +44,7 @@ export function CollectionPanel({
   onUpgrade,
 }: CollectionPanelProps) {
   const [filter, setFilter] = useState<FilterType>('all');
-  const [sort, setSort] = useState<SortType>('tier');
+  const [sort, setSort] = useState<SortType>('upgrade');
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [swapPickerCardIndex, setSwapPickerCardIndex] = useState<number | null>(null);
   const [upgradeReveal, setUpgradeReveal] = useState<{
@@ -70,8 +67,6 @@ export function CollectionPanel({
     })
     .sort((a, b) => {
       switch (sort) {
-        case 'tier':
-          return TIER_ORDER.indexOf(b.def.tier) - TIER_ORDER.indexOf(a.def.tier);
         case 'upgrade':
           return UPGRADE_TIER_ORDER.indexOf(b.card.upgradeTier) - UPGRADE_TIER_ORDER.indexOf(a.card.upgradeTier);
         case 'type':
@@ -105,7 +100,6 @@ export function CollectionPanel({
           onChange={(e) => setSort(e.target.value as SortType)}
           className="bg-surface-800 border border-surface-700 rounded-lg px-2 py-1 text-sm"
         >
-          <option value="tier">Sort: Tier</option>
           <option value="upgrade">Sort: Upgrade</option>
           <option value="type">Sort: Type</option>
         </select>
@@ -197,9 +191,6 @@ export function CollectionPanel({
                     </div>
                   )}
                   <h3 className="text-xl font-bold">{def.name}</h3>
-                  <p className="text-sm" style={{ color: TIER_COLORS[def.tier] }}>
-                    {TIER_LABELS[def.tier]}
-                  </p>
                 </div>
 
                 {/* Upgrade Tier Progress Bar */}
