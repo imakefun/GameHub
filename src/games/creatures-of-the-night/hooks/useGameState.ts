@@ -412,11 +412,15 @@ function createInitialState(config: GameConfig): GameState {
       isOnExpedition: false,
     }));
 
+  // Each starter card discovered grants +1 CL
+  const startingCL = starterOwned.length;
+  const startClFields = deriveCLFields(startingCL, config, ['basic-collection'], 0);
+
   return {
     currencies: { shadowEssence: 0, lunarCrystals: 5, voidEnergy: 0 },
     ownedCards: starterOwned,
-    cryptSlots: 3,
-    collectionLevel: 0,
+    cryptSlots: startClFields.cryptSlots,
+    collectionLevel: startingCL,
     clRewardsClaimed: [],
     playerStats: {
       totalEssenceCollected: 0,
@@ -429,7 +433,7 @@ function createInitialState(config: GameConfig): GameState {
     },
     activeExpeditions: [],
     starterTomeClaimed: false,
-    unlockedFeatures: ['basic-collection'],
+    unlockedFeatures: startClFields.unlockedFeatures,
     dailyQuests: assignDailyQuests(config.dailyQuestPool),
     dailyQuestsLastReset: getTodayMidnight(),
     weeklyQuestCount: 0,

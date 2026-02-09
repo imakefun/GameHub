@@ -9,7 +9,7 @@ import {
   Cloud,
   Database,
 } from 'lucide-react';
-import type { CardDefinition } from './types';
+import type { CardDefinition, CLReward } from './types';
 import { useGameState } from './hooks/useGameState';
 import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
@@ -20,6 +20,7 @@ import { ExpeditionPanel } from './components/ExpeditionPanel';
 import { GrimoirePanel } from './components/GrimoirePanel';
 import { PackOpening } from './components/PackOpening';
 import { NewCardReveal } from './components/NewCardReveal';
+import { RewardReveal } from './components/RewardReveal';
 import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
 import { isNightTime, getLunarPhase } from './hooks/useGameState';
 
@@ -54,21 +55,30 @@ function CreaturesGame() {
   const [activeTab, setActiveTab] = useState<Tab>('crypt');
   const [showSettings, setShowSettings] = useState(false);
   const [revealingCard, setRevealingCard] = useState<CardDefinition | null>(null);
+  const [revealingReward, setRevealingReward] = useState<CLReward | null>(null);
 
-  // Wrap claimCLReward: if the reward is a card, show a reveal overlay before claiming
+  // Wrap claimCLReward: show a celebration overlay for every reward type
   const handleClaimCLReward = useCallback(
     (cl: number) => {
       const reward = config.clRewards.find((r) => r.cl === cl);
-      if (reward?.type === 'card' && reward.cardId) {
+      if (!reward) {
+        claimCLReward(cl);
+        return;
+      }
+
+      // Claim immediately so state updates; overlay shows on top
+      claimCLReward(cl);
+
+      if (reward.type === 'card' && reward.cardId) {
         const cardDef = config.cards.find((c) => c.id === reward.cardId);
         if (cardDef) {
           setRevealingCard(cardDef);
-          // Claim immediately so the state updates; the reveal overlay shows on top
-          claimCLReward(cl);
           return;
         }
       }
-      claimCLReward(cl);
+
+      // Non-card rewards get their own celebration
+      setRevealingReward(reward);
     },
     [config.clRewards, config.cards, claimCLReward],
   );
@@ -371,6 +381,16 @@ function CreaturesGame() {
           <NewCardReveal
             card={revealingCard}
             onDismiss={() => setRevealingCard(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Reward Reveal Overlay */}
+      <AnimatePresence>
+        {revealingReward && (
+          <RewardReveal
+            reward={revealingReward}
+            onDismiss={() => setRevealingReward(null)}
           />
         )}
       </AnimatePresence>
