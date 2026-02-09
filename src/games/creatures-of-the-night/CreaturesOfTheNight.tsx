@@ -59,6 +59,16 @@ function CreaturesGame() {
   const [revealingCard, setRevealingCard] = useState<CardDefinition | null>(null);
   const [revealingReward, setRevealingReward] = useState<CLReward | null>(null);
   const [revealingQuestReward, setRevealingQuestReward] = useState<DailyQuest | null>(null);
+  const [shardTargetCardName, setShardTargetCardName] = useState<string | null>(null);
+
+  // Pick a random owned card and resolve its display name
+  const pickShardTarget = useCallback(() => {
+    const cards = state.ownedCards;
+    if (cards.length === 0) return { index: undefined, name: undefined };
+    const idx = Math.floor(Math.random() * cards.length);
+    const def = config.cards.find((c) => c.id === cards[idx].definitionId);
+    return { index: idx, name: def?.name };
+  }, [state.ownedCards, config.cards]);
 
   // Wrap claimCLReward: show a celebration overlay for every reward type
   const handleClaimCLReward = useCallback(
@@ -66,6 +76,15 @@ function CreaturesGame() {
       const reward = config.clRewards.find((r) => r.cl === cl);
       if (!reward) {
         claimCLReward(cl);
+        return;
+      }
+
+      // For soulShard rewards, pick the target card for both reducer and display
+      if (reward.type === 'soulShards') {
+        const target = pickShardTarget();
+        claimCLReward(cl, target.index);
+        setShardTargetCardName(target.name ?? null);
+        setRevealingReward(reward);
         return;
       }
 
@@ -81,9 +100,10 @@ function CreaturesGame() {
       }
 
       // Non-card rewards get their own celebration
+      setShardTargetCardName(null);
       setRevealingReward(reward);
     },
-    [config.clRewards, config.cards, claimCLReward],
+    [config.clRewards, config.cards, claimCLReward, pickShardTarget],
   );
 
   // Wrap completeQuest: show a celebration overlay for quest rewards
@@ -96,10 +116,21 @@ function CreaturesGame() {
         completeQuest(questIndex);
         return;
       }
-      completeQuest(questIndex);
+
+      // Pick shard target if this quest rewards shards
+      let targetName: string | undefined;
+      let targetIndex: number | undefined;
+      if (questDef.rewards.soulShards) {
+        const target = pickShardTarget();
+        targetName = target.name;
+        targetIndex = target.index;
+      }
+
+      completeQuest(questIndex, targetIndex);
+      setShardTargetCardName(targetName ?? null);
       setRevealingQuestReward(questDef);
     },
-    [state.dailyQuests, config.dailyQuestPool, completeQuest],
+    [state.dailyQuests, config.dailyQuestPool, completeQuest, pickShardTarget],
   );
 
   // Tutorial: force tab switch from TutorialOverlay
@@ -411,7 +442,8 @@ function CreaturesGame() {
         {revealingReward && (
           <RewardReveal
             reward={revealingReward}
-            onDismiss={() => setRevealingReward(null)}
+            shardTargetCardName={shardTargetCardName ?? undefined}
+            onDismiss={() => { setRevealingReward(null); setShardTargetCardName(null); }}
           />
         )}
       </AnimatePresence>
@@ -422,7 +454,8 @@ function CreaturesGame() {
           <QuestRewardReveal
             questDescription={revealingQuestReward.description}
             rewards={revealingQuestReward.rewards}
-            onDismiss={() => setRevealingQuestReward(null)}
+            shardTargetCardName={shardTargetCardName ?? undefined}
+            onDismiss={() => { setRevealingQuestReward(null); setShardTargetCardName(null); }}
           />
         )}
       </AnimatePresence>

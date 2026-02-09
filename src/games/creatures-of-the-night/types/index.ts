@@ -338,8 +338,8 @@ export type GameAction =
   | { type: 'PURCHASE_PACK'; packId: string }
   | { type: 'CLAIM_STARTER_TOME' }
   | { type: 'START_EXPEDITION'; zoneId: string; cardIndices: number[] }
-  | { type: 'COMPLETE_QUEST'; questIndex: number }
-  | { type: 'CLAIM_CL_REWARD'; cl: number }
+  | { type: 'COMPLETE_QUEST'; questIndex: number; shardTargetIndex?: number }
+  | { type: 'CLAIM_CL_REWARD'; cl: number; shardTargetIndex?: number }
   | { type: 'CLAIM_WEEKLY_REWARD'; tier: number }
   | { type: 'COLLECT_EXPEDITION'; expeditionIndex: number }
   | { type: 'RUSH_EXPEDITION'; expeditionIndex: number }

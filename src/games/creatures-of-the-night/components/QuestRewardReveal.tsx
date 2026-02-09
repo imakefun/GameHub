@@ -8,6 +8,7 @@ interface QuestRewardRevealProps {
     soulShards?: number;
     lunarCrystals?: number;
   };
+  shardTargetCardName?: string;
   onDismiss: () => void;
 }
 
@@ -22,7 +23,7 @@ const REWARD_ITEMS: {
   { key: 'lunarCrystals', emoji: '🌙', label: 'Lunar Crystals', color: '#f59e0b' },
 ];
 
-export function QuestRewardReveal({ questDescription, rewards, onDismiss }: QuestRewardRevealProps) {
+export function QuestRewardReveal({ questDescription, rewards, shardTargetCardName, onDismiss }: QuestRewardRevealProps) {
   const activeRewards = REWARD_ITEMS.filter((r) => rewards[r.key] && rewards[r.key]! > 0);
   const primaryColor = activeRewards[0]?.color ?? '#10b981';
 
@@ -113,18 +114,30 @@ export function QuestRewardReveal({ questDescription, rewards, onDismiss }: Ques
           {activeRewards.map((item, idx) => (
             <motion.div
               key={item.key}
-              className="flex items-center justify-center gap-3"
+              className="flex flex-col items-center gap-0.5"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 + idx * 0.15 }}
             >
-              <span className="text-2xl">{item.emoji}</span>
-              <span className="text-2xl font-bold text-white">
-                +{rewards[item.key]!.toLocaleString()}
-              </span>
-              <span className="text-sm font-medium" style={{ color: item.color }}>
-                {item.label}
-              </span>
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl">{item.emoji}</span>
+                <span className="text-2xl font-bold text-white">
+                  +{rewards[item.key]!.toLocaleString()}
+                </span>
+                <span className="text-sm font-medium" style={{ color: item.color }}>
+                  {item.label}
+                </span>
+              </div>
+              {item.key === 'soulShards' && shardTargetCardName && (
+                <motion.p
+                  className="text-xs text-blue-300"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 + idx * 0.15 }}
+                >
+                  &rarr; {shardTargetCardName}
+                </motion.p>
+              )}
             </motion.div>
           ))}
         </div>
