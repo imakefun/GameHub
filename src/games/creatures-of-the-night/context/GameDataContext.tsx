@@ -14,7 +14,7 @@ import type {
   GameConfig,
   GameSettings,
 } from '../types';
-import { fetchGameData, DEFAULT_SETTINGS, clearCache } from '../services/sheetsService';
+import { fetchGameData, clearCache } from '../services/sheetsService';
 import { isSheetsConfigured } from '../config/sheets';
 
 import { cards as localCards } from '../data/cards';
@@ -31,6 +31,7 @@ import {
   typeUnlockCL as localTypeUnlockCL,
   cryptSlotUnlocks as localCryptSlotUnlocks,
 } from '../data/clConfig';
+import { settings as localSettings } from '../data/settings';
 import cardArtMap from '../data/cardArtMap';
 
 // Eagerly import all card art PNGs – Vite resolves these to hashed asset URLs at build time
@@ -75,7 +76,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [dailyQuestPool, setDailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
   const [typeUnlockCL, setTypeUnlockCL] = useState<Record<CardType, number>>(localTypeUnlockCL);
   const [cryptSlotUnlocks, setCryptSlotUnlocks] = useState<CryptSlotUnlock[]>(localCryptSlotUnlocks);
-  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<GameSettings>(localSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUsingSheets, setIsUsingSheets] = useState(false);
