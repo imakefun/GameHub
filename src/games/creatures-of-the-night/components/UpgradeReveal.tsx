@@ -6,8 +6,6 @@ import {
   UPGRADE_TIER_LABELS,
   UPGRADE_COSTS,
   CARD_TYPE_INFO,
-  TIER_LABELS,
-  TIER_COLORS,
 } from '../types';
 
 interface UpgradeRevealProps {
@@ -23,7 +21,6 @@ export function UpgradeReveal({ card, fromTier, toTier, onDismiss }: UpgradeReve
   const toColor = UPGRADE_TIER_COLORS[toTier];
   const clGain = UPGRADE_COSTS[toTier].clGain;
   const typeInfo = CARD_TYPE_INFO[card.type];
-  const tierColor = TIER_COLORS[card.tier];
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('transform'), 1200);
@@ -196,13 +193,13 @@ export function UpgradeReveal({ card, fromTier, toTier, onDismiss }: UpgradeReve
             )}
           </AnimatePresence>
 
-          {/* Tier + NEW badge */}
+          {/* Upgrade tier badges */}
           <div className="flex justify-between items-start px-4 pt-3 relative z-10">
             <motion.span
               className="text-xs font-bold px-2 py-1 rounded-full"
-              style={{ background: `${tierColor}30`, color: tierColor }}
+              style={{ background: `${typeInfo.emoji ? fromColor : fromColor}30`, color: fromColor }}
             >
-              {TIER_LABELS[card.tier]}
+              {typeInfo.emoji} {typeInfo.label}
             </motion.span>
             <AnimatePresence mode="wait">
               <motion.span

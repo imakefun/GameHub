@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { OwnedCard, CardDefinition, UpgradeTier } from '../types';
-import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS, UPGRADE_TIER_ORDER } from '../types';
+import { CARD_TYPE_INFO, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS, UPGRADE_TIER_ORDER } from '../types';
 
 // Higher tiers get thicker, glowing borders
 function borderStyle(tier: UpgradeTier, color: string) {
@@ -34,7 +34,6 @@ export function CardComponent({
   onClick,
   onCollect,
 }: CardComponentProps) {
-  const tierColor = TIER_COLORS[definition.tier];
   const upgradeColor = UPGRADE_TIER_COLORS[card.upgradeTier];
   const typeInfo = CARD_TYPE_INFO[definition.type];
   const hasEssence = card.accumulatedEssence >= 1;
@@ -116,26 +115,11 @@ export function CardComponent({
         />
       )}
 
-      {/* Upgrade tier badge */}
-      {card.upgradeTier !== 'base' && (
-        <div
-          className="absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full z-10"
-          style={{ background: `${upgradeColor}30`, color: upgradeColor }}
-        >
-          {UPGRADE_TIER_LABELS[card.upgradeTier]}
-        </div>
-      )}
-
       {/* Card header */}
       <div className="px-3 pt-3 pb-1 flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium" style={{ color: tierColor }}>
-            {TIER_LABELS[definition.tier]}
-          </p>
-          <h3 className="font-bold text-sm leading-tight">{definition.name}</h3>
-        </div>
+        <h3 className="font-bold text-sm leading-tight">{definition.name}</h3>
         <span
-          className="text-xs px-1.5 py-0.5 rounded"
+          className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
           style={{ background: `${upgradeColor}20`, color: upgradeColor }}
         >
           {UPGRADE_TIER_LABELS[card.upgradeTier]}
@@ -167,7 +151,7 @@ export function CardComponent({
       <div className="px-3 pb-1">
         <span
           className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-          style={{ background: `${tierColor}20`, color: tierColor }}
+          style={{ background: `${upgradeColor}20`, color: upgradeColor }}
         >
           {typeInfo.emoji} {typeInfo.label}
         </span>

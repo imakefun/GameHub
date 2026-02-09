@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CardDefinition, CardTier, GameConfig, OwnedCard, PackGuarantee } from '../types';
-import { TIER_COLORS, TIER_LABELS, CARD_TYPE_INFO, TIER_ORDER } from '../types';
+import { CARD_TYPE_INFO, TIER_ORDER, UPGRADE_TIER_COLORS } from '../types';
 
 interface PackOpeningProps {
   config: GameConfig;
@@ -272,14 +272,14 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
             <div className="grid grid-cols-5 gap-2">
               {cards.map((card, i) => {
                 const isNew = isNewCard(card);
-                const tierColor = TIER_COLORS[card.tier];
+                const cardColor = UPGRADE_TIER_COLORS.base;
                 return (
                   <div
                     key={i}
                     className="relative rounded-xl border overflow-hidden"
                     style={{
-                      borderColor: `${tierColor}60`,
-                      background: `linear-gradient(180deg, ${tierColor}20, rgba(0,0,0,0.4))`,
+                      borderColor: `${cardColor}60`,
+                      background: `linear-gradient(180deg, ${cardColor}20, rgba(0,0,0,0.4))`,
                     }}
                   >
                     {isNew ? (
@@ -300,8 +300,8 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
                     </div>
                     <div className="px-1 pb-1">
                       <p className="text-[9px] font-medium truncate text-center">{card.name}</p>
-                      <p className="text-[8px] text-center" style={{ color: tierColor }}>
-                        {TIER_LABELS[card.tier]}
+                      <p className="text-[8px] text-center text-surface-400">
+                        {CARD_TYPE_INFO[card.type].label}
                       </p>
                     </div>
                   </div>
@@ -331,25 +331,25 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
 
 /** Large single-card reveal view */
 function RevealedCard({ card, isNew }: { card: CardDefinition; isNew: boolean }) {
-  const tierColor = TIER_COLORS[card.tier];
+  const cardColor = UPGRADE_TIER_COLORS.base;
   const typeInfo = CARD_TYPE_INFO[card.type];
 
   return (
     <motion.div
       className="w-full rounded-2xl border-2 overflow-hidden cursor-pointer"
       style={{
-        borderColor: `${tierColor}70`,
-        background: `linear-gradient(180deg, ${tierColor}20 0%, rgba(0,0,0,0.5) 100%)`,
-        boxShadow: `0 0 40px ${tierColor}30, 0 0 80px ${tierColor}15`,
+        borderColor: `${cardColor}70`,
+        background: `linear-gradient(180deg, ${cardColor}20 0%, rgba(0,0,0,0.5) 100%)`,
+        boxShadow: `0 0 40px ${cardColor}30, 0 0 80px ${cardColor}15`,
       }}
     >
       {/* Badge */}
       <div className="flex justify-between items-start px-4 pt-3">
         <span
           className="text-xs font-bold px-2 py-1 rounded-full"
-          style={{ background: `${tierColor}30`, color: tierColor }}
+          style={{ background: `${cardColor}30`, color: cardColor }}
         >
-          {TIER_LABELS[card.tier]}
+          {typeInfo.emoji} {typeInfo.label}
         </span>
         {isNew ? (
           <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-500 text-white">
@@ -367,8 +367,8 @@ function RevealedCard({ card, isNew }: { card: CardDefinition; isNew: boolean })
         <div
           className="w-full aspect-[3/4] rounded-xl overflow-hidden border flex items-center justify-center"
           style={{
-            borderColor: `${tierColor}30`,
-            background: `linear-gradient(135deg, ${tierColor}10, rgba(0,0,0,0.4))`,
+            borderColor: `${cardColor}30`,
+            background: `linear-gradient(135deg, ${cardColor}10, rgba(0,0,0,0.4))`,
           }}
         >
           {card.artUrl ? (
@@ -385,7 +385,7 @@ function RevealedCard({ card, isNew }: { card: CardDefinition; isNew: boolean })
         <div className="flex items-center justify-center gap-2 text-sm">
           <span
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
-            style={{ background: `${tierColor}20`, color: tierColor }}
+            style={{ background: `${cardColor}20`, color: cardColor }}
           >
             {typeInfo.emoji} {typeInfo.label}
           </span>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Currencies, GameConfig, OwnedCard, CardDefinition, PackDefinition } from '../types';
-import { TIER_COLORS } from '../types';
+import { UPGRADE_TIER_COLORS } from '../types';
 import { PackOpening } from './PackOpening';
 import { getLunarPhase } from '../hooks/useGameState';
 
@@ -199,8 +199,7 @@ function PackCard({
   const canAfford = currencies[cost.currency] >= cost.amount;
   const canBuy = available && canAfford;
   const clLocked = pack.requiredCL ? collectionLevel < pack.requiredCL : false;
-  const highestTier = Object.keys(pack.tierWeights).pop() || 'twilight';
-  const color = TIER_COLORS[highestTier as keyof typeof TIER_COLORS] || TIER_COLORS.twilight;
+  const color = UPGRADE_TIER_COLORS.base;
 
   return (
     <div
