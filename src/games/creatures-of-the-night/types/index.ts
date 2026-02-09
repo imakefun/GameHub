@@ -2,18 +2,10 @@
 // Creatures of the Night - Type Definitions
 // ============================================================
 
-// --- Card Tiers ---
+// --- Card Tiers (rarity / power classification) ---
 export type CardTier = 'twilight' | 'dusk' | 'midnight' | 'umbral' | 'eternal';
 
 export const TIER_ORDER: CardTier[] = ['twilight', 'dusk', 'midnight', 'umbral', 'eternal'];
-
-export const TIER_MAX_LEVEL: Record<CardTier, number> = {
-  twilight: 30,
-  dusk: 40,
-  midnight: 50,
-  umbral: 60,
-  eternal: 75,
-};
 
 export const TIER_LABELS: Record<CardTier, string> = {
   twilight: 'Twilight',
@@ -40,21 +32,57 @@ export const TIER_DUPLICATE_SHARDS: Record<CardTier, number> = {
   eternal: 120,
 };
 
-// Ascension costs (from current tier max → next tier level 1)
-export const ASCENSION_COSTS: Record<string, { soulShards: number; shadowEssence: number; lunarCrystals: number }> = {
-  'twilight->dusk': { soulShards: 200, shadowEssence: 2000, lunarCrystals: 0 },
-  'dusk->midnight': { soulShards: 500, shadowEssence: 5000, lunarCrystals: 5 },
-  'midnight->umbral': { soulShards: 1000, shadowEssence: 10000, lunarCrystals: 10 },
-  'umbral->eternal': { soulShards: 2000, shadowEssence: 20000, lunarCrystals: 20 },
+// --- Upgrade Tiers (card visual quality / progression) ---
+// In the Marvel Snap-style system, cards are upgraded through 6 tiers.
+// Each upgrade costs Shadow Essence + card-specific Shards and increases Collection Level.
+export type UpgradeTier = 'base' | 'twilight' | 'dusk' | 'midnight' | 'umbral' | 'eternal' | 'cosmic';
+
+export const UPGRADE_TIER_ORDER: UpgradeTier[] = ['base', 'twilight', 'dusk', 'midnight', 'umbral', 'eternal', 'cosmic'];
+
+export const UPGRADE_TIER_LABELS: Record<UpgradeTier, string> = {
+  base: 'Base',
+  twilight: 'Twilight',
+  dusk: 'Dusk',
+  midnight: 'Midnight',
+  umbral: 'Umbral',
+  eternal: 'Eternal',
+  cosmic: 'Cosmic',
 };
 
-// Awakening thresholds and costs per tier
-export const AWAKENING_INFO: Record<CardTier, { level: number; soulShards: number; shadowEssence: number; lunarCrystals: number }> = {
-  twilight: { level: 15, soulShards: 100, shadowEssence: 1000, lunarCrystals: 1 },
-  dusk: { level: 20, soulShards: 200, shadowEssence: 2000, lunarCrystals: 2 },
-  midnight: { level: 25, soulShards: 400, shadowEssence: 5000, lunarCrystals: 5 },
-  umbral: { level: 30, soulShards: 800, shadowEssence: 10000, lunarCrystals: 10 },
-  eternal: { level: 40, soulShards: 1600, shadowEssence: 20000, lunarCrystals: 20 },
+export const UPGRADE_TIER_COLORS: Record<UpgradeTier, string> = {
+  base: '#9ca3af',
+  twilight: '#a78bfa',
+  dusk: '#60a5fa',
+  midnight: '#c084fc',
+  umbral: '#f472b6',
+  eternal: '#fbbf24',
+  cosmic: '#f43f5e',
+};
+
+export interface UpgradeCost {
+  shadowEssence: number;
+  shards: number;
+  clGain: number;
+}
+
+export const UPGRADE_COSTS: Record<Exclude<UpgradeTier, 'base'>, UpgradeCost> = {
+  twilight: { shadowEssence: 25, shards: 5, clGain: 1 },
+  dusk: { shadowEssence: 100, shards: 10, clGain: 2 },
+  midnight: { shadowEssence: 200, shards: 20, clGain: 4 },
+  umbral: { shadowEssence: 300, shards: 30, clGain: 6 },
+  eternal: { shadowEssence: 400, shards: 40, clGain: 8 },
+  cosmic: { shadowEssence: 500, shards: 50, clGain: 10 },
+};
+
+// Production bonus per upgrade tier (modest boost to reward upgrading)
+export const UPGRADE_TIER_PRODUCTION_BONUS: Record<UpgradeTier, number> = {
+  base: 1.0,
+  twilight: 1.05,
+  dusk: 1.10,
+  midnight: 1.20,
+  umbral: 1.30,
+  eternal: 1.45,
+  cosmic: 1.65,
 };
 
 // --- Card Types ---
@@ -126,20 +154,20 @@ export interface CardDefinition {
   description: string;
   flavorText: string;
   artUrl?: string;
+  set?: number;                    // card set (1 = starter set, undefined = legacy)
 }
 
 // --- Owned Card Instance (player's copy) ---
 export interface OwnedCard {
   definitionId: string;
-  level: number;
-  soulShards: number;              // card-specific soul shards
-  awakened: boolean;
+  upgradeTier: UpgradeTier;          // visual quality tier (base -> cosmic)
+  soulShards: number;                // card-specific shards
   placedInCrypt: boolean;
   lastCollected: number;
   accumulatedEssence: number;
   isOnExpedition: boolean;
-  expeditionReturnTime?: number;   // timestamp when card returns from temp loss
-  fatigueUntil?: number;           // timestamp when fatigue/damage wears off
+  expeditionReturnTime?: number;     // timestamp when card returns from temp loss
+  fatigueUntil?: number;             // timestamp when fatigue/damage wears off
 }
 
 // --- Currencies ---
@@ -221,9 +249,10 @@ export interface CrossTypeSynergy {
 // --- Collection Level Reward ---
 export interface CLReward {
   cl: number;
-  type: 'shadowEssence' | 'soulShards' | 'lunarCrystals' | 'tome' | 'premiumTome' | 'special';
+  type: 'shadowEssence' | 'soulShards' | 'lunarCrystals' | 'tome' | 'premiumTome' | 'special' | 'card';
   amount: number;
   description: string;
+  cardId?: string;         // for type 'card' - the card definition ID to unlock
 }
 
 // --- Daily Quest ---
@@ -264,9 +293,8 @@ export interface GameState {
   currencies: Currencies;
   ownedCards: OwnedCard[];
   cryptSlots: number;
-  collectionLevel: number;
-  collectionLevelPoints: number;
-  clRewardsClaimed: number[];      // CL milestones already claimed
+  collectionLevel: number;           // linear CL counter (sum of all upgrade CL gains)
+  clRewardsClaimed: number[];        // CL milestones already claimed
   playerStats: {
     totalEssenceCollected: number;
     totalPacksOpened: number;
@@ -305,9 +333,7 @@ export type GameAction =
   | { type: 'PLACE_CARD'; cardIndex: number }
   | { type: 'SWAP_CARD'; removeIndex: number; placeIndex: number }
   | { type: 'REMOVE_CARD'; cardIndex: number }
-  | { type: 'LEVEL_UP_CARD'; cardIndex: number }
-  | { type: 'ASCEND_CARD'; cardIndex: number }
-  | { type: 'AWAKEN_CARD'; cardIndex: number }
+  | { type: 'UPGRADE_CARD'; cardIndex: number }
   | { type: 'OPEN_PACK'; cards: CardDefinition[]; packId: string }
   | { type: 'PURCHASE_PACK'; packId: string }
   | { type: 'CLAIM_STARTER_TOME' }
@@ -323,13 +349,6 @@ export type GameAction =
   | { type: 'DISMISS_PACK_REWARD'; packId: string }
   | { type: 'LOAD_GAME'; state: GameState }
   | { type: 'RESET_GAME' };
-
-// --- Level-Up Cost Config (per tier, from sheets) ---
-export interface LevelCostConfig {
-  tier: CardTier;
-  baseCost: number;       // cost at level 1→2
-  scalingPower: number;   // cost = ceil(baseCost * level^scalingPower)
-}
 
 // --- Crypt Slot Unlock ---
 export interface CryptSlotUnlock {
@@ -347,8 +366,6 @@ export interface GameConfig {
   featureUnlocks: FeatureUnlock[];
   clRewards: CLReward[];
   dailyQuestPool: DailyQuest[];
-  levelCosts: LevelCostConfig[];
-  clTierMultipliers: Record<CardTier, number>;
   typeUnlockCL: Record<CardType, number>;
   cryptSlotUnlocks: CryptSlotUnlock[];
   settings: GameSettings;
@@ -358,7 +375,6 @@ export interface GameSettings {
   tickInterval: number;
   autoSaveInterval: number;
   maxCryptSlots: number;
-  essencePerLevelPercent: number;  // 5% per level
   offlineMaxHours: number;         // 8 hours
   offlineEssenceMultiplier: number;
 }

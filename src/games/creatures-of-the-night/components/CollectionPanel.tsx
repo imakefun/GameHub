@@ -1,35 +1,49 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { OwnedCard, GameConfig, CardType } from '../types';
-import { CARD_TYPE_INFO, TIER_LABELS, TIER_COLORS, TIER_ORDER, TIER_MAX_LEVEL, AWAKENING_INFO, ASCENSION_COSTS } from '../types';
+import {
+  CARD_TYPE_INFO,
+  TIER_LABELS,
+  TIER_COLORS,
+  TIER_ORDER,
+  UPGRADE_TIER_ORDER,
+  UPGRADE_TIER_LABELS,
+  UPGRADE_TIER_COLORS,
+  UPGRADE_COSTS,
+  UPGRADE_TIER_PRODUCTION_BONUS,
+} from '../types';
 import { CardComponent } from './CardComponent';
-import { levelUpCost } from '../hooks/useGameState';
+import { getNextUpgradeTier, getEffectiveGeneration } from '../hooks/useGameState';
 
 interface CollectionPanelProps {
   ownedCards: OwnedCard[];
   config: GameConfig;
   cryptSlots: number;
+  currencies: { shadowEssence: number };
   onPlaceCard: (index: number) => void;
   onSwapCard: (removeIndex: number, placeIndex: number) => void;
   onRemoveCard: (index: number) => void;
-  onLevelUp: (index: number) => void;
-  onAscend: (index: number) => void;
-  onAwaken: (index: number) => void;
+  onUpgrade: (index: number) => void;
 }
 
 type FilterType = 'all' | CardType;
-type SortType = 'type' | 'tier' | 'level';
+type SortType = 'type' | 'tier' | 'upgrade';
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return Math.floor(n).toLocaleString();
+}
 
 export function CollectionPanel({
   ownedCards,
   config,
   cryptSlots,
+  currencies,
   onPlaceCard,
   onSwapCard,
   onRemoveCard,
-  onLevelUp,
-  onAscend,
-  onAwaken,
+  onUpgrade,
 }: CollectionPanelProps) {
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('tier');
@@ -52,8 +66,8 @@ export function CollectionPanel({
       switch (sort) {
         case 'tier':
           return TIER_ORDER.indexOf(b.def.tier) - TIER_ORDER.indexOf(a.def.tier);
-        case 'level':
-          return b.card.level - a.card.level;
+        case 'upgrade':
+          return UPGRADE_TIER_ORDER.indexOf(b.card.upgradeTier) - UPGRADE_TIER_ORDER.indexOf(a.card.upgradeTier);
         case 'type':
           return a.def.type.localeCompare(b.def.type);
         default:
@@ -86,7 +100,7 @@ export function CollectionPanel({
           className="bg-surface-800 border border-surface-700 rounded-lg px-2 py-1 text-sm"
         >
           <option value="tier">Sort: Tier</option>
-          <option value="level">Sort: Level</option>
+          <option value="upgrade">Sort: Upgrade</option>
           <option value="type">Sort: Type</option>
         </select>
       </div>
@@ -143,21 +157,8 @@ export function CollectionPanel({
       <AnimatePresence>
         {selectedItem && (() => {
           const { card, def, index } = selectedItem;
-          const maxLevel = TIER_MAX_LEVEL[def.tier];
-          const cost = levelUpCost(card.level, def.tier, config);
-          const canLevelUp = card.soulShards >= cost && card.level < maxLevel;
-          const atMaxLevel = card.level >= maxLevel;
-          const tierIdx = TIER_ORDER.indexOf(def.tier);
-          const canAscend = atMaxLevel && tierIdx < TIER_ORDER.length - 1;
-          const awakeningInfo = AWAKENING_INFO[def.tier];
-          const canAwaken = !card.awakened && card.level >= awakeningInfo.level;
-
-          let ascensionCostInfo = null;
-          if (canAscend) {
-            const nextTier = TIER_ORDER[tierIdx + 1];
-            const costKey = `${def.tier}->${nextTier}`;
-            ascensionCostInfo = ASCENSION_COSTS[costKey];
-          }
+          const nextTier = getNextUpgradeTier(card.upgradeTier);
+          const upgradeColor = UPGRADE_TIER_COLORS[card.upgradeTier];
 
           return (
             <motion.div
@@ -174,19 +175,55 @@ export function CollectionPanel({
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-sm rounded-2xl border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
                 style={{
-                  borderColor: `${TIER_COLORS[def.tier]}40`,
-                  background: `linear-gradient(180deg, ${TIER_COLORS[def.tier]}15, rgba(15,23,42,0.98))`,
+                  borderColor: `${upgradeColor}40`,
+                  background: `linear-gradient(180deg, ${upgradeColor}15, rgba(15,23,42,0.98))`,
                 }}
               >
                 {/* Card header */}
                 <div className="text-center">
-                  <div className="text-5xl mb-2">
-                    {CARD_TYPE_INFO[def.type].emoji}
-                  </div>
+                  {def.artUrl ? (
+                    <div className="w-20 h-20 mx-auto rounded-xl overflow-hidden mb-2">
+                      <img src={def.artUrl} alt={def.name} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="text-5xl mb-2">
+                      {CARD_TYPE_INFO[def.type].emoji}
+                    </div>
+                  )}
                   <h3 className="text-xl font-bold">{def.name}</h3>
                   <p className="text-sm" style={{ color: TIER_COLORS[def.tier] }}>
-                    {TIER_LABELS[def.tier]} - Level {card.level}/{maxLevel}
-                    {card.awakened && ' ★ Awakened'}
+                    {TIER_LABELS[def.tier]}
+                  </p>
+                </div>
+
+                {/* Upgrade Tier Progress Bar */}
+                <div>
+                  <div className="flex items-center gap-0.5 mb-1">
+                    {UPGRADE_TIER_ORDER.map((tier) => {
+                      const tierIdx = UPGRADE_TIER_ORDER.indexOf(tier);
+                      const currentIdx = UPGRADE_TIER_ORDER.indexOf(card.upgradeTier);
+                      const isActive = tierIdx <= currentIdx;
+                      const color = UPGRADE_TIER_COLORS[tier];
+
+                      return (
+                        <div
+                          key={tier}
+                          className="flex-1 h-2.5 rounded-sm transition-all relative group"
+                          style={{
+                            background: isActive ? color : 'rgba(255,255,255,0.08)',
+                          }}
+                          title={UPGRADE_TIER_LABELS[tier]}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-center font-medium" style={{ color: upgradeColor }}>
+                    {UPGRADE_TIER_LABELS[card.upgradeTier]}
+                    {nextTier && (
+                      <span className="text-surface-500">
+                        {' → '}{UPGRADE_TIER_LABELS[nextTier]}
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -200,21 +237,21 @@ export function CollectionPanel({
                     </p>
                   </div>
                   <div className="bg-surface-800/60 rounded-lg p-2.5">
-                    <p className="text-surface-400 text-xs">Generation</p>
-                    <p className="font-medium">{def.baseGenerationAmount} SE / {def.baseInterval}s</p>
+                    <p className="text-surface-400 text-xs">Production</p>
+                    <p className="font-medium">{getEffectiveGeneration(card, def).toFixed(1)} SE / {def.baseInterval}s</p>
                   </div>
                   <div className="bg-surface-800/60 rounded-lg p-2.5">
                     <p className="text-surface-400 text-xs">Soul Shards</p>
-                    <p className="font-medium">💎 {card.soulShards}</p>
+                    <p className="font-medium text-blue-400">{card.soulShards}</p>
                   </div>
                   <div className="bg-surface-800/60 rounded-lg p-2.5">
                     <p className="text-surface-400 text-xs">Status</p>
                     <p className="font-medium">
                       {card.isOnExpedition
-                        ? '⚔️ Expedition'
+                        ? 'Expedition'
                         : card.placedInCrypt
-                        ? '🏚️ In Crypt'
-                        : '📦 Stored'}
+                        ? 'In Crypt'
+                        : 'Stored'}
                     </p>
                   </div>
                 </div>
@@ -224,47 +261,67 @@ export function CollectionPanel({
                   &ldquo;{def.flavorText}&rdquo;
                 </p>
 
-                {/* Actions */}
+                {/* Upgrade Action */}
                 <div className="space-y-2">
-                  {/* Level up */}
-                  {!atMaxLevel && (
-                    <button
-                      onClick={() => onLevelUp(index)}
-                      disabled={!canLevelUp}
-                      className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                        canLevelUp
-                          ? 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white'
-                          : 'bg-surface-800 text-surface-500 cursor-not-allowed'
-                      }`}
-                    >
-                      Level Up (💎 {cost} Soul Shards)
-                    </button>
-                  )}
+                  {nextTier ? (() => {
+                    const cost = UPGRADE_COSTS[nextTier];
+                    const canAffordShards = card.soulShards >= cost.shards;
+                    const canAffordEssence = currencies.shadowEssence >= cost.shadowEssence;
+                    const canUpgrade = canAffordShards && canAffordEssence;
+                    const nextColor = UPGRADE_TIER_COLORS[nextTier];
 
-                  {/* Ascend */}
-                  {canAscend && ascensionCostInfo && (
-                    <button
-                      onClick={() => onAscend(index)}
-                      className="w-full py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-600 text-black"
-                    >
-                      Ascend to {TIER_LABELS[TIER_ORDER[tierIdx + 1]]}
-                      <span className="block text-xs font-normal mt-0.5">
-                        💎 {ascensionCostInfo.soulShards} / 🌑 {ascensionCostInfo.shadowEssence} / 🌙 {ascensionCostInfo.lunarCrystals}
+                    return (
+                      <>
+                        <div
+                          className="p-3 rounded-lg border"
+                          style={{ borderColor: `${nextColor}30`, background: `${nextColor}08` }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium" style={{ color: nextColor }}>
+                              Upgrade to {UPGRADE_TIER_LABELS[nextTier]}
+                            </span>
+                            <span className="text-xs text-amber-400 font-medium">
+                              +{cost.clGain} CL
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className={`flex items-center gap-1 ${canAffordEssence ? 'text-white' : 'text-red-400'}`}>
+                              <span>🌑</span>
+                              <span>{formatNumber(cost.shadowEssence)} Essence</span>
+                            </div>
+                            <div className={`flex items-center gap-1 ${canAffordShards ? 'text-white' : 'text-red-400'}`}>
+                              <span>💎</span>
+                              <span>{cost.shards} Shards</span>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-surface-500 mt-1">
+                            Production bonus: x{UPGRADE_TIER_PRODUCTION_BONUS[card.upgradeTier].toFixed(2)} → x{UPGRADE_TIER_PRODUCTION_BONUS[nextTier].toFixed(2)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => onUpgrade(index)}
+                          disabled={!canUpgrade}
+                          className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                            canUpgrade
+                              ? 'text-white'
+                              : 'bg-surface-800 text-surface-500 cursor-not-allowed'
+                          }`}
+                          style={canUpgrade ? { background: `linear-gradient(135deg, ${nextColor}, ${nextColor}cc)` } : undefined}
+                        >
+                          {canUpgrade
+                            ? `Upgrade to ${UPGRADE_TIER_LABELS[nextTier]}`
+                            : !canAffordEssence
+                            ? `Need ${formatNumber(cost.shadowEssence - currencies.shadowEssence)} more Essence`
+                            : `Need ${cost.shards - card.soulShards} more Shards`}
+                        </button>
+                      </>
+                    );
+                  })() : (
+                    <div className="text-center py-2">
+                      <span className="text-xs font-medium" style={{ color: UPGRADE_TIER_COLORS.cosmic }}>
+                        Maximum Upgrade (Cosmic)
                       </span>
-                    </button>
-                  )}
-
-                  {/* Awaken */}
-                  {canAwaken && (
-                    <button
-                      onClick={() => onAwaken(index)}
-                      className="w-full py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-yellow-500 to-amber-600 text-black"
-                    >
-                      Awaken (+25% Generation)
-                      <span className="block text-xs font-normal mt-0.5">
-                        💎 {awakeningInfo.soulShards} / 🌑 {awakeningInfo.shadowEssence} / 🌙 {awakeningInfo.lunarCrystals}
-                      </span>
-                    </button>
+                    </div>
                   )}
 
                   {/* Place/Remove */}
@@ -329,6 +386,8 @@ export function CollectionPanel({
                 !!item.def && item.card.placedInCrypt,
             );
 
+          const newUpgradeColor = UPGRADE_TIER_COLORS[newCard.upgradeTier];
+
           return (
             <motion.div
               initial={{ opacity: 0 }}
@@ -354,12 +413,12 @@ export function CollectionPanel({
                 <div
                   className="flex items-center gap-3 p-3 rounded-xl border mb-4"
                   style={{
-                    borderColor: `${TIER_COLORS[newDef.tier]}50`,
-                    background: `linear-gradient(135deg, ${TIER_COLORS[newDef.tier]}15, transparent)`,
+                    borderColor: `${newUpgradeColor}50`,
+                    background: `linear-gradient(135deg, ${newUpgradeColor}15, transparent)`,
                   }}
                 >
                   <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
-                    style={{ background: `${TIER_COLORS[newDef.tier]}20` }}
+                    style={{ background: `${newUpgradeColor}20` }}
                   >
                     {newDef.artUrl ? (
                       <img src={newDef.artUrl} alt={newDef.name} className="w-full h-full object-cover" />
@@ -369,8 +428,8 @@ export function CollectionPanel({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm truncate">{newDef.name}</p>
-                    <p className="text-xs" style={{ color: TIER_COLORS[newDef.tier] }}>
-                      {TIER_LABELS[newDef.tier]} Lv.{newCard.level}
+                    <p className="text-xs" style={{ color: newUpgradeColor }}>
+                      {UPGRADE_TIER_LABELS[newCard.upgradeTier]}
                     </p>
                     <p className="text-xs text-surface-400">
                       {CARD_TYPE_INFO[newDef.type].emoji} {CARD_TYPE_INFO[newDef.type].label}
@@ -388,6 +447,7 @@ export function CollectionPanel({
                 <div className="space-y-2">
                   {placedCards.map(({ card: placed, idx, def: placedDef }) => {
                     const hasEssence = placed.accumulatedEssence >= 1;
+                    const placedUpgradeColor = UPGRADE_TIER_COLORS[placed.upgradeTier];
                     return (
                       <button
                         key={idx}
@@ -398,12 +458,12 @@ export function CollectionPanel({
                         }}
                         className="w-full flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-red-500/50 hover:bg-red-500/5 text-left"
                         style={{
-                          borderColor: `${TIER_COLORS[placedDef.tier]}30`,
-                          background: `linear-gradient(135deg, ${TIER_COLORS[placedDef.tier]}08, transparent)`,
+                          borderColor: `${placedUpgradeColor}30`,
+                          background: `linear-gradient(135deg, ${placedUpgradeColor}08, transparent)`,
                         }}
                       >
                         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
-                          style={{ background: `${TIER_COLORS[placedDef.tier]}20` }}
+                          style={{ background: `${placedUpgradeColor}20` }}
                         >
                           {placedDef.artUrl ? (
                             <img src={placedDef.artUrl} alt={placedDef.name} className="w-full h-full object-cover" />
@@ -413,9 +473,8 @@ export function CollectionPanel({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-sm truncate">{placedDef.name}</p>
-                          <p className="text-xs" style={{ color: TIER_COLORS[placedDef.tier] }}>
-                            {TIER_LABELS[placedDef.tier]} Lv.{placed.level}
-                            {placed.awakened && ' \u2605'}
+                          <p className="text-xs" style={{ color: placedUpgradeColor }}>
+                            {UPGRADE_TIER_LABELS[placed.upgradeTier]}
                           </p>
                           <p className="text-xs text-surface-400">
                             {CARD_TYPE_INFO[placedDef.type].emoji} {CARD_TYPE_INFO[placedDef.type].label}

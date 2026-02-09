@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { OwnedCard, GameConfig, CardType } from '../types';
-import { CARD_TYPE_INFO, TIER_COLORS, TIER_LABELS } from '../types';
+import { CARD_TYPE_INFO, TIER_COLORS, TIER_LABELS, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS } from '../types';
 import { CardComponent } from './CardComponent';
 
 interface CryptBoardProps {
@@ -210,8 +210,10 @@ export function CryptBoard({
                   )}
                   <h3 className="text-xl font-bold">{def.name}</h3>
                   <p className="text-sm" style={{ color: TIER_COLORS[def.tier] }}>
-                    {TIER_LABELS[def.tier]} - Level {card.level}
-                    {card.awakened && ' \u2605 Awakened'}
+                    {TIER_LABELS[def.tier]} &middot;{' '}
+                    <span style={{ color: UPGRADE_TIER_COLORS[card.upgradeTier] }}>
+                      {UPGRADE_TIER_LABELS[card.upgradeTier]}
+                    </span>
                   </p>
                 </div>
 

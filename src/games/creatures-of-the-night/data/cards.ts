@@ -1,9 +1,44 @@
 import type { CardDefinition } from '../types';
 
-// All 120 card definitions - 12 types x 5 tiers x 2 cards per slot
+// ============================================================
+// Set 1 — Starter & CL Road Phase 1 Cards (CL 1-32)
+// ============================================================
+// Players begin with Rat, Bat, and Owl. Additional Set 1 cards
+// are unlocked from the CL Road as the player upgrades cards.
+export const set1Cards: CardDefinition[] = [
+  // --- Starter cards (always owned) ---
+  { id: 'set1-rat', name: 'Rat', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 1.5, baseInterval: 15, description: 'A common sewer rat with sharp instincts', flavorText: 'It thrives where others dare not tread.' },
+  { id: 'set1-bat', name: 'Bat', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 1.8, baseInterval: 18, description: 'A nocturnal hunter with keen senses', flavorText: 'The darkness is its domain.' },
+  { id: 'set1-owl', name: 'Owl', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 2.0, baseInterval: 20, description: 'A wise bird of the night', flavorText: 'Its silent wings carry ancient knowledge.' },
+
+  // --- CL Road Phase 1 unlocks ---
+  { id: 'set1-shadow-imp', name: 'Shadow Imp', type: 'shadow', tier: 'twilight', set: 1, baseGenerationAmount: 1.8, baseInterval: 14, description: 'A tiny creature of living shadow', flavorText: 'Mischief made manifest.' },
+  { id: 'set1-moon-touched', name: 'Moon-Touched', type: 'spirit', tier: 'twilight', set: 1, baseGenerationAmount: 1.5, baseInterval: 12, description: 'A being blessed by moonlight', flavorText: 'The moon chose this one.' },
+  { id: 'set1-shadow-rat', name: 'Shadow Rat', type: 'shadow', tier: 'twilight', set: 1, baseGenerationAmount: 2.0, baseInterval: 18, description: 'A rat cloaked in living shadow', flavorText: 'Where it treads, light fades.' },
+  { id: 'set1-partial-shifter', name: 'Partial Shifter', type: 'lycanthrope', tier: 'twilight', set: 1, baseGenerationAmount: 2.2, baseInterval: 16, description: 'A young shapeshifter still learning control', flavorText: 'Half one thing, half another.' },
+  { id: 'set1-darkness-wisp', name: 'Darkness Wisp', type: 'spirit', tier: 'twilight', set: 1, baseGenerationAmount: 1.6, baseInterval: 13, description: 'A flickering mote of dark energy', flavorText: 'Follow the light... if you dare.' },
+  { id: 'set1-werewolf-pup', name: 'Werewolf Pup', type: 'lycanthrope', tier: 'twilight', set: 1, baseGenerationAmount: 2.4, baseInterval: 17, description: 'A young werewolf cub with big paws', flavorText: 'The moon calls to it already.' },
+  { id: 'set1-dusk-hound', name: 'Dusk Hound', type: 'beast', tier: 'dusk', set: 1, baseGenerationAmount: 7.5, baseInterval: 55, description: 'A loyal hound that hunts at dusk', flavorText: 'Its howl marks the end of day.' },
+  { id: 'set1-moonlight-stalker', name: 'Moonlight Stalker', type: 'lycanthrope', tier: 'dusk', set: 1, baseGenerationAmount: 8.0, baseInterval: 60, description: 'A predator that hunts by moonlight', flavorText: 'Silver light guides its fangs.' },
+  { id: 'set1-wolf-kin', name: 'Wolf Kin', type: 'beast', tier: 'dusk', set: 1, baseGenerationAmount: 7.0, baseInterval: 50, description: 'A wolf bound to a supernatural pack', flavorText: 'The pack is everything.' },
+  { id: 'set1-umbral-stalker', name: 'Umbral Stalker', type: 'shadow', tier: 'dusk', set: 1, baseGenerationAmount: 7.2, baseInterval: 55, description: 'A predator born of darkness', flavorText: 'You never see it coming.' },
+  { id: 'set1-night-stalker', name: 'Night Stalker', type: 'beast', tier: 'dusk', set: 1, baseGenerationAmount: 7.8, baseInterval: 58, description: 'A feline predator of the deep night', flavorText: 'Silent paws on moonlit stone.' },
+  { id: 'set1-moon-hunter', name: 'Moon Hunter', type: 'lycanthrope', tier: 'dusk', set: 1, baseGenerationAmount: 8.5, baseInterval: 65, description: 'A werewolf that has embraced the hunt', flavorText: 'Half-human, all predator.' },
+  { id: 'set1-shadow-weaver', name: 'Shadow Weaver', type: 'shadow', tier: 'midnight', set: 1, baseGenerationAmount: 20.0, baseInterval: 270, description: 'Spins darkness into solid form', flavorText: 'The fabric of night is its loom.' },
+  { id: 'set1-mist-panther', name: 'Mist Panther', type: 'beast', tier: 'midnight', set: 1, baseGenerationAmount: 22.0, baseInterval: 280, description: 'A great cat that moves like fog', flavorText: 'Here one moment, gone the next.' },
+  { id: 'set1-pack-runner', name: 'Pack Runner', type: 'beast', tier: 'midnight', set: 1, baseGenerationAmount: 21.0, baseInterval: 275, description: 'The fastest beast in the shadow pack', flavorText: 'Nothing outruns the pack.' },
+  { id: 'set1-night-shroud', name: 'Night Shroud', type: 'shadow', tier: 'midnight', set: 1, baseGenerationAmount: 19.0, baseInterval: 260, description: 'A living cloak of darkness', flavorText: 'It wraps around reality itself.' },
+  { id: 'set1-dire-wolf', name: 'Dire Wolf', type: 'beast', tier: 'midnight', set: 1, baseGenerationAmount: 23.0, baseInterval: 290, description: 'A massive wolf of primal power', flavorText: 'Ancient and unstoppable.' },
+];
+
+// ============================================================
+// Legacy Cards — 120 card definitions (12 types x 5 tiers x 2 per slot)
+// ============================================================
 // baseGenerationAmount = shadow essence per collection
 // baseInterval = seconds between collections
 export const cards: CardDefinition[] = [
+  ...set1Cards,
+
   // ============ BEAST (CL 1) ============
   { id: 'beast-night-owl', name: 'Night Owl', type: 'beast', tier: 'twilight', baseGenerationAmount: 2.4, baseInterval: 20, description: 'An owl with luminous eyes', flavorText: 'Its gaze pierces the darkest night.' },
   { id: 'beast-shadow-rat', name: 'Shadow Rat', type: 'beast', tier: 'twilight', baseGenerationAmount: 2.0, baseInterval: 18, description: 'A rat touched by darkness', flavorText: 'It gnaws at the veil between worlds.' },

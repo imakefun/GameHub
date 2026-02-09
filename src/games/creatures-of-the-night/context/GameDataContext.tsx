@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
   CardDefinition,
-  CardTier,
   CardType,
   PackDefinition,
   ExpeditionZone,
@@ -12,7 +11,6 @@ import type {
   CLReward,
   CryptSlotUnlock,
   DailyQuest,
-  LevelCostConfig,
   GameConfig,
   GameSettings,
 } from '../types';
@@ -29,9 +27,7 @@ import {
   clRewards as localCLRewards,
   dailyQuestPool as localDailyQuestPool,
 } from '../data/synergies';
-import { levelCosts as localLevelCosts } from '../data/levelCosts';
 import {
-  clTierMultipliers as localCLTierMultipliers,
   typeUnlockCL as localTypeUnlockCL,
   cryptSlotUnlocks as localCryptSlotUnlocks,
 } from '../data/clConfig';
@@ -77,8 +73,6 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [featureUnlocks, setFeatureUnlocks] = useState<FeatureUnlock[]>(localFeatureUnlocks);
   const [clRewards, setCLRewards] = useState<CLReward[]>(localCLRewards);
   const [dailyQuestPool, setDailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
-  const [levelCosts, setLevelCosts] = useState<LevelCostConfig[]>(localLevelCosts);
-  const [clTierMultipliers, setCLTierMultipliers] = useState<Record<CardTier, number>>(localCLTierMultipliers);
   const [typeUnlockCL, setTypeUnlockCL] = useState<Record<CardType, number>>(localTypeUnlockCL);
   const [cryptSlotUnlocks, setCryptSlotUnlocks] = useState<CryptSlotUnlock[]>(localCryptSlotUnlocks);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
@@ -116,17 +110,11 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
       if (data.dailyQuests && data.dailyQuests.length > 0) {
         setDailyQuestPool(data.dailyQuests);
       }
-      if (data.levelCosts && data.levelCosts.length > 0) {
-        setLevelCosts(data.levelCosts);
-      }
       if (data.clRewards && data.clRewards.length > 0) {
         setCLRewards(data.clRewards);
       }
       if (data.featureUnlocks && data.featureUnlocks.length > 0) {
         setFeatureUnlocks(data.featureUnlocks);
-      }
-      if (data.clTierMultipliers) {
-        setCLTierMultipliers(data.clTierMultipliers);
       }
       if (data.typeUnlockCL) {
         setTypeUnlockCL(data.typeUnlockCL);
@@ -163,8 +151,6 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     featureUnlocks,
     clRewards,
     dailyQuestPool,
-    levelCosts,
-    clTierMultipliers,
     typeUnlockCL,
     cryptSlotUnlocks,
     settings,

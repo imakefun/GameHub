@@ -51,8 +51,7 @@ export function ExpeditionPanel({
 
   const availableCards = ownedCards
     .map((card, index) => ({ card, index }))
-    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil)
-    .filter(({ card }) => !zone?.requirements.minCardLevel || card.level >= zone.requirements.minCardLevel);
+    .filter(({ card }) => !card.isOnExpedition && !card.fatigueUntil);
 
   const canStart = zone && selectedCards.size >= zone.requirements.minCards && chosenDuration > 0;
 
@@ -151,8 +150,7 @@ export function ExpeditionPanel({
           {config.expeditions.map((expZone) => {
             const unlocked = collectionLevel >= expZone.unlockCL;
             const eligibleCount = ownedCards.filter(
-              (c) => !c.isOnExpedition && !c.fatigueUntil &&
-                (!expZone.requirements.minCardLevel || c.level >= expZone.requirements.minCardLevel),
+              (c) => !c.isOnExpedition && !c.fatigueUntil,
             ).length;
             const meetsCards = eligibleCount >= expZone.requirements.minCards;
             const isAvailable = unlocked && meetsCards;
@@ -182,9 +180,6 @@ export function ExpeditionPanel({
                 </div>
                 <div className="flex gap-3 mt-2 text-xs text-surface-500 flex-wrap">
                   <span>Min {expZone.requirements.minCards} cards</span>
-                  {expZone.requirements.minCardLevel && (
-                    <span className="text-amber-400">Lvl {expZone.requirements.minCardLevel}+</span>
-                  )}
                   {expZone.requirements.requiredTier && expZone.requirements.requiredTierCount && (
                     <span className="text-purple-400">
                       {expZone.requirements.requiredTierCount} {expZone.requirements.requiredTier}

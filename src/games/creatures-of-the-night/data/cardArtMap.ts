@@ -2,6 +2,28 @@
 // Each of the 120 cards maps to one of the 120 PNG files
 
 const cardArtMap: Record<string, string> = {
+  // ============ SET 1 (Starter & CL Road) ============
+  'set1-rat': 'Rat',
+  'set1-bat': 'Bat',
+  'set1-owl': 'Owl',
+  'set1-shadow-imp': 'Shadow_Imp',
+  'set1-moon-touched': 'Moon_Touched',
+  'set1-shadow-rat': 'Shadow_Rat',
+  'set1-partial-shifter': 'Partial_Shifter',
+  'set1-darkness-wisp': 'Darkness_Wisp',
+  'set1-werewolf-pup': 'Werewolf_Pup',
+  'set1-dusk-hound': 'Dusk_Hound',
+  'set1-moonlight-stalker': 'Moonlight_Stalker',
+  'set1-wolf-kin': 'Wolf_Kin',
+  'set1-umbral-stalker': 'Umbral_Stalker',
+  'set1-night-stalker': 'Night_Stalker',
+  'set1-moon-hunter': 'Moon_Hunter',
+  'set1-shadow-weaver': 'Shadow_Weaver',
+  'set1-mist-panther': 'Mist_Panther',
+  'set1-pack-runner': 'Pack_Runner',
+  'set1-night-shroud': 'Night_Shroud',
+  'set1-dire-wolf': 'Dire_Wolf',
+
   // ============ BEAST ============
   'beast-night-owl': 'Owl',
   'beast-shadow-rat': 'Rat',

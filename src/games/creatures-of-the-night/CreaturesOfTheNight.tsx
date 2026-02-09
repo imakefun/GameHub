@@ -32,9 +32,7 @@ function CreaturesGame() {
     placeCard,
     swapCard,
     removeCard,
-    levelUpCard,
-    ascendCard,
-    awakenCard,
+    upgradeCard,
     openPack,
     purchasePack,
     claimStarterTome,
@@ -208,7 +206,6 @@ function CreaturesGame() {
         <ResourceBar
           currencies={state.currencies}
           collectionLevel={state.collectionLevel}
-          collectionLevelPoints={state.collectionLevelPoints}
         />
       </div>
 
@@ -270,12 +267,11 @@ function CreaturesGame() {
                 ownedCards={state.ownedCards}
                 config={config}
                 cryptSlots={state.cryptSlots}
+                currencies={state.currencies}
                 onPlaceCard={placeCard}
                 onSwapCard={swapCard}
                 onRemoveCard={removeCard}
-                onLevelUp={levelUpCard}
-                onAscend={ascendCard}
-                onAwaken={awakenCard}
+                onUpgrade={upgradeCard}
               />
             )}
             {activeTab === 'shop' && (
