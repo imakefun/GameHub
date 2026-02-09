@@ -50,13 +50,13 @@ export const UPGRADE_TIER_LABELS: Record<UpgradeTier, string> = {
 };
 
 export const UPGRADE_TIER_COLORS: Record<UpgradeTier, string> = {
-  base: '#9ca3af',
-  twilight: '#a78bfa',
-  dusk: '#60a5fa',
-  midnight: '#c084fc',
-  umbral: '#f472b6',
-  eternal: '#fbbf24',
-  cosmic: '#f43f5e',
+  base: '#9ca3af',       // gray
+  twilight: '#22d3ee',   // cyan
+  dusk: '#34d399',       // emerald
+  midnight: '#818cf8',   // indigo
+  umbral: '#f472b6',     // pink
+  eternal: '#fbbf24',    // gold
+  cosmic: '#f43f5e',     // crimson
 };
 
 export interface UpgradeCost {
