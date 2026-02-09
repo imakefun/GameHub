@@ -1,10 +1,8 @@
-import { motion } from 'framer-motion';
 import type { Currencies } from '../types';
 
 interface ResourceBarProps {
   currencies: Currencies;
   collectionLevel: number;
-  collectionLevelPoints: number;
 }
 
 const resources = [
@@ -19,35 +17,16 @@ function formatNumber(n: number): string {
   return Math.floor(n).toLocaleString();
 }
 
-function pointsForLevel(level: number): number {
-  const x = 10 * level - 5;
-  return (x * x - 25) / 20;
-}
-
-export function ResourceBar({ currencies, collectionLevel, collectionLevelPoints }: ResourceBarProps) {
-  const currentFloor = pointsForLevel(collectionLevel);
-  const nextFloor = pointsForLevel(collectionLevel + 1);
-  const progressInLevel = collectionLevelPoints - currentFloor;
-  const levelRange = nextFloor - currentFloor;
-  const clPercent = Math.min(100, (progressInLevel / levelRange) * 100);
-
+export function ResourceBar({ currencies, collectionLevel }: ResourceBarProps) {
   return (
     <div className="space-y-3" data-tutorial="resource-bar">
-      {/* Collection Level bar */}
+      {/* Collection Level display (linear) */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/30 rounded-lg px-3 py-1.5">
           <span className="text-amber-400 font-bold text-sm">CL {collectionLevel}</span>
         </div>
-        <div className="flex-1 h-2 bg-surface-800 rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${clPercent}%` }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-        <span className="text-xs text-surface-400 w-20 text-right">
-          {formatNumber(progressInLevel)}/{formatNumber(levelRange)}
+        <span className="text-xs text-surface-400">
+          Collection Level
         </span>
       </div>
 

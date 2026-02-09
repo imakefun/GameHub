@@ -173,35 +173,54 @@ export const featureUnlocks: FeatureUnlock[] = [
 ];
 
 // ============================================================
-// Collection Level Rewards
+// Collection Level Rewards — CL Road
 // ============================================================
+// Phase 1 (CL 1-32): Card unlocks from Set 1
+// Higher CL: Currency/tome rewards + future phases
+
+import { clRoadPhase1 } from './clConfig';
+
 function generateCLRewards(): CLReward[] {
   const rewards: CLReward[] = [];
 
-  // Early shadow essence boosts
-  rewards.push({ cl: 2, type: 'shadowEssence', amount: 100, description: '100 Shadow Essence' });
-  rewards.push({ cl: 3, type: 'shadowEssence', amount: 200, description: '200 Shadow Essence' });
-  rewards.push({ cl: 4, type: 'shadowEssence', amount: 300, description: '300 Shadow Essence' });
-  rewards.push({ cl: 6, type: 'shadowEssence', amount: 500, description: '500 Shadow Essence' });
-  rewards.push({ cl: 8, type: 'shadowEssence', amount: 750, description: '750 Shadow Essence' });
-  rewards.push({ cl: 9, type: 'shadowEssence', amount: 1000, description: '1000 Shadow Essence' });
+  // Phase 1: CL Road card unlocks (CL 1-32)
+  for (const entry of clRoadPhase1) {
+    rewards.push({
+      cl: entry.cl,
+      type: 'card',
+      amount: 1,
+      description: entry.cardName,
+      cardId: entry.cardId,
+    });
+  }
 
-  // Every 5 CL: 1 Standard Tome
-  for (let cl = 5; cl <= 150; cl += 5) {
+  // Essence boosts interspersed with card unlocks
+  rewards.push({ cl: 3, type: 'shadowEssence', amount: 150, description: '150 Shadow Essence' });
+  rewards.push({ cl: 5, type: 'shadowEssence', amount: 250, description: '250 Shadow Essence' });
+  rewards.push({ cl: 7, type: 'shadowEssence', amount: 400, description: '400 Shadow Essence' });
+  rewards.push({ cl: 9, type: 'shadowEssence', amount: 500, description: '500 Shadow Essence' });
+  rewards.push({ cl: 11, type: 'shadowEssence', amount: 600, description: '600 Shadow Essence' });
+  rewards.push({ cl: 13, type: 'shadowEssence', amount: 750, description: '750 Shadow Essence' });
+  rewards.push({ cl: 15, type: 'soulShards', amount: 25, description: '25 Universal Soul Shards' });
+  rewards.push({ cl: 17, type: 'shadowEssence', amount: 1000, description: '1000 Shadow Essence' });
+  rewards.push({ cl: 19, type: 'shadowEssence', amount: 1200, description: '1200 Shadow Essence' });
+  rewards.push({ cl: 21, type: 'soulShards', amount: 50, description: '50 Universal Soul Shards' });
+  rewards.push({ cl: 23, type: 'lunarCrystals', amount: 3, description: '3 Lunar Crystals' });
+  rewards.push({ cl: 25, type: 'tome', amount: 1, description: '1 Standard Tome' });
+  rewards.push({ cl: 27, type: 'soulShards', amount: 75, description: '75 Universal Soul Shards' });
+  rewards.push({ cl: 29, type: 'lunarCrystals', amount: 5, description: '5 Lunar Crystals' });
+  rewards.push({ cl: 31, type: 'shadowEssence', amount: 2000, description: '2000 Shadow Essence' });
+
+  // Higher CL rewards (beyond Phase 1)
+  for (let cl = 35; cl <= 150; cl += 5) {
     rewards.push({ cl, type: 'tome', amount: 1, description: '1 Standard Tome' });
   }
-
-  // Every 10 CL: 25 Universal Soul Shards
-  for (let cl = 10; cl <= 150; cl += 10) {
+  for (let cl = 40; cl <= 150; cl += 10) {
     rewards.push({ cl, type: 'soulShards', amount: 25, description: '25 Universal Soul Shards' });
   }
-
-  // Every 25 CL: 3 Lunar Crystals
-  for (let cl = 25; cl <= 150; cl += 25) {
+  for (let cl = 50; cl <= 150; cl += 25) {
     rewards.push({ cl, type: 'lunarCrystals', amount: 3, description: '3 Lunar Crystals' });
   }
-
-  // Every 50 CL: 1 Premium Tome
   for (let cl = 50; cl <= 150; cl += 50) {
     rewards.push({ cl, type: 'premiumTome', amount: 1, description: '1 Premium Tome' });
   }

@@ -1,6 +1,7 @@
 import type { GameState, GameConfig, CardType } from '../types';
 import { CARD_TYPE_INFO } from '../types';
 import { isNightTime, getLunarPhase, WEEKLY_MILESTONES, LOGIN_STREAK_MILESTONES } from '../hooks/useGameState';
+import { clRoadPhase1 } from '../data/clConfig';
 
 interface GrimoirePanelProps {
   state: GameState;
@@ -17,11 +18,6 @@ function formatNumber(n: number): string {
   return Math.floor(n).toLocaleString();
 }
 
-function pointsForLevel(level: number): number {
-  const x = 10 * level - 5;
-  return (x * x - 25) / 20;
-}
-
 const LUNAR_DISPLAY: Record<string, { emoji: string; label: string; effect: string }> = {
   new_moon: { emoji: '🌑', label: 'New Moon', effect: 'Shadow/Cursed +75%' },
   waxing: { emoji: '🌒', label: 'Waxing', effect: 'No special bonus' },
@@ -35,10 +31,10 @@ function formatWeeklyReward(rewards: { shadowEssence?: number; soulShards?: numb
   const parts: string[] = [];
   if (rewards.tome) {
     const tomeNames: Record<string, string> = { 'standard-tome': 'Standard Tome', 'enhanced-tome': 'Enhanced Tome', 'premium-tome': 'Premium Tome' };
-    parts.push(`📦 ${tomeNames[rewards.tome] || rewards.tome}`);
+    parts.push(tomeNames[rewards.tome] || rewards.tome);
   }
-  if (rewards.soulShards) parts.push(`💎 ${rewards.soulShards}`);
-  if (rewards.lunarCrystals) parts.push(`🌙 ${rewards.lunarCrystals}`);
+  if (rewards.soulShards) parts.push(`${rewards.soulShards} Shards`);
+  if (rewards.lunarCrystals) parts.push(`${rewards.lunarCrystals} LC`);
   return parts.join(' + ');
 }
 
@@ -54,12 +50,7 @@ export function GrimoirePanel({
   const lunarPhase = getLunarPhase();
   const lunar = LUNAR_DISPLAY[lunarPhase] || LUNAR_DISPLAY.none;
 
-  const currentFloor = pointsForLevel(state.collectionLevel);
-  const nextFloor = pointsForLevel(state.collectionLevel + 1);
-  const progressInLevel = state.collectionLevelPoints - currentFloor;
-  const levelRange = nextFloor - currentFloor;
-
-  // Unclaimed CL rewards
+  // All unclaimed CL rewards (cards + resources)
   const unclaimedRewards = config.clRewards.filter(
     (r) => r.cl <= state.collectionLevel && !state.clRewardsClaimed.includes(r.cl)
   );
@@ -72,7 +63,6 @@ export function GrimoirePanel({
     if (def) typeCounts[def.type] = (typeCounts[def.type] || 0) + 1;
   });
 
-  // Active type synergies
   const activeTypeSynergies = config.typeSynergies
     .map((syn) => {
       const count = typeCounts[syn.type] || 0;
@@ -83,18 +73,97 @@ export function GrimoirePanel({
     })
     .filter(Boolean) as { type: CardType; count: number; bonus: number; thresholds: { count: number; bonus: number }[] }[];
 
-  // Active cross-type synergies
   const activeCrossSynergies = config.crossTypeSynergies.filter(
     (syn) => (typeCounts[syn.type1] || 0) >= 1 && (typeCounts[syn.type2] || 0) >= 1
   );
 
   const maxWeekly = WEEKLY_MILESTONES[WEEKLY_MILESTONES.length - 1]?.quests || 25;
+  const maxCLRoad = clRoadPhase1[clRoadPhase1.length - 1]?.cl || 32;
 
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-bold flex items-center gap-2">
         <span>📖</span> Grimoire
       </h2>
+
+      {/* CL Road - Phase 1 */}
+      <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+        <h3 className="font-semibold text-sm mb-2">
+          CL Road — Phase 1: Starter
+          <span className="text-surface-400 font-normal ml-2">CL {state.collectionLevel}</span>
+        </h3>
+
+        <div className="h-3 bg-surface-800 rounded-full overflow-hidden mb-3">
+          <div
+            className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(100, (state.collectionLevel / maxCLRoad) * 100)}%` }}
+          />
+        </div>
+
+        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+          {clRoadPhase1.map((entry) => {
+            const unlocked = state.collectionLevel >= entry.cl;
+            const claimed = state.clRewardsClaimed.includes(entry.cl);
+            const canClaim = unlocked && !claimed;
+
+            return (
+              <div
+                key={entry.cl}
+                className={`flex items-center gap-3 p-2 rounded-lg text-xs transition-all ${
+                  claimed
+                    ? 'bg-surface-800/30 opacity-50'
+                    : canClaim
+                    ? 'bg-amber-500/10 border border-amber-500/30'
+                    : unlocked
+                    ? 'bg-surface-800/30'
+                    : 'bg-surface-800/20 opacity-60'
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  unlocked ? 'bg-amber-500 text-black' : 'bg-surface-700 text-surface-400'
+                }`}>
+                  {entry.cl}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium ${unlocked ? 'text-white' : 'text-surface-400'}`}>
+                    {entry.cardName}
+                  </p>
+                  <p className="text-surface-500">New Card</p>
+                </div>
+                {canClaim && (
+                  <button
+                    onClick={() => onClaimCLReward(entry.cl)}
+                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors flex-shrink-0"
+                  >
+                    Claim
+                  </button>
+                )}
+                {claimed && (
+                  <span className="text-surface-500 text-xs flex-shrink-0">Claimed</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {unclaimedRewards.filter((r) => r.type !== 'card').length > 0 && (
+          <div className="mt-3 pt-3 border-t border-amber-500/10 space-y-1">
+            <p className="text-xs text-amber-400 font-medium">Bonus Rewards:</p>
+            {unclaimedRewards
+              .filter((r) => r.type !== 'card')
+              .map((reward) => (
+                <button
+                  key={reward.cl}
+                  onClick={() => onClaimCLReward(reward.cl)}
+                  className="w-full flex items-center justify-between p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-xs"
+                >
+                  <span>CL {reward.cl}: {reward.description}</span>
+                  <span className="text-amber-400 font-medium">Claim</span>
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
 
       {/* Cosmic Cycle */}
       <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5">
@@ -120,16 +189,12 @@ export function GrimoirePanel({
             <>Day: Beast/Stone/Magic +20%, Shadow/Lycanthrope/Undead -10%</>
           )}
         </p>
-
-        {/* Lunar Phase */}
         <div className="mt-3 pt-3 border-t border-purple-500/10 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-2xl">{lunar.emoji}</span>
             <div>
               <p className="text-sm font-medium">{lunar.label}</p>
-              {lunar.effect && (
-                <p className="text-xs text-surface-400">{lunar.effect}</p>
-              )}
+              {lunar.effect && <p className="text-xs text-surface-400">{lunar.effect}</p>}
             </div>
           </div>
           <span className="text-xs text-surface-500">Lunar Phase</span>
@@ -140,15 +205,11 @@ export function GrimoirePanel({
       {(activeTypeSynergies.length > 0 || activeCrossSynergies.length > 0) && (
         <div className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5">
           <h3 className="font-semibold text-sm mb-3">Active Synergies</h3>
-
           {activeTypeSynergies.length > 0 && (
             <div className="space-y-2 mb-3">
               <p className="text-xs text-surface-400 font-medium">Type Synergies</p>
               {activeTypeSynergies.map((syn) => (
-                <div
-                  key={syn.type}
-                  className="flex items-center justify-between p-2 rounded-lg bg-cyan-500/10"
-                >
+                <div key={syn.type} className="flex items-center justify-between p-2 rounded-lg bg-cyan-500/10">
                   <div className="flex items-center gap-2 text-xs">
                     <span>{CARD_TYPE_INFO[syn.type].emoji}</span>
                     <span className="font-medium">{CARD_TYPE_INFO[syn.type].label}</span>
@@ -159,15 +220,11 @@ export function GrimoirePanel({
               ))}
             </div>
           )}
-
           {activeCrossSynergies.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-surface-400 font-medium">Cross-Type Synergies</p>
               {activeCrossSynergies.map((syn) => (
-                <div
-                  key={syn.id}
-                  className="p-2 rounded-lg bg-cyan-500/10"
-                >
+                <div key={syn.id} className="p-2 rounded-lg bg-cyan-500/10">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
                       <span>{CARD_TYPE_INFO[syn.type1].emoji}</span>
@@ -185,37 +242,6 @@ export function GrimoirePanel({
         </div>
       )}
 
-      {/* Collection Level Progress */}
-      <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
-        <h3 className="font-semibold text-sm mb-2">Collection Level {state.collectionLevel}</h3>
-        <div className="h-3 bg-surface-800 rounded-full overflow-hidden mb-1">
-          <div
-            className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
-            style={{ width: `${Math.min(100, (progressInLevel / levelRange) * 100)}%` }}
-          />
-        </div>
-        <p className="text-xs text-surface-400">
-          {formatNumber(progressInLevel)} / {formatNumber(levelRange)} CL Points
-        </p>
-
-        {/* Unclaimed rewards */}
-        {unclaimedRewards.length > 0 && (
-          <div className="mt-3 space-y-1">
-            <p className="text-xs text-amber-400 font-medium">Unclaimed Rewards:</p>
-            {unclaimedRewards.map((reward) => (
-              <button
-                key={reward.cl}
-                onClick={() => onClaimCLReward(reward.cl)}
-                className="w-full flex items-center justify-between p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-xs"
-              >
-                <span>CL {reward.cl}: {reward.description}</span>
-                <span className="text-amber-400 font-medium">Claim</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Daily Quests */}
       <div className="p-4 rounded-xl border border-green-500/20 bg-green-500/5">
         <h3 className="font-semibold text-sm mb-3">Daily Quests</h3>
@@ -226,36 +252,23 @@ export function GrimoirePanel({
             {state.dailyQuests.map((quest, i) => {
               const questDef = config.dailyQuestPool.find((q) => q.id === quest.questId);
               if (!questDef) return null;
-
               const progress = Math.min(quest.progress, questDef.target);
               const complete = progress >= questDef.target;
-
               return (
                 <div
                   key={i}
                   className={`p-3 rounded-lg border ${
-                    quest.claimed
-                      ? 'border-surface-700 opacity-50'
-                      : complete
-                      ? 'border-green-500/40 bg-green-500/5'
-                      : 'border-surface-700'
+                    quest.claimed ? 'border-surface-700 opacity-50' : complete ? 'border-green-500/40 bg-green-500/5' : 'border-surface-700'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium">{questDef.description}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      questDef.difficulty === 'hard'
-                        ? 'bg-red-500/20 text-red-400'
-                        : 'bg-green-500/20 text-green-400'
-                    }`}>
+                    <span className={`text-xs px-2 py-0.5 rounded ${questDef.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
                       {questDef.difficulty}
                     </span>
                   </div>
                   <div className="h-1.5 bg-surface-800 rounded-full overflow-hidden mb-1">
-                    <div
-                      className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
-                      style={{ width: `${(progress / questDef.target) * 100}%` }}
-                    />
+                    <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full" style={{ width: `${(progress / questDef.target) * 100}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-xs text-surface-400">
                     <span>{progress}/{questDef.target}</span>
@@ -266,16 +279,11 @@ export function GrimoirePanel({
                     </div>
                   </div>
                   {complete && !quest.claimed && (
-                    <button
-                      onClick={() => onCompleteQuest(i)}
-                      className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white"
-                    >
+                    <button onClick={() => onCompleteQuest(i)} className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white">
                       Claim Reward
                     </button>
                   )}
-                  {quest.claimed && (
-                    <p className="mt-1 text-xs text-surface-500 text-center">Claimed</p>
-                  )}
+                  {quest.claimed && <p className="mt-1 text-xs text-surface-500 text-center">Claimed</p>}
                 </div>
               );
             })}
@@ -290,30 +298,13 @@ export function GrimoirePanel({
           {WEEKLY_MILESTONES.map((milestone) => {
             const claimed = state.weeklyRewardsClaimed.includes(milestone.quests);
             const reached = state.weeklyQuestCount >= milestone.quests;
-
             return (
-              <div
-                key={milestone.quests}
-                className={`flex items-center justify-between p-2 rounded-lg ${
-                  claimed ? 'bg-surface-800/30 opacity-50' : reached ? 'bg-blue-500/10' : 'bg-surface-800/30'
-                }`}
-              >
+              <div key={milestone.quests} className={`flex items-center justify-between p-2 rounded-lg ${claimed ? 'bg-surface-800/30 opacity-50' : reached ? 'bg-blue-500/10' : 'bg-surface-800/30'}`}>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    reached ? 'bg-blue-500 text-white' : 'bg-surface-700 text-surface-400'
-                  }`}>
-                    {milestone.quests}
-                  </span>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${reached ? 'bg-blue-500 text-white' : 'bg-surface-700 text-surface-400'}`}>{milestone.quests}</span>
                   <span>{formatWeeklyReward(milestone.rewards)}</span>
                 </div>
-                {reached && !claimed && (
-                  <button
-                    onClick={() => onClaimWeeklyReward(milestone.quests)}
-                    className="text-xs text-blue-400 font-medium hover:text-blue-300"
-                  >
-                    Claim
-                  </button>
-                )}
+                {reached && !claimed && <button onClick={() => onClaimWeeklyReward(milestone.quests)} className="text-xs text-blue-400 font-medium hover:text-blue-300">Claim</button>}
                 {claimed && <span className="text-xs text-surface-500">Claimed</span>}
               </div>
             );
@@ -321,39 +312,21 @@ export function GrimoirePanel({
         </div>
       </div>
 
-      {/* Login Streak Rewards */}
+      {/* Login Streak */}
       {LOGIN_STREAK_MILESTONES.some((m) => !state.loginStreakRewardsClaimed.includes(m.days)) && (
         <div className="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5">
-          <h3 className="font-semibold text-sm mb-2">
-            Login Streak: {state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}
-          </h3>
+          <h3 className="font-semibold text-sm mb-2">Login Streak: {state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}</h3>
           <div className="space-y-2">
             {LOGIN_STREAK_MILESTONES.map((m) => {
               const claimed = state.loginStreakRewardsClaimed.includes(m.days);
               const reached = state.playerStats.loginStreak >= m.days;
               return (
-                <div
-                  key={m.days}
-                  className={`flex items-center justify-between p-2 rounded-lg ${
-                    claimed ? 'bg-surface-800/30 opacity-50' : reached ? 'bg-orange-500/10' : 'bg-surface-800/30'
-                  }`}
-                >
+                <div key={m.days} className={`flex items-center justify-between p-2 rounded-lg ${claimed ? 'bg-surface-800/30 opacity-50' : reached ? 'bg-orange-500/10' : 'bg-surface-800/30'}`}>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      reached ? 'bg-orange-500 text-white' : 'bg-surface-700 text-surface-400'
-                    }`}>
-                      {m.days}
-                    </span>
-                    <span>{m.lunarCrystals} 🌙 Lunar Crystals</span>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${reached ? 'bg-orange-500 text-white' : 'bg-surface-700 text-surface-400'}`}>{m.days}</span>
+                    <span>{m.lunarCrystals} Lunar Crystals</span>
                   </div>
-                  {reached && !claimed && (
-                    <button
-                      onClick={() => onClaimLoginStreakReward(m.days)}
-                      className="text-xs text-orange-400 font-medium hover:text-orange-300"
-                    >
-                      Claim
-                    </button>
-                  )}
+                  {reached && !claimed && <button onClick={() => onClaimLoginStreakReward(m.days)} className="text-xs text-orange-400 font-medium hover:text-orange-300">Claim</button>}
                   {claimed && <span className="text-xs text-surface-500">Claimed</span>}
                 </div>
               );
@@ -366,30 +339,12 @@ export function GrimoirePanel({
       <div className="p-4 rounded-xl border border-surface-700/50">
         <h3 className="font-semibold text-sm mb-2">Statistics</h3>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="bg-surface-800/30 rounded-lg p-2">
-            <p className="text-surface-500">Cards Owned</p>
-            <p className="font-semibold">{state.ownedCards.length}</p>
-          </div>
-          <div className="bg-surface-800/30 rounded-lg p-2">
-            <p className="text-surface-500">Tomes Opened</p>
-            <p className="font-semibold">{state.playerStats.totalPacksOpened}</p>
-          </div>
-          <div className="bg-surface-800/30 rounded-lg p-2">
-            <p className="text-surface-500">Essence Collected</p>
-            <p className="font-semibold">{formatNumber(state.playerStats.totalEssenceCollected)}</p>
-          </div>
-          <div className="bg-surface-800/30 rounded-lg p-2">
-            <p className="text-surface-500">Expeditions</p>
-            <p className="font-semibold">{state.playerStats.totalExpeditionsCompleted}</p>
-          </div>
-          <div className="bg-surface-800/30 rounded-lg p-2">
-            <p className="text-surface-500">Login Streak</p>
-            <p className="font-semibold">{state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}</p>
-          </div>
-          <div className="bg-surface-800/30 rounded-lg p-2">
-            <p className="text-surface-500">Crypt Cards</p>
-            <p className="font-semibold">{cryptCards.length}/{state.cryptSlots}</p>
-          </div>
+          <div className="bg-surface-800/30 rounded-lg p-2"><p className="text-surface-500">Cards Owned</p><p className="font-semibold">{state.ownedCards.length}</p></div>
+          <div className="bg-surface-800/30 rounded-lg p-2"><p className="text-surface-500">Tomes Opened</p><p className="font-semibold">{state.playerStats.totalPacksOpened}</p></div>
+          <div className="bg-surface-800/30 rounded-lg p-2"><p className="text-surface-500">Essence Collected</p><p className="font-semibold">{formatNumber(state.playerStats.totalEssenceCollected)}</p></div>
+          <div className="bg-surface-800/30 rounded-lg p-2"><p className="text-surface-500">Expeditions</p><p className="font-semibold">{state.playerStats.totalExpeditionsCompleted}</p></div>
+          <div className="bg-surface-800/30 rounded-lg p-2"><p className="text-surface-500">Login Streak</p><p className="font-semibold">{state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}</p></div>
+          <div className="bg-surface-800/30 rounded-lg p-2"><p className="text-surface-500">Crypt Cards</p><p className="font-semibold">{cryptCards.length}/{state.cryptSlots}</p></div>
         </div>
       </div>
     </div>

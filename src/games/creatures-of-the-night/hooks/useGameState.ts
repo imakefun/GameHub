@@ -5,23 +5,20 @@ import type {
   GameConfig,
   OwnedCard,
   CardDefinition,
-  CardTier,
   CardType,
   CosmicPhase,
   LunarPhase,
+  UpgradeTier,
 } from '../types';
 import {
-  TIER_ORDER,
-  TIER_MAX_LEVEL,
   TIER_DUPLICATE_SHARDS,
-  ASCENSION_COSTS,
-  AWAKENING_INFO,
   TYPE_SPECIALIZATIONS,
+  UPGRADE_TIER_ORDER,
+  UPGRADE_COSTS,
+  UPGRADE_TIER_PRODUCTION_BONUS,
 } from '../types';
 
 const STORAGE_KEY = 'creatures-of-the-night-save';
-
-// (Crypt slot unlock thresholds moved to config.cryptSlotUnlocks)
 
 // LC cost to buy extra crypt slots beyond CL-unlocked ones
 const EXTRA_CRYPT_SLOT_LC_COST = 15;
@@ -91,22 +88,19 @@ export function getLunarPhase(): LunarPhase {
 
 /**
  * Lunar bonus for a card type (fractional, additive with cosmic bonus).
- * New Moon: Shadow +75%, Cursed +75%
- * Full Moon: Lycanthrope +100%, all cards +10%
- * Blood Moon: Blood +200%, Lycanthrope +100%, all other +25%
  */
 export function getLunarBonus(type: CardType): number {
-  const phase = getLunarPhase();
   const spec = TYPE_SPECIALIZATIONS[type];
   let bonus = 0;
+  const phase = getLunarPhase();
 
   if (phase === 'blood_moon') {
     if (type === 'blood') bonus += 2.0;
     else if (type === 'lycanthrope') bonus += 1.0;
     else bonus += 0.25;
   } else if (phase === 'full_moon') {
-    bonus += 0.1; // all cards get +10%
-    if (spec.fullMoonBonus) bonus += spec.fullMoonBonus; // e.g. Lycanthrope +100%
+    bonus += 0.1;
+    if (spec.fullMoonBonus) bonus += spec.fullMoonBonus;
   } else if (phase === 'new_moon') {
     if (type === 'shadow') bonus += 0.75;
     if (type === 'cursed') bonus += 0.75;
@@ -117,12 +111,10 @@ export function getLunarBonus(type: CardType): number {
 
 /**
  * Cosmic-cycle production bonus for a card type (fractional).
- * Includes both solar (day/night) and lunar bonuses.
  */
 export function getCosmicBonus(type: CardType): number {
   let bonus = 0;
 
-  // Solar cycle
   if (isNightTime()) {
     if (type === 'shadow' || type === 'lycanthrope' || type === 'undead' || type === 'infernal')
       bonus += 0.3;
@@ -133,55 +125,32 @@ export function getCosmicBonus(type: CardType): number {
       bonus -= 0.1;
   }
 
-  // Lunar cycle
   bonus += getLunarBonus(type);
-
   return bonus;
 }
 
-// Hardcoded fallback if config isn't available yet
-const DEFAULT_LEVEL_COST_PARAMS: Record<CardTier, { baseCost: number; scalingPower: number }> = {
-  twilight:  { baseCost: 2,     scalingPower: 1.076 },
-  dusk:      { baseCost: 4.23,  scalingPower: 1.076 },
-  midnight:  { baseCost: 8.94,  scalingPower: 1.076 },
-  umbral:    { baseCost: 18.92, scalingPower: 1.076 },
-  eternal:   { baseCost: 40,    scalingPower: 1.172 },
-};
-
 /**
- * Soul-shard cost to go from `level` to `level + 1`.
- * Uses config-driven per-tier parameters: cost = ceil(baseCost * level^scalingPower)
+ * Get the next upgrade tier for a card, or null if already at max (cosmic).
  */
-export function levelUpCost(level: number, tier: CardTier, config?: GameConfig): number {
-  const configEntry = config?.levelCosts?.find((c) => c.tier === tier);
-  const params = configEntry
-    ? { baseCost: configEntry.baseCost, scalingPower: configEntry.scalingPower }
-    : DEFAULT_LEVEL_COST_PARAMS[tier];
-  return Math.ceil(params.baseCost * Math.pow(level, params.scalingPower));
+export function getNextUpgradeTier(current: UpgradeTier): Exclude<UpgradeTier, 'base'> | null {
+  const idx = UPGRADE_TIER_ORDER.indexOf(current);
+  if (idx < 0 || idx >= UPGRADE_TIER_ORDER.length - 1) return null;
+  return UPGRADE_TIER_ORDER[idx + 1] as Exclude<UpgradeTier, 'base'>;
 }
 
 /**
  * Effective generation *amount* per collection event
  * (before cosmic / synergy / fatigue).
+ * Uses upgrade tier production bonus instead of old level-based scaling.
  */
 export function getEffectiveGeneration(
   card: OwnedCard,
   def: CardDefinition,
-  config: GameConfig,
 ): number {
   const spec = TYPE_SPECIALIZATIONS[def.type];
-  const lvlMult = 1 + (card.level - 1) * config.settings.essencePerLevelPercent;
-  let amount = def.baseGenerationAmount * lvlMult * spec.amountMultiplier;
-  if (card.awakened) amount *= 1.25;
+  const upgradeBonus = UPGRADE_TIER_PRODUCTION_BONUS[card.upgradeTier];
+  const amount = def.baseGenerationAmount * upgradeBonus * spec.amountMultiplier;
   return amount;
-}
-
-/**
- * Derive Collection Level from accumulated CL points.
- */
-export function collectionLevelForPoints(points: number): number {
-  if (points <= 0) return 1;
-  return Math.floor((5 + Math.sqrt(25 + 20 * points)) / 10);
 }
 
 // ============================================================
@@ -202,11 +171,10 @@ function effectiveInterval(def: CardDefinition): number {
   if (isNightTime() && spec.nightIntervalMultiplier) {
     interval *= spec.nightIntervalMultiplier;
   }
-  // Cursed-style random interval variance (±50%)
   if (spec.randomIntervalVariance) {
     interval *= 1 + (Math.random() * 2 - 1) * spec.randomIntervalVariance;
   }
-  return Math.max(1, interval); // floor at 1s
+  return Math.max(1, interval);
 }
 
 function getPlacedTypeCounts(
@@ -259,14 +227,13 @@ function cryptSlotsForCL(cl: number, max: number, unlocks: GameConfig['cryptSlot
   return Math.min(slots, max);
 }
 
-/** Recompute CL, crypt slots and feature unlocks after points change. */
+/** Recompute crypt slots and feature unlocks after CL change. */
 function deriveCLFields(
-  clPoints: number,
+  cl: number,
   config: GameConfig,
   currentUnlocks: string[],
   purchasedCryptSlots: number = 0,
-): Pick<GameState, 'collectionLevel' | 'cryptSlots' | 'unlockedFeatures'> {
-  const cl = collectionLevelForPoints(clPoints);
+): Pick<GameState, 'cryptSlots' | 'unlockedFeatures'> {
   const baseSlots = cryptSlotsForCL(cl, config.settings.maxCryptSlots, config.cryptSlotUnlocks);
   const slots = Math.min(baseSlots + purchasedCryptSlots, config.settings.maxCryptSlots + MAX_PURCHASED_CRYPT_SLOTS);
   const unlocks = [...currentUnlocks];
@@ -275,7 +242,7 @@ function deriveCLFields(
       unlocks.push(fu.feature);
     }
   }
-  return { collectionLevel: cl, cryptSlots: slots, unlockedFeatures: unlocks };
+  return { cryptSlots: slots, unlockedFeatures: unlocks };
 }
 
 /** Full per-second rate for a placed card (all multipliers). */
@@ -286,14 +253,13 @@ function cardRatePerSecond(
   ownedCards: OwnedCard[],
   now: number,
 ): number {
-  const amount = getEffectiveGeneration(card, def, config);
+  const amount = getEffectiveGeneration(card, def);
   const interval = effectiveInterval(def);
   let rate = amount / interval;
 
   rate *= 1 + getCosmicBonus(def.type);
   rate *= 1 + getSynergyBonus(ownedCards, def.type, config) / 100;
 
-  // Fatigue / damage -> 50% production
   if (card.fatigueUntil && now < card.fatigueUntil) {
     rate *= 0.5;
   }
@@ -303,22 +269,19 @@ function cardRatePerSecond(
 
 /**
  * Apply per-collection specialization effects (failChance, randomVariance,
- * doubleChance).  Used by COLLECT_CARD / COLLECT_ALL.
+ * doubleChance).
  */
 function applyCollectionEffects(amount: number, type: CardType): number {
   const spec = TYPE_SPECIALIZATIONS[type];
 
-  // Fail -> produce nothing
   if (spec.failChance && Math.random() < spec.failChance) return 0;
 
   let result = amount;
 
-  // Random variance
   if (spec.randomVariance) {
     result *= 1 + (Math.random() * 2 - 1) * spec.randomVariance;
   }
 
-  // Double chance
   if (spec.doubleChance && Math.random() < spec.doubleChance) {
     result *= 2;
   }
@@ -330,14 +293,12 @@ function applyCollectionEffects(amount: number, type: CardType): number {
 // Daily Quest Helpers
 // ============================================================
 
-/** Get the start of today (midnight local time) as a timestamp. */
 function getTodayMidnight(): number {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
 
-/** Pick random daily quests from the pool: 4 easy + 2 hard. */
 function assignDailyQuests(
   pool: GameConfig['dailyQuestPool'],
 ): GameState['dailyQuests'] {
@@ -366,7 +327,6 @@ function assignDailyQuests(
   }));
 }
 
-/** Increment progress for quests that match the given trigger. */
 function trackQuestProgress(
   quests: GameState['dailyQuests'],
   pool: GameConfig['dailyQuestPool'],
@@ -379,10 +339,10 @@ function trackQuestProgress(
     const def = pool.find((p) => p.id === q.questId);
     if (!def) return q;
 
-    // Match quest triggers by id pattern
     let matches = false;
     if (trigger === 'collect_card' && def.id.includes('collect')) matches = true;
     if (trigger === 'level_up' && def.id.includes('level')) matches = true;
+    if (trigger === 'upgrade' && def.id.includes('level')) matches = true; // upgrade counts as level-up for quests
     if (trigger === 'open_pack' && def.id.includes('pack')) matches = true;
     if (trigger === 'expedition' && def.id.includes('expedition')) matches = true;
     if (trigger === 'essence' && def.id.includes('essence')) matches = true;
@@ -400,32 +360,63 @@ function trackQuestProgress(
 }
 
 // ============================================================
+// Save Migration — convert old saves to new format
+// ============================================================
+
+function migrateOwnedCard(card: Record<string, unknown>): OwnedCard {
+  // Old format had: level, awakened. New format has: upgradeTier.
+  if ('upgradeTier' in card && typeof card.upgradeTier === 'string') {
+    return card as unknown as OwnedCard;
+  }
+
+  // Migrate: estimate upgrade tier from old level
+  const oldLevel = typeof card.level === 'number' ? card.level : 1;
+  let upgradeTier: UpgradeTier = 'base';
+  if (oldLevel >= 40) upgradeTier = 'cosmic';
+  else if (oldLevel >= 30) upgradeTier = 'eternal';
+  else if (oldLevel >= 20) upgradeTier = 'umbral';
+  else if (oldLevel >= 15) upgradeTier = 'midnight';
+  else if (oldLevel >= 10) upgradeTier = 'dusk';
+  else if (oldLevel >= 5) upgradeTier = 'twilight';
+
+  return {
+    definitionId: card.definitionId as string,
+    upgradeTier,
+    soulShards: typeof card.soulShards === 'number' ? card.soulShards : 0,
+    placedInCrypt: typeof card.placedInCrypt === 'boolean' ? card.placedInCrypt : false,
+    lastCollected: typeof card.lastCollected === 'number' ? card.lastCollected : Date.now(),
+    accumulatedEssence: typeof card.accumulatedEssence === 'number' ? card.accumulatedEssence : 0,
+    isOnExpedition: typeof card.isOnExpedition === 'boolean' ? card.isOnExpedition : false,
+    expeditionReturnTime: card.expeditionReturnTime as number | undefined,
+    fatigueUntil: card.fatigueUntil as number | undefined,
+  };
+}
+
+// ============================================================
 // Initial State
 // ============================================================
 
 function createInitialState(config: GameConfig): GameState {
-  const starter = config.cards.find((c) => c.id === 'shadow-shadow-rat');
-  const starterOwned: OwnedCard[] = starter
-    ? [
-        {
-          definitionId: starter.id,
-          level: 1,
-          soulShards: 0,
-          awakened: false,
-          placedInCrypt: true,
-          lastCollected: Date.now(),
-          accumulatedEssence: 0,
-          isOnExpedition: false,
-        },
-      ]
-    : [];
+  // Start with Rat, Bat, and Owl from Set 1
+  const starterIds = ['set1-rat', 'set1-bat', 'set1-owl'];
+  const starterOwned: OwnedCard[] = starterIds
+    .map((id) => config.cards.find((c) => c.id === id))
+    .filter((c): c is CardDefinition => !!c)
+    .map((def, idx) => ({
+      definitionId: def.id,
+      upgradeTier: 'base' as UpgradeTier,
+      soulShards: 0,
+      placedInCrypt: idx === 0, // Place Rat in crypt by default
+      lastCollected: Date.now(),
+      accumulatedEssence: 0,
+      isOnExpedition: false,
+    }));
 
   return {
     currencies: { shadowEssence: 0, lunarCrystals: 5, voidEnergy: 0 },
     ownedCards: starterOwned,
     cryptSlots: 3,
-    collectionLevel: 1,
-    collectionLevelPoints: 0,
+    collectionLevel: 0,
     clRewardsClaimed: [],
     playerStats: {
       totalEssenceCollected: 0,
@@ -477,7 +468,6 @@ function createGameReducer(config: GameConfig) {
           dailyQuests = assignDailyQuests(config.dailyQuestPool);
           dailyQuestsLastReset = todayMidnight;
 
-          // Reset weekly counts on Monday
           const dayOfWeek = new Date(now).getDay();
           if (dayOfWeek === 1 && new Date(state.dailyQuestsLastReset).getDay() !== 1) {
             weeklyQuestCount = 0;
@@ -527,7 +517,6 @@ function createGameReducer(config: GameConfig) {
           const zone = config.expeditions.find((z) => z.id === exp.zoneId);
           if (!zone) return;
 
-          // Currency rewards
           if (zone.rewards.shadowEssence) {
             const [min, max] = zone.rewards.shadowEssence;
             currencies.shadowEssence += min + Math.random() * (max - min);
@@ -545,7 +534,6 @@ function createGameReducer(config: GameConfig) {
             );
           }
 
-          // Soul-shard rewards -> expedition cards
           if (zone.rewards.soulShards) {
             const [min, max] = zone.rewards.soulShards;
             const total = Math.floor(min + Math.random() * (max - min));
@@ -562,7 +550,6 @@ function createGameReducer(config: GameConfig) {
             }
           }
 
-          // Expedition pack reward
           const expPack = config.packs.find(
             (p) => p.availability === 'expedition' && p.expeditionId === exp.zoneId,
           );
@@ -570,7 +557,6 @@ function createGameReducer(config: GameConfig) {
             newPackRewards.push(expPack.id);
           }
 
-          // Risk effects
           if (Math.random() * 100 < zone.riskPercent) {
             const riskEnd = now + zone.riskDuration * 1000;
             for (const ci of exp.cardIds) {
@@ -595,7 +581,6 @@ function createGameReducer(config: GameConfig) {
             }
           }
 
-          // Return cards (unless temp-lost)
           for (const ci of exp.cardIds) {
             if (updatedCards[ci] && !updatedCards[ci].expeditionReturnTime) {
               updatedCards[ci] = {
@@ -606,7 +591,6 @@ function createGameReducer(config: GameConfig) {
           }
         });
 
-        // Track expedition completion quests
         if (expCompleted > 0) {
           dailyQuests = trackQuestProgress(
             dailyQuests, config.dailyQuestPool, 'expedition', expCompleted
@@ -663,7 +647,6 @@ function createGameReducer(config: GameConfig) {
           Math.floor(applyCollectionEffects(card.accumulatedEssence, def.type)),
         );
 
-        // Track quest progress
         let dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'collect_card');
         dq = trackQuestProgress(dq, config.dailyQuestPool, 'essence', collected);
 
@@ -705,7 +688,6 @@ function createGameReducer(config: GameConfig) {
 
         if (total === 0) return state;
 
-        // Track quest progress
         let dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'collect_card', cardsCollected);
         dq = trackQuestProgress(dq, config.dailyQuestPool, 'essence', total);
 
@@ -773,7 +755,6 @@ function createGameReducer(config: GameConfig) {
         const card = state.ownedCards[action.cardIndex];
         if (!card || !card.placedInCrypt) return state;
 
-        // Preserve accumulated essence on the card (spec: "does NOT lose accumulated resources")
         return {
           ...state,
           ownedCards: state.ownedCards.map((c, i) =>
@@ -784,141 +765,45 @@ function createGameReducer(config: GameConfig) {
         };
       }
 
-      // ======================== LEVEL_UP_CARD ========================
-      case 'LEVEL_UP_CARD': {
+      // ======================== UPGRADE_CARD ========================
+      case 'UPGRADE_CARD': {
         const card = state.ownedCards[action.cardIndex];
         if (!card) return state;
 
-        const def = getCardDef(config, card.definitionId);
-        if (!def) return state;
+        const nextTier = getNextUpgradeTier(card.upgradeTier);
+        if (!nextTier) return state; // already at cosmic
 
-        if (card.level >= TIER_MAX_LEVEL[def.tier]) return state;
+        const cost = UPGRADE_COSTS[nextTier];
+        if (card.soulShards < cost.shards) return state;
+        if (state.currencies.shadowEssence < cost.shadowEssence) return state;
 
-        const cost = levelUpCost(card.level, def.tier, config);
-        if (card.soulShards < cost) return state;
-
-        // CL points: 1 base * tier multiplier
-        const newCLPoints =
-          state.collectionLevelPoints + config.clTierMultipliers[def.tier];
+        const newCL = state.collectionLevel + cost.clGain;
 
         const newCards = state.ownedCards.map((c, i) =>
           i === action.cardIndex
-            ? { ...c, level: c.level + 1, soulShards: c.soulShards - cost }
+            ? { ...c, upgradeTier: nextTier, soulShards: c.soulShards - cost.shards }
             : c,
         );
 
         const clFields = deriveCLFields(
-          newCLPoints,
+          newCL,
           config,
           state.unlockedFeatures,
           state.purchasedCryptSlots,
         );
 
-        // Track quest progress
-        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'level_up');
+        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'upgrade');
 
         return {
           ...state,
+          currencies: {
+            ...state.currencies,
+            shadowEssence: state.currencies.shadowEssence - cost.shadowEssence,
+          },
           ownedCards: newCards,
-          collectionLevelPoints: newCLPoints,
+          collectionLevel: newCL,
           dailyQuests: dq,
           ...clFields,
-        };
-      }
-
-      // ======================== ASCEND_CARD ========================
-      case 'ASCEND_CARD': {
-        const card = state.ownedCards[action.cardIndex];
-        if (!card) return state;
-
-        const def = getCardDef(config, card.definitionId);
-        if (!def) return state;
-
-        if (card.level < TIER_MAX_LEVEL[def.tier]) return state;
-
-        const tierIdx = TIER_ORDER.indexOf(def.tier);
-        if (tierIdx < 0 || tierIdx >= TIER_ORDER.length - 1) return state;
-        const nextTier = TIER_ORDER[tierIdx + 1];
-
-        const costKey = `${def.tier}->${nextTier}`;
-        const cost = ASCENSION_COSTS[costKey];
-        if (!cost) return state;
-
-        if (card.soulShards < cost.soulShards) return state;
-        if (state.currencies.shadowEssence < cost.shadowEssence) return state;
-        if (state.currencies.lunarCrystals < cost.lunarCrystals) return state;
-
-        const nextDef = config.cards.find(
-          (c) => c.type === def.type && c.tier === nextTier,
-        );
-        if (!nextDef) return state;
-
-        const newCLPoints =
-          state.collectionLevelPoints + config.clTierMultipliers[nextTier] * 5;
-        const clFields = deriveCLFields(
-          newCLPoints,
-          config,
-          state.unlockedFeatures,
-          state.purchasedCryptSlots,
-        );
-
-        return {
-          ...state,
-          currencies: {
-            ...state.currencies,
-            shadowEssence:
-              state.currencies.shadowEssence - cost.shadowEssence,
-            lunarCrystals:
-              state.currencies.lunarCrystals - cost.lunarCrystals,
-          },
-          ownedCards: state.ownedCards.map((c, i) =>
-            i === action.cardIndex
-              ? {
-                  ...c,
-                  definitionId: nextDef.id,
-                  level: 1,
-                  soulShards: c.soulShards - cost.soulShards,
-                  awakened: false,
-                }
-              : c,
-          ),
-          collectionLevelPoints: newCLPoints,
-          ...clFields,
-        };
-      }
-
-      // ======================== AWAKEN_CARD ========================
-      case 'AWAKEN_CARD': {
-        const card = state.ownedCards[action.cardIndex];
-        if (!card || card.awakened) return state;
-
-        const def = getCardDef(config, card.definitionId);
-        if (!def) return state;
-
-        const info = AWAKENING_INFO[def.tier];
-        if (card.level < info.level) return state;
-        if (card.soulShards < info.soulShards) return state;
-        if (state.currencies.shadowEssence < info.shadowEssence) return state;
-        if (state.currencies.lunarCrystals < info.lunarCrystals) return state;
-
-        return {
-          ...state,
-          currencies: {
-            ...state.currencies,
-            shadowEssence:
-              state.currencies.shadowEssence - info.shadowEssence,
-            lunarCrystals:
-              state.currencies.lunarCrystals - info.lunarCrystals,
-          },
-          ownedCards: state.ownedCards.map((c, i) =>
-            i === action.cardIndex
-              ? {
-                  ...c,
-                  awakened: true,
-                  soulShards: c.soulShards - info.soulShards,
-                }
-              : c,
-          ),
         };
       }
 
@@ -929,7 +814,6 @@ function createGameReducer(config: GameConfig) {
         let voidEnergyGained = 0;
 
         for (const cardDef of action.cards) {
-          // Check existing owned cards AND cards newly added in this pack
           const existIdx = cards.findIndex(
             (c) => c.definitionId === cardDef.id,
           );
@@ -938,7 +822,6 @@ function createGameReducer(config: GameConfig) {
           );
 
           if (existIdx >= 0) {
-            // Duplicate of already-owned card
             if (cardDef.tier === 'eternal') {
               voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
             }
@@ -948,7 +831,6 @@ function createGameReducer(config: GameConfig) {
               soulShards: cards[existIdx].soulShards + shards,
             };
           } else if (newIdx >= 0) {
-            // Duplicate within this same pack – convert to shards
             if (cardDef.tier === 'eternal') {
               voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
             }
@@ -960,9 +842,8 @@ function createGameReducer(config: GameConfig) {
           } else {
             newOwned.push({
               definitionId: cardDef.id,
-              level: 1,
+              upgradeTier: 'base',
               soulShards: 0,
-              awakened: false,
               placedInCrypt: false,
               lastCollected: Date.now(),
               accumulatedEssence: 0,
@@ -971,7 +852,6 @@ function createGameReducer(config: GameConfig) {
           }
         }
 
-        // Track quest progress
         const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'open_pack');
 
         return {
@@ -1023,7 +903,6 @@ function createGameReducer(config: GameConfig) {
         if (duration < zone.durationRange[0] || duration > zone.durationRange[1])
           return state;
 
-        // Track quest progress
         const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'expedition');
 
         const now = Date.now();
@@ -1064,7 +943,6 @@ function createGameReducer(config: GameConfig) {
         if (qDef.rewards.lunarCrystals)
           newCur.lunarCrystals += qDef.rewards.lunarCrystals;
 
-        // Quest soul-shard rewards go to a random owned card
         let newCards = [...state.ownedCards];
         if (qDef.rewards.soulShards && newCards.length > 0) {
           const ri = Math.floor(Math.random() * newCards.length);
@@ -1114,6 +992,30 @@ function createGameReducer(config: GameConfig) {
               });
             }
             break;
+          case 'card': {
+            // Unlock a new card from the CL Road
+            if (reward.cardId) {
+              const alreadyOwned = newCards.some((c) => c.definitionId === reward.cardId);
+              if (!alreadyOwned) {
+                const cardDef = config.cards.find((c) => c.id === reward.cardId);
+                if (cardDef) {
+                  newCards = [
+                    ...newCards,
+                    {
+                      definitionId: cardDef.id,
+                      upgradeTier: 'base' as UpgradeTier,
+                      soulShards: 0,
+                      placedInCrypt: false,
+                      lastCollected: Date.now(),
+                      accumulatedEssence: 0,
+                      isOnExpedition: false,
+                    },
+                  ];
+                }
+              }
+            }
+            break;
+          }
           // tome / premiumTome / special are handled by the UI layer
         }
 
@@ -1122,6 +1024,13 @@ function createGameReducer(config: GameConfig) {
           currencies: newCur,
           ownedCards: newCards,
           clRewardsClaimed: [...state.clRewardsClaimed, action.cl],
+          playerStats: {
+            ...state.playerStats,
+            totalCardsCollected:
+              reward.type === 'card'
+                ? state.playerStats.totalCardsCollected + 1
+                : state.playerStats.totalCardsCollected,
+          },
         };
       }
 
@@ -1165,13 +1074,11 @@ function createGameReducer(config: GameConfig) {
         const exp = state.activeExpeditions[action.expeditionIndex];
         if (!exp) return state;
 
-        // Cost: 1 LC per 10 minutes remaining (minimum 1)
         const remaining = Math.max(0, (exp.completesAt - Date.now()) / 1000);
-        if (remaining <= 0) return state; // already done
+        if (remaining <= 0) return state;
         const lcCost = Math.max(1, Math.ceil(remaining / 600));
         if (state.currencies.lunarCrystals < lcCost) return state;
 
-        // Set completesAt to now so TICK picks it up next frame
         return {
           ...state,
           currencies: {
@@ -1193,7 +1100,7 @@ function createGameReducer(config: GameConfig) {
 
         const newPurchased = state.purchasedCryptSlots + 1;
         const clFields = deriveCLFields(
-          state.collectionLevelPoints,
+          state.collectionLevel,
           config,
           state.unlockedFeatures,
           newPurchased,
@@ -1274,17 +1181,31 @@ export function useGameState(config: GameConfig) {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
-          const parsed = JSON.parse(saved) as GameState;
+          const parsed = JSON.parse(saved) as Record<string, unknown>;
           const initial = createInitialState(cfg);
           const restored: GameState = {
             ...initial,
-            ...parsed,
+            ...(parsed as Partial<GameState>),
             lastTick: Date.now(),
           };
 
+          // Migrate owned cards from old format
+          if (Array.isArray(parsed.ownedCards)) {
+            restored.ownedCards = (parsed.ownedCards as Record<string, unknown>[]).map(migrateOwnedCard);
+          }
+
+          // Migrate: remove old collectionLevelPoints if present, use collectionLevel directly
+          if (typeof (parsed as Record<string, unknown>).collectionLevelPoints === 'number' && restored.collectionLevel === 0) {
+            // Old saves had a quadratic CL system; approximate CL from points
+            const pts = (parsed as Record<string, unknown>).collectionLevelPoints as number;
+            if (pts > 0) {
+              restored.collectionLevel = Math.floor((5 + Math.sqrt(25 + 20 * pts)) / 10);
+            }
+          }
+
           // Login streak tracking
           const today = new Date().toISOString().split('T')[0];
-          const lastLogin = parsed.playerStats?.lastLoginDate || '';
+          const lastLogin = restored.playerStats?.lastLoginDate || '';
           if (lastLogin !== today) {
             const yesterday = new Date(Date.now() - 86_400_000)
               .toISOString()
@@ -1306,7 +1227,6 @@ export function useGameState(config: GameConfig) {
             restored.dailyQuestsLastReset = todayMidnight;
           }
 
-          // Ensure quests exist (migration from old saves)
           if (!restored.dailyQuests || restored.dailyQuests.length === 0) {
             restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool);
             restored.dailyQuestsLastReset = todayMidnight;
@@ -1314,8 +1234,9 @@ export function useGameState(config: GameConfig) {
 
           // Offline essence (capped at offlineMaxHours)
           const maxOffline = cfg.settings.offlineMaxHours * 3600;
+          const lastTick = typeof parsed.lastTick === 'number' ? parsed.lastTick : Date.now();
           const offlineSec = Math.min(
-            (Date.now() - parsed.lastTick) / 1000,
+            (Date.now() - lastTick) / 1000,
             maxOffline,
           );
 
@@ -1331,7 +1252,7 @@ export function useGameState(config: GameConfig) {
               const def = getCardDef(cfg, card.definitionId);
               if (!def) return card;
 
-              const amount = getEffectiveGeneration(card, def, cfg);
+              const amount = getEffectiveGeneration(card, def);
               const interval = effectiveInterval(def);
               const rate = amount / interval;
               const offlineEssence =
@@ -1414,18 +1335,8 @@ export function useGameState(config: GameConfig) {
     [],
   );
 
-  const levelUpCard = useCallback(
-    (cardIndex: number) => dispatch({ type: 'LEVEL_UP_CARD', cardIndex }),
-    [],
-  );
-
-  const ascendCard = useCallback(
-    (cardIndex: number) => dispatch({ type: 'ASCEND_CARD', cardIndex }),
-    [],
-  );
-
-  const awakenCard = useCallback(
-    (cardIndex: number) => dispatch({ type: 'AWAKEN_CARD', cardIndex }),
+  const upgradeCard = useCallback(
+    (cardIndex: number) => dispatch({ type: 'UPGRADE_CARD', cardIndex }),
     [],
   );
 
@@ -1518,9 +1429,7 @@ export function useGameState(config: GameConfig) {
     placeCard,
     swapCard,
     removeCard,
-    levelUpCard,
-    ascendCard,
-    awakenCard,
+    upgradeCard,
     openPack,
     purchasePack,
     claimStarterTome,
