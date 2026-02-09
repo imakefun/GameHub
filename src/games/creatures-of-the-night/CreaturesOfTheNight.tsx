@@ -9,8 +9,10 @@ import {
   Cloud,
   Database,
 } from 'lucide-react';
-import type { CardDefinition, CLReward, DailyQuest } from './types';
+import type { CardDefinition, CLReward, DailyQuest, CardType } from './types';
+import { CARD_TYPE_INFO } from './types';
 import { useGameState } from './hooks/useGameState';
+import { Filter, ArrowUpDown } from 'lucide-react';
 import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
 import { CryptBoard } from './components/CryptBoard';
@@ -56,6 +58,9 @@ function CreaturesGame() {
 
   const [activeTab, setActiveTab] = useState<Tab>('crypt');
   const [showSettings, setShowSettings] = useState(false);
+  const [collectionFilter, setCollectionFilter] = useState<'all' | CardType>('all');
+  const [collectionSort, setCollectionSort] = useState<'type' | 'upgrade'>('upgrade');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [revealingCard, setRevealingCard] = useState<CardDefinition | null>(null);
   const [revealingReward, setRevealingReward] = useState<CLReward | null>(null);
   const [revealingQuestReward, setRevealingQuestReward] = useState<DailyQuest | null>(null);
@@ -296,11 +301,11 @@ function CreaturesGame() {
         style={{ background: 'rgba(10, 0, 21, 0.8)', backdropFilter: 'blur(8px)' }}
       >
         <div className="max-w-4xl mx-auto px-4">
-          <div className="flex gap-1 py-2">
+          <div className="flex items-center gap-1 py-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setShowFilterMenu(false); }}
                 className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                   activeTab === tab.id
                     ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
@@ -316,7 +321,73 @@ function CreaturesGame() {
                 )}
               </button>
             ))}
+
+            {/* Filter & Sort buttons - shown when on collection tab */}
+            {activeTab === 'collection' && (
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    collectionFilter !== 'all'
+                      ? 'bg-purple-500/30 text-purple-300 border border-purple-500/40'
+                      : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  {collectionFilter === 'all' ? 'Filter' : CARD_TYPE_INFO[collectionFilter].emoji}
+                </button>
+                <button
+                  onClick={() => setCollectionSort(collectionSort === 'upgrade' ? 'type' : 'upgrade')}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{collectionSort === 'upgrade' ? 'Tier' : 'Type'}</span>
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Filter dropdown for collection tab */}
+          {activeTab === 'collection' && showFilterMenu && (() => {
+            const ownedTypes = new Set(
+              state.ownedCards
+                .map((c) => config.cards.find((d) => d.id === c.definitionId)?.type)
+                .filter(Boolean)
+            );
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="pb-2 flex gap-1.5 flex-wrap"
+              >
+                <button
+                  onClick={() => { setCollectionFilter('all'); setShowFilterMenu(false); }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    collectionFilter === 'all'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-surface-800 text-surface-400 hover:bg-surface-700'
+                  }`}
+                >
+                  All
+                </button>
+                {Object.entries(CARD_TYPE_INFO)
+                  .filter(([type]) => ownedTypes.has(type as CardType))
+                  .map(([type, info]) => (
+                    <button
+                      key={type}
+                      onClick={() => { setCollectionFilter(type as CardType); setShowFilterMenu(false); }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        collectionFilter === type
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-surface-800 text-surface-400 hover:bg-surface-700'
+                      }`}
+                    >
+                      {info.emoji} {info.label}
+                    </button>
+                  ))}
+              </motion.div>
+            );
+          })()}
         </div>
       </div>
 
@@ -349,6 +420,8 @@ function CreaturesGame() {
                 config={config}
                 cryptSlots={state.cryptSlots}
                 currencies={state.currencies}
+                filter={collectionFilter}
+                sort={collectionSort}
                 onPlaceCard={placeCard}
                 onSwapCard={swapCard}
                 onRemoveCard={removeCard}
