@@ -17,6 +17,7 @@ export const SHEETS_CONFIG = {
     featureUnlocks: 'FeatureUnlocks',
     clConfig: 'CLConfig',
     settings: 'Settings',
+    lootTables: 'LootTables',
   },
 
   cacheDuration: 5 * 60 * 1000, // 5 minutes

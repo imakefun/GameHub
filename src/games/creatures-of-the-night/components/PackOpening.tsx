@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { CardDefinition, CardTier, GameConfig, OwnedCard, PackGuarantee } from '../types';
+import type { CardDefinition, CardTier, CardType, GameConfig, LootTableEntry, OwnedCard, PackGuarantee } from '../types';
 import { CARD_TYPE_INFO, TIER_ORDER, UPGRADE_TIER_COLORS } from '../types';
 
 interface PackOpeningProps {
@@ -20,38 +20,116 @@ function pickRandomFrom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function rollCards(config: GameConfig, packId: string, collectionLevel: number): CardDefinition[] {
-  const pack = config.packs.find((p) => p.id === packId);
-  if (!pack) return [];
+// ============================================================
+// Card Pool Filter — parses loot table cardPool expressions
+// ============================================================
 
-  // Filter cards to only include types the player has unlocked via CL
-  const unlockedCards = config.cards.filter(
-    (c) => collectionLevel >= (config.typeUnlockCL[c.type] ?? 1)
-  );
-  if (unlockedCards.length === 0) return [];
+function applyCardPoolFilter(cards: CardDefinition[], cardPool: string): CardDefinition[] {
+  const poolLower = cardPool.trim().toLowerCase();
 
+  // "any" → no filter
+  if (poolLower === 'any') return cards;
+
+  // Specific card ID (no colon, no plus)
+  if (!poolLower.includes(':') && !poolLower.includes('+')) {
+    const match = cards.filter((c) => c.id === cardPool.trim());
+    return match.length > 0 ? match : cards;
+  }
+
+  // Parse segments separated by "+"
+  let pool = cards;
+  const segments = poolLower.split('+').map((s) => s.trim());
+
+  for (const seg of segments) {
+    if (seg.startsWith('tier:')) {
+      const tier = seg.slice(5) as CardTier;
+      pool = pool.filter((c) => c.tier === tier);
+    } else if (seg.startsWith('mintier:')) {
+      const minTier = seg.slice(8) as CardTier;
+      pool = pool.filter((c) => tierAtLeast(c.tier, minTier));
+    } else if (seg.startsWith('type:')) {
+      const types = seg.slice(5).split(',').map((t) => t.trim()) as CardType[];
+      pool = pool.filter((c) => types.includes(c.type));
+    }
+  }
+
+  return pool;
+}
+
+// ============================================================
+// Loot Table roller
+// ============================================================
+
+function rollCardsFromLootTable(
+  entries: LootTableEntry[],
+  allCards: CardDefinition[],
+  ownedCardIds: Set<string>,
+  cardCount: number,
+): CardDefinition[] {
+  const results: CardDefinition[] = [];
+
+  // Separate numbered slots from fill slots
+  const numberedSlots = entries
+    .filter((e) => typeof e.slot === 'number')
+    .sort((a, b) => (a.slot as number) - (b.slot as number));
+  const fillEntries = entries.filter((e) => e.slot === 'fill');
+
+  // Helper: pick a card from a pool, respecting newOnly
+  const pickFromPool = (pool: CardDefinition[], newOnly?: boolean): CardDefinition => {
+    if (newOnly && pool.length > 0) {
+      const newPool = pool.filter((c) => !ownedCardIds.has(c.id));
+      if (newPool.length > 0) return pickRandomFrom(newPool);
+    }
+    return pickRandomFrom(pool);
+  };
+
+  // 1. Process numbered slots
+  for (const entry of numberedSlots) {
+    const pool = applyCardPoolFilter(allCards, entry.cardPool);
+    if (pool.length > 0) {
+      results.push(pickFromPool(pool, entry.newOnly));
+    }
+  }
+
+  // 2. Fill remaining slots using weighted random from fill entries
+  const totalFillWeight = fillEntries.reduce((sum, e) => sum + e.weight, 0);
+
+  while (results.length < cardCount && fillEntries.length > 0) {
+    // Pick a fill entry by weight
+    let roll = Math.random() * totalFillWeight;
+    let chosenEntry = fillEntries[0];
+    for (const entry of fillEntries) {
+      roll -= entry.weight;
+      if (roll <= 0) {
+        chosenEntry = entry;
+        break;
+      }
+    }
+
+    const pool = applyCardPoolFilter(allCards, chosenEntry.cardPool);
+    if (pool.length > 0) {
+      results.push(pickFromPool(pool, chosenEntry.newOnly));
+    } else {
+      // Fallback: pick any card
+      results.push(pickRandomFrom(allCards));
+    }
+  }
+
+  return results;
+}
+
+// ============================================================
+// Legacy roller (fallback when no loot table exists for a pack)
+// ============================================================
+
+function rollCardsLegacy(
+  pack: { cardCount: number; tierWeights: Partial<Record<CardTier, number>>; guarantees?: PackGuarantee[]; typeBoost?: CardType[] },
+  unlockedCards: CardDefinition[],
+): CardDefinition[] {
   const results: CardDefinition[] = [];
   const tierWeights = pack.tierWeights;
   const tiers = Object.entries(tierWeights) as [CardTier, number][];
   const totalWeight = tiers.reduce((sum, [, w]) => sum + w, 0);
-
-  // Helper: pick a card from unlocked pool by tier, with optional type boost
-  const pickCard = (forceTier?: CardTier): CardDefinition => {
-    const tier = forceTier ?? pickTier();
-    let pool = unlockedCards.filter((c) => c.tier === tier);
-
-    // Apply type boost: double weight for boosted types
-    if (pack.typeBoost && pack.typeBoost.length > 0 && pool.length > 0) {
-      const boosted = pool.filter((c) => pack.typeBoost!.includes(c.type));
-      const normal = pool.filter((c) => !pack.typeBoost!.includes(c.type));
-      // Weighted pool: boosted cards appear 3x more
-      pool = [...normal, ...boosted, ...boosted, ...boosted];
-    }
-
-    if (pool.length > 0) return pickRandomFrom(pool);
-    // Fallback to any unlocked card
-    return pickRandomFrom(unlockedCards);
-  };
 
   const pickTier = (): CardTier => {
     let roll = Math.random() * totalWeight;
@@ -62,7 +140,21 @@ function rollCards(config: GameConfig, packId: string, collectionLevel: number):
     return tiers[0][0];
   };
 
-  // --- Fill guaranteed slots first ---
+  const pickCard = (forceTier?: CardTier): CardDefinition => {
+    const tier = forceTier ?? pickTier();
+    let pool = unlockedCards.filter((c) => c.tier === tier);
+
+    if (pack.typeBoost && pack.typeBoost.length > 0 && pool.length > 0) {
+      const boosted = pool.filter((c) => pack.typeBoost!.includes(c.type));
+      const normal = pool.filter((c) => !pack.typeBoost!.includes(c.type));
+      pool = [...normal, ...boosted, ...boosted, ...boosted];
+    }
+
+    if (pool.length > 0) return pickRandomFrom(pool);
+    return pickRandomFrom(unlockedCards);
+  };
+
+  // Fill guaranteed slots first
   const guarantees = pack.guarantees ?? [];
   for (const g of guarantees) {
     for (let n = 0; n < g.count; n++) {
@@ -71,7 +163,7 @@ function rollCards(config: GameConfig, packId: string, collectionLevel: number):
     }
   }
 
-  // --- Fill remaining slots randomly ---
+  // Fill remaining slots randomly
   while (results.length < pack.cardCount) {
     results.push(pickCard());
   }
@@ -79,7 +171,7 @@ function rollCards(config: GameConfig, packId: string, collectionLevel: number):
   return results;
 }
 
-/** Pick a card that satisfies a guarantee rule */
+/** Pick a card that satisfies a guarantee rule (legacy path) */
 function pickGuaranteed(
   g: PackGuarantee,
   unlockedCards: CardDefinition[],
@@ -99,7 +191,6 @@ function pickGuaranteed(
 
   if (pool.length === 0) return null;
 
-  // Apply type boost to guaranteed pool too
   if (typeBoost && typeBoost.length > 0) {
     const boosted = pool.filter((c) => typeBoost.includes(c.type));
     const normal = pool.filter((c) => !typeBoost.includes(c.type));
@@ -109,6 +200,33 @@ function pickGuaranteed(
   }
 
   return pickRandomFrom(pool);
+}
+
+// ============================================================
+// Main rollCards entry point
+// ============================================================
+
+function rollCards(config: GameConfig, packId: string, collectionLevel: number, ownedCards?: OwnedCard[]): CardDefinition[] {
+  const pack = config.packs.find((p) => p.id === packId);
+  if (!pack) return [];
+
+  // Filter cards to only include types the player has unlocked via CL
+  const unlockedCards = config.cards.filter(
+    (c) => collectionLevel >= (config.typeUnlockCL[c.type] ?? 1)
+  );
+  if (unlockedCards.length === 0) return [];
+
+  // Check for loot table entries for this pack
+  const lootEntries = config.lootTables.filter((e) => e.packId === packId);
+
+  if (lootEntries.length > 0) {
+    // Use loot table system
+    const ownedCardIds = new Set(ownedCards?.map((c) => c.definitionId) ?? []);
+    return rollCardsFromLootTable(lootEntries, unlockedCards, ownedCardIds, pack.cardCount);
+  }
+
+  // Fallback to legacy tier-weight system
+  return rollCardsLegacy(pack, unlockedCards);
 }
 
 const SHARD_RATES: Record<CardTier, number> = {
@@ -127,7 +245,7 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
   const pack = config.packs.find((p) => p.id === packId);
 
   const handleOpen = () => {
-    const rolled = rollCards(config, packId, collectionLevel);
+    const rolled = rollCards(config, packId, collectionLevel, ownedCards);
     // Sort by tier (highest last for drama)
     rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
     setCards(rolled);

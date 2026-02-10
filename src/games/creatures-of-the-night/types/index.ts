@@ -361,6 +361,24 @@ export interface CryptSlotUnlock {
   slot: number;
 }
 
+// --- Loot Table Entry ---
+// Each entry defines a weighted card pool for a specific pack slot.
+// cardPool syntax:
+//   "any"                              → any unlocked card
+//   "tier:twilight"                    → exact tier
+//   "minTier:umbral"                  → this tier or higher
+//   "type:beast"                       → exact type
+//   "type:beast,spirit"               → one of these types
+//   "minTier:umbral+type:undead,stone" → combined filters
+//   "set1-rat"                         → specific card ID
+export interface LootTableEntry {
+  packId: string;
+  slot: number | 'fill';   // numbered slot (1-indexed) for guarantees, or 'fill' for remaining slots
+  cardPool: string;         // filter expression (see syntax above)
+  weight: number;           // probability weight for weighted random selection
+  newOnly?: boolean;        // if true, prefer cards the player doesn't own yet
+}
+
 // --- Game Config (provided by context) ---
 export interface GameConfig {
   cards: CardDefinition[];
@@ -373,6 +391,7 @@ export interface GameConfig {
   dailyQuestPool: DailyQuest[];
   typeUnlockCL: Record<CardType, number>;
   cryptSlotUnlocks: CryptSlotUnlock[];
+  lootTables: LootTableEntry[];
   settings: GameSettings;
 }
 
