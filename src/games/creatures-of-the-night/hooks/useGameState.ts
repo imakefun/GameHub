@@ -938,8 +938,6 @@ function createGameReducer(config: GameConfig) {
         });
         if (validIndices.length < zone.requirements.minCards) return state;
 
-        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'expedition');
-
         const now = Date.now();
         return {
           ...state,
@@ -957,7 +955,6 @@ function createGameReducer(config: GameConfig) {
               completesAt: now + zone.duration * 1000,
             },
           ],
-          dailyQuests: dq,
         };
       }
 
