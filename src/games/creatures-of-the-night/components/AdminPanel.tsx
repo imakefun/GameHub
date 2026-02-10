@@ -17,6 +17,7 @@ import {
   typeUnlockCL as localTypeUnlockCL,
   cryptSlotUnlocks as localCryptSlotUnlocks,
 } from '../data/clConfig';
+import { lootTables as localLootTables } from '../data/lootTables';
 import { settings as localSettings } from '../data/settings';
 
 import {
@@ -26,6 +27,7 @@ import {
   generateSynergiesFile,
   generateSettingsFile,
   generateCLConfigFile,
+  generateLootTablesFile,
   downloadFile,
 } from './adminCodegen';
 
@@ -38,6 +40,7 @@ import type {
   CLReward,
   FeatureUnlock,
   DailyQuest,
+  LootTableEntry,
   CardType,
   CryptSlotUnlock,
   GameSettings,
@@ -144,6 +147,16 @@ function flattenCLConfig(typeUnlockCL: Record<CardType, number>, cryptSlotUnlock
   return rows;
 }
 
+function flattenLootTableEntry(e: LootTableEntry): Record<string, string> {
+  return {
+    packId: e.packId,
+    slot: String(e.slot),
+    cardPool: e.cardPool,
+    weight: String(e.weight),
+    newOnly: e.newOnly ? 'true' : '',
+  };
+}
+
 function flattenSettings(settings: GameSettings): Record<string, string>[] {
   return Object.entries(settings).map(([key, value]) => ({ key, value: String(value) }));
 }
@@ -168,6 +181,7 @@ const SHEET_DEFS: SheetDef[] = [
   { name: 'CL Rewards', sheetTab: 'CLRewards', getRows: () => localCLRewards.map(flattenCLReward) },
   { name: 'Feature Unlocks', sheetTab: 'FeatureUnlocks', getRows: () => localFeatureUnlocks.map(flattenFeatureUnlock) },
   { name: 'CL Config', sheetTab: 'CLConfig', getRows: () => flattenCLConfig(localTypeUnlockCL, localCryptSlotUnlocks) },
+  { name: 'Loot Tables', sheetTab: 'LootTables', getRows: () => localLootTables.map(flattenLootTableEntry) },
   { name: 'Settings', sheetTab: 'Settings', getRows: () => flattenSettings(localSettings) },
 ];
 
@@ -175,7 +189,7 @@ const SHEET_DEFS: SheetDef[] = [
 // Pull: file output definitions
 // ============================================================
 
-const SHEET_TABS = ['Cards', 'Packs', 'Expeditions', 'TypeSynergies', 'CrossTypeSynergies', 'DailyQuests', 'CLRewards', 'FeatureUnlocks', 'CLConfig', 'Settings'] as const;
+const SHEET_TABS = ['Cards', 'Packs', 'Expeditions', 'TypeSynergies', 'CrossTypeSynergies', 'DailyQuests', 'CLRewards', 'FeatureUnlocks', 'CLConfig', 'LootTables', 'Settings'] as const;
 
 interface FileDef {
   name: string;
@@ -221,6 +235,12 @@ const FILE_DEFS: FileDef[] = [
     filename: 'clConfig.ts',
     sheets: ['CLConfig', 'CLRewards'],
     generate: (d) => generateCLConfigFile(d.CLConfig, d.CLRewards),
+  },
+  {
+    name: 'Loot Tables',
+    filename: 'lootTables.ts',
+    sheets: ['LootTables'],
+    generate: (d) => generateLootTablesFile(d.LootTables),
   },
 ];
 

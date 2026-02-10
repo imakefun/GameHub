@@ -14,6 +14,7 @@ import type {
   FeatureUnlock,
   CryptSlotUnlock,
   DailyQuest,
+  LootTableEntry,
   GameSettings,
 } from '../types';
 
@@ -32,6 +33,7 @@ interface SheetsCache {
   featureUnlocks: FeatureUnlock[] | null;
   typeUnlockCL: Record<CardType, number> | null;
   cryptSlotUnlocks: CryptSlotUnlock[] | null;
+  lootTables: LootTableEntry[] | null;
   settings: GameSettings | null;
   lastFetch: number;
 }
@@ -49,6 +51,7 @@ const cache: SheetsCache = {
   featureUnlocks: null,
   typeUnlockCL: null,
   cryptSlotUnlocks: null,
+  lootTables: null,
   settings: null,
   lastFetch: 0,
 };
@@ -305,6 +308,22 @@ function parseCLConfig(rows: Record<string, string>[]): {
   };
 }
 
+function parseLootTables(rows: Record<string, string>[]): LootTableEntry[] {
+  return rows
+    .map((row) => {
+      const slotRaw = (row['slot'] || '').trim().toLowerCase();
+      const slot: number | 'fill' = slotRaw === 'fill' ? 'fill' : parseInt(slotRaw || '0');
+      return {
+        packId: row['packId'] || '',
+        slot,
+        cardPool: row['cardPool'] || 'any',
+        weight: parseFloat(row['weight'] || '1'),
+        newOnly: row['newOnly'] === 'true' || row['newOnly'] === '1' || undefined,
+      };
+    })
+    .filter((e) => e.packId && (e.slot === 'fill' || (typeof e.slot === 'number' && e.slot > 0)));
+}
+
 // ============================================================
 // Public API
 // ============================================================
@@ -320,6 +339,7 @@ export interface GameSheetData {
   featureUnlocks: FeatureUnlock[] | null;
   typeUnlockCL: Record<CardType, number> | null;
   cryptSlotUnlocks: CryptSlotUnlock[] | null;
+  lootTables: LootTableEntry[] | null;
   settings: GameSettings;
 }
 
@@ -341,6 +361,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       featureUnlocks: cache.featureUnlocks,
       typeUnlockCL: cache.typeUnlockCL,
       cryptSlotUnlocks: cache.cryptSlotUnlocks,
+      lootTables: cache.lootTables,
       settings: cache.settings,
     };
   }
@@ -361,6 +382,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       featureUnlockRows,
       clConfigRows,
       settingsRows,
+      lootTableRows,
     ] = await Promise.all([
       fetchSheet(SHEETS_CONFIG.sheets.cards),
       fetchSheet(SHEETS_CONFIG.sheets.packs).catch(() => []),
@@ -372,6 +394,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       fetchSheet(SHEETS_CONFIG.sheets.featureUnlocks).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.clConfig).catch(() => []),
       fetchSheet(SHEETS_CONFIG.sheets.settings).catch(() => []),
+      fetchSheet(SHEETS_CONFIG.sheets.lootTables).catch(() => []),
     ]);
 
     const cards = parseCards(cardRows);
@@ -383,6 +406,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
     const clRewards = clRewardRows.length > 0 ? parseCLRewards(clRewardRows) : null;
     const featureUnlocks = featureUnlockRows.length > 0 ? parseFeatureUnlocks(featureUnlockRows) : null;
     const clConfig = clConfigRows.length > 0 ? parseCLConfig(clConfigRows) : { typeUnlockCL: null, cryptSlotUnlocks: null };
+    const lootTables = lootTableRows.length > 0 ? parseLootTables(lootTableRows) : null;
     const settings = parseSettings(settingsRows);
 
     cache.cards = cards;
@@ -395,15 +419,17 @@ export async function fetchGameData(): Promise<GameSheetData> {
     cache.featureUnlocks = featureUnlocks;
     cache.typeUnlockCL = clConfig.typeUnlockCL;
     cache.cryptSlotUnlocks = clConfig.cryptSlotUnlocks;
+    cache.lootTables = lootTables;
     cache.settings = settings;
     cache.lastFetch = now;
 
-    console.log(`[Creatures] Loaded from Sheets: ${cards.length} cards, ${packs?.length ?? 0} packs, ${expeditions?.length ?? 0} expeditions`);
+    console.log(`[Creatures] Loaded from Sheets: ${cards.length} cards, ${packs?.length ?? 0} packs, ${expeditions?.length ?? 0} expeditions, ${lootTables?.length ?? 0} loot table entries`);
     return {
       cards, packs, expeditions, typeSynergies, crossTypeSynergies, dailyQuests,
       clRewards, featureUnlocks,
       typeUnlockCL: clConfig.typeUnlockCL,
       cryptSlotUnlocks: clConfig.cryptSlotUnlocks,
+      lootTables,
       settings,
     };
   } catch (error) {
@@ -423,6 +449,7 @@ export function clearCache(): void {
   cache.featureUnlocks = null;
   cache.typeUnlockCL = null;
   cache.cryptSlotUnlocks = null;
+  cache.lootTables = null;
   cache.settings = null;
   cache.lastFetch = 0;
 }

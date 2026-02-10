@@ -378,6 +378,30 @@ export function generateCLConfigFile(clConfigRows: Row[], clRewardRows: Row[]): 
   return s;
 }
 
+// ============================================================
+// Loot Tables
+// ============================================================
+
+function deflateLootTableEntry(r: Row) {
+  const entry: Record<string, unknown> = {
+    packId: r.packId,
+    slot: (r.slot || '').toLowerCase() === 'fill' ? 'fill' : int(r.slot, 1),
+    cardPool: r.cardPool || 'any',
+    weight: num(r.weight, 1),
+  };
+  if (r.newOnly === 'true' || r.newOnly === '1') entry.newOnly = true;
+  return entry;
+}
+
+export function generateLootTablesFile(rows: Row[]): string {
+  const entries = rows.filter(r => r.packId).map(deflateLootTableEntry);
+  let s = "import type { LootTableEntry } from '../types';\n\n";
+  s += "export const lootTables: LootTableEntry[] = [\n";
+  for (const e of entries) s += `  ${toTS(e, 1, true)},\n`;
+  s += "];\n";
+  return s;
+}
+
 /** Trigger a browser file download. */
 export function downloadFile(filename: string, content: string): void {
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });

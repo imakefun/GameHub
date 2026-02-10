@@ -11,6 +11,7 @@ import type {
   CLReward,
   CryptSlotUnlock,
   DailyQuest,
+  LootTableEntry,
   GameConfig,
   GameSettings,
 } from '../types';
@@ -31,6 +32,7 @@ import {
   typeUnlockCL as localTypeUnlockCL,
   cryptSlotUnlocks as localCryptSlotUnlocks,
 } from '../data/clConfig';
+import { lootTables as localLootTables } from '../data/lootTables';
 import { settings as localSettings } from '../data/settings';
 
 // Eagerly import all card art PNGs – Vite resolves these to hashed asset URLs at build time
@@ -78,6 +80,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [dailyQuestPool, setDailyQuestPool] = useState<DailyQuest[]>(localDailyQuestPool);
   const [typeUnlockCL, setTypeUnlockCL] = useState<Record<CardType, number>>(localTypeUnlockCL);
   const [cryptSlotUnlocks, setCryptSlotUnlocks] = useState<CryptSlotUnlock[]>(localCryptSlotUnlocks);
+  const [lootTables, setLootTables] = useState<LootTableEntry[]>(localLootTables);
   const [settings, setSettings] = useState<GameSettings>(localSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +128,9 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
       if (data.cryptSlotUnlocks) {
         setCryptSlotUnlocks(data.cryptSlotUnlocks);
       }
+      if (data.lootTables && data.lootTables.length > 0) {
+        setLootTables(data.lootTables);
+      }
       setSettings(data.settings);
       setIsUsingSheets(true);
     } catch (err) {
@@ -156,6 +162,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     dailyQuestPool,
     typeUnlockCL,
     cryptSlotUnlocks,
+    lootTables,
     settings,
   };
 
