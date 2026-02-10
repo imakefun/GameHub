@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -9,7 +9,7 @@ import {
   Cloud,
   Database,
 } from 'lucide-react';
-import type { CardDefinition, CLReward, DailyQuest, CardType } from './types';
+import type { CardDefinition, CLReward, DailyQuest, CardType, UpgradeTier } from './types';
 import { CARD_TYPE_INFO } from './types';
 import { useGameState } from './hooks/useGameState';
 import { Filter, ArrowUpDown } from 'lucide-react';
@@ -76,6 +76,29 @@ function CreaturesGame() {
     const def = config.cards.find((c) => c.id === cards[idx].definitionId);
     return { index: idx, name: def?.name };
   }, [state.ownedCards, config.cards]);
+
+  // ---- Upgrade → CL Road animation flow ----
+  const clBeforeUpgradeRef = useRef(state.collectionLevel);
+  const [clRoadAnimation, setClRoadAnimation] = useState<{ clFrom: number; clTo: number } | null>(null);
+
+  // Wraps upgradeCard: capture CL *before* dispatch so we can animate the gain
+  const handleUpgrade = useCallback(
+    (index: number, targetTier?: Exclude<UpgradeTier, 'base'>, useLunarCrystals?: boolean) => {
+      clBeforeUpgradeRef.current = state.collectionLevel;
+      upgradeCard(index, targetTier, useLunarCrystals);
+    },
+    [state.collectionLevel, upgradeCard],
+  );
+
+  // Called when UpgradeReveal "Continue" is clicked → opens CL Road with animation
+  const handleUpgradeFlowNext = useCallback(() => {
+    const clFrom = clBeforeUpgradeRef.current;
+    const clTo = state.collectionLevel;
+    if (clTo > clFrom) {
+      setClRoadAnimation({ clFrom, clTo });
+      setShowCLRoad(true);
+    }
+  }, [state.collectionLevel]);
 
   // Wrap claimCLReward: show a celebration overlay for every reward type
   const handleClaimCLReward = useCallback(
@@ -427,7 +450,8 @@ function CreaturesGame() {
                 onPlaceCard={placeCard}
                 onSwapCard={swapCard}
                 onRemoveCard={removeCard}
-                onUpgrade={upgradeCard}
+                onUpgrade={handleUpgrade}
+                onUpgradeFlowNext={handleUpgradeFlowNext}
               />
             )}
             {activeTab === 'shop' && (
@@ -492,7 +516,11 @@ function CreaturesGame() {
             state={state}
             config={config}
             onClaimReward={handleClaimCLReward}
-            onClose={() => setShowCLRoad(false)}
+            onClose={() => {
+              setShowCLRoad(false);
+              setClRoadAnimation(null);
+            }}
+            animation={clRoadAnimation ?? undefined}
           />
         )}
       </AnimatePresence>
