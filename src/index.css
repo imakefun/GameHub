@@ -85,3 +85,21 @@ body {
 .glow-accent {
   box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
 }
+
+/* Upgrade arrow animation - green chevrons flowing upward on upgradeable cards */
+@keyframes upgradeArrowRise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.85;
+  }
+  75% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-180px);
+    opacity: 0;
+  }
+}

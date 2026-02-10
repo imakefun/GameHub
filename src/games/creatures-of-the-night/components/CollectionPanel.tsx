@@ -91,6 +91,15 @@ export function CollectionPanel({
 
   const cryptIsFull = ownedCards.filter((c) => c.placedInCrypt).length >= cryptSlots;
 
+  // Check if a card can be upgraded to its next tier (has enough resources)
+  const canUpgradeNext = (card: OwnedCard): boolean => {
+    const nextIdx = UPGRADE_TIER_ORDER.indexOf(card.upgradeTier) + 1;
+    if (nextIdx >= UPGRADE_TIER_ORDER.length) return false;
+    const nextTier = UPGRADE_TIER_ORDER[nextIdx] as Exclude<UpgradeTier, 'base'>;
+    const cost = UPGRADE_COSTS[nextTier];
+    return currencies.shadowEssence >= cost.shadowEssence && card.soulShards >= cost.shards;
+  };
+
   const filteredCards = ownedCards
     .map((card, index) => {
       const def = config.cards.find((c) => c.id === card.definitionId);
@@ -131,6 +140,7 @@ export function CollectionPanel({
             const typeInfo = CARD_TYPE_INFO[def.type];
             const border = borderStyle(card.upgradeTier, upgradeColor);
             const isFatigued = card.fatigueUntil && Date.now() < card.fatigueUntil;
+            const isUpgradeable = canUpgradeNext(card);
 
             return (
               <motion.button
@@ -144,8 +154,10 @@ export function CollectionPanel({
                 style={{
                   borderWidth: border.borderWidth,
                   borderStyle: 'solid',
-                  borderColor: border.borderColor,
-                  boxShadow: border.boxShadow,
+                  borderColor: isUpgradeable ? '#4ade8080' : border.borderColor,
+                  boxShadow: isUpgradeable
+                    ? `${border.boxShadow}, 0 0 10px rgba(74, 222, 128, 0.25), inset 0 0 6px rgba(74, 222, 128, 0.08)`
+                    : border.boxShadow,
                   opacity: isFatigued ? 0.6 : 1,
                 }}
               >
@@ -166,6 +178,44 @@ export function CollectionPanel({
                     <span className="text-4xl">{typeInfo.emoji}</span>
                   )}
                 </div>
+
+                {/* Green upgrade arrows flowing upward */}
+                {isUpgradeable && (
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl z-[5]">
+                    {/* Left side arrows */}
+                    {[0, 1, 2].map((j) => (
+                      <div
+                        key={`l-${j}`}
+                        className="absolute left-[3px]"
+                        style={{
+                          bottom: '-6px',
+                          animation: 'upgradeArrowRise 2.1s ease-in-out infinite',
+                          animationDelay: `${j * 0.7}s`,
+                        }}
+                      >
+                        <svg width="10" height="8" viewBox="0 0 10 8" style={{ filter: 'drop-shadow(0 0 3px rgba(74, 222, 128, 0.6))' }}>
+                          <path d="M1 7 L5 1.5 L9 7" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    ))}
+                    {/* Right side arrows */}
+                    {[0, 1, 2].map((j) => (
+                      <div
+                        key={`r-${j}`}
+                        className="absolute right-[3px]"
+                        style={{
+                          bottom: '-6px',
+                          animation: 'upgradeArrowRise 2.1s ease-in-out infinite',
+                          animationDelay: `${j * 0.7 + 0.35}s`,
+                        }}
+                      >
+                        <svg width="10" height="8" viewBox="0 0 10 8" style={{ filter: 'drop-shadow(0 0 3px rgba(74, 222, 128, 0.6))' }}>
+                          <path d="M1 7 L5 1.5 L9 7" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Upgrade tier indicator - top right */}
                 {card.upgradeTier !== 'base' && (
