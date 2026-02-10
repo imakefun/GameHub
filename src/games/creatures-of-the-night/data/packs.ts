@@ -9,7 +9,7 @@ export const packs: PackDefinition[] = [
     name: 'Starter Tome',
     description: 'A free introductory tome for new summoners.',
     cost: null,
-    cardCount: 5,
+    cardCount: 3,
     tierWeights: { twilight: 100 },
     isOneTime: true,
     availability: 'shop',

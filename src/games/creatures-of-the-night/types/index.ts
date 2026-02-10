@@ -374,7 +374,7 @@ export interface CryptSlotUnlock {
 //   "type:beast"                       → exact type
 //   "type:beast,spirit"               → one of these types
 //   "minSet:5+type:undead,stone"      → combined filters
-//   "set1-rat"                         → specific card ID
+//   "rat"                              → specific card ID
 //
 // Resource rewards use minQty / maxQty / step for quantity ranges.
 export type LootRewardType = 'card' | 'shadowEssence' | 'soulShards' | 'lunarCrystals' | 'voidEnergy';

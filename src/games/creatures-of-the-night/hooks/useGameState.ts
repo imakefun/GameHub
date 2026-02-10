@@ -367,7 +367,20 @@ function trackQuestProgress(
 // Save Migration — convert old saves to new format
 // ============================================================
 
+// Migrate old starter card IDs (set1-rat → rat, etc.)
+const STARTER_ID_MIGRATION: Record<string, string> = {
+  'set1-rat': 'rat',
+  'set1-bat': 'bat',
+  'set1-owl': 'owl',
+};
+
 function migrateOwnedCard(card: Record<string, unknown>): OwnedCard {
+  // Migrate old starter IDs
+  const defId = card.definitionId as string;
+  if (defId in STARTER_ID_MIGRATION) {
+    card = { ...card, definitionId: STARTER_ID_MIGRATION[defId] };
+  }
+
   // Old format had: level, awakened. New format has: upgradeTier.
   if ('upgradeTier' in card && typeof card.upgradeTier === 'string') {
     return card as unknown as OwnedCard;
@@ -402,7 +415,7 @@ function migrateOwnedCard(card: Record<string, unknown>): OwnedCard {
 
 function createInitialState(config: GameConfig): GameState {
   // Start with Rat, Bat, and Owl from Set 1
-  const starterIds = ['set1-rat', 'set1-bat', 'set1-owl'];
+  const starterIds = ['rat', 'bat', 'owl'];
   const starterOwned: OwnedCard[] = starterIds
     .map((id) => config.cards.find((c) => c.id === id))
     .filter((c): c is CardDefinition => !!c)
