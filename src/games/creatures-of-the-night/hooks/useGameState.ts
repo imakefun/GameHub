@@ -865,7 +865,11 @@ function createGameReducer(config: GameConfig) {
       // ======================== CLAIM_STARTER_TOME ========================
       case 'CLAIM_STARTER_TOME': {
         if (state.starterTomeClaimed) return state;
-        return { ...state, starterTomeClaimed: true };
+        return {
+          ...state,
+          starterTomeClaimed: true,
+          pendingPackRewards: [...state.pendingPackRewards, 'starter-tome'],
+        };
       }
 
       // ======================== START_EXPEDITION ========================
