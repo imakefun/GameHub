@@ -60,14 +60,14 @@ function int(s: string | undefined, fallback = 0): number {
   return isNaN(n) ? fallback : n;
 }
 
-function deflateCard(r: Row, includeSet: boolean) {
+function deflateCard(r: Row) {
   const card: Record<string, unknown> = {
     id: r.id,
     name: r.name,
     type: r.type,
     tier: r.tier,
   };
-  if (includeSet) card.set = 1;
+  if (r.set) card.set = int(r.set, 1);
   card.baseGenerationAmount = num(r.baseGenerationAmount, 1);
   card.baseInterval = int(r.baseInterval, 30);
   card.description = r.description || '';
@@ -218,14 +218,14 @@ export function generateCardsFile(rows: Row[]): string {
   s += "// Set 1 — Starter & CL Road Phase 1 Cards (CL 1-32)\n";
   s += "// ============================================================\n";
   s += "export const set1Cards: CardDefinition[] = [\n";
-  for (const r of set1) s += `  ${toTS(deflateCard(r, true), 1, true)},\n`;
+  for (const r of set1) s += `  ${toTS(deflateCard(r), 1, true)},\n`;
   s += "];\n\n";
 
   s += "// ============================================================\n";
   s += "// Legacy Cards\n";
   s += "// ============================================================\n";
   s += "const legacyCards: CardDefinition[] = [\n";
-  for (const r of legacy) s += `  ${toTS(deflateCard(r, false), 1, true)},\n`;
+  for (const r of legacy) s += `  ${toTS(deflateCard(r), 1, true)},\n`;
   s += "];\n\n";
 
   s += "export const cards: CardDefinition[] = [...set1Cards, ...legacyCards];\n\n";
@@ -390,6 +390,10 @@ function deflateLootTableEntry(r: Row) {
     weight: num(r.weight, 1),
   };
   if (r.newOnly === 'true' || r.newOnly === '1') entry.newOnly = true;
+  if (r.rewardType && r.rewardType !== 'card') entry.rewardType = r.rewardType;
+  if (r.minQty) entry.minQty = num(r.minQty);
+  if (r.maxQty) entry.maxQty = num(r.maxQty);
+  if (r.step) entry.step = num(r.step);
   return entry;
 }
 

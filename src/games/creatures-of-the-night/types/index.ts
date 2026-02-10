@@ -338,7 +338,7 @@ export type GameAction =
   | { type: 'SWAP_CARD'; removeIndex: number; placeIndex: number }
   | { type: 'REMOVE_CARD'; cardIndex: number }
   | { type: 'UPGRADE_CARD'; cardIndex: number; targetTier?: Exclude<UpgradeTier, 'base'>; useLunarCrystals?: boolean }
-  | { type: 'OPEN_PACK'; cards: CardDefinition[]; packId: string }
+  | { type: 'OPEN_PACK'; cards: CardDefinition[]; resourceRewards?: PackRewardResource[]; packId: string }
   | { type: 'PURCHASE_PACK'; packId: string }
   | { type: 'CLAIM_STARTER_TOME' }
   | { type: 'START_EXPEDITION'; zoneId: string; cardIndices: number[] }
@@ -362,21 +362,39 @@ export interface CryptSlotUnlock {
 }
 
 // --- Loot Table Entry ---
-// Each entry defines a weighted card pool for a specific pack slot.
-// cardPool syntax:
+// Each entry defines a weighted card/resource pool for a specific pack slot.
+//
+// rewardType: 'card' (default) or a currency key for resource rewards.
+// cardPool syntax (for card rewards):
 //   "any"                              → any unlocked card
-//   "tier:twilight"                    → exact tier
-//   "minTier:umbral"                  → this tier or higher
+//   "set:1"                            → exact card set
+//   "minSet:3"                         → this set or higher
+//   "tier:twilight"                    → exact tier (legacy)
+//   "minTier:umbral"                   → this tier or higher (legacy)
 //   "type:beast"                       → exact type
 //   "type:beast,spirit"               → one of these types
-//   "minTier:umbral+type:undead,stone" → combined filters
+//   "minSet:5+type:undead,stone"      → combined filters
 //   "set1-rat"                         → specific card ID
+//
+// Resource rewards use minQty / maxQty / step for quantity ranges.
+export type LootRewardType = 'card' | 'shadowEssence' | 'soulShards' | 'lunarCrystals' | 'voidEnergy';
+
 export interface LootTableEntry {
   packId: string;
-  slot: number | 'fill';   // numbered slot (1-indexed) for guarantees, or 'fill' for remaining slots
-  cardPool: string;         // filter expression (see syntax above)
-  weight: number;           // probability weight for weighted random selection
-  newOnly?: boolean;        // if true, prefer cards the player doesn't own yet
+  slot: number | 'fill';        // numbered slot (1-indexed) for guarantees, or 'fill' for remaining slots
+  cardPool: string;              // filter expression for card rewards (see syntax above)
+  weight: number;                // probability weight for weighted random selection
+  newOnly?: boolean;             // if true, prefer cards the player doesn't own yet
+  rewardType?: LootRewardType;   // 'card' (default) or a currency type
+  minQty?: number;               // minimum resource quantity (for resource rewards)
+  maxQty?: number;               // maximum resource quantity (for resource rewards)
+  step?: number;                 // round quantity to nearest step (e.g. step=5 → 10,15,20...)
+}
+
+// --- Pack Reward (resource result from loot table) ---
+export interface PackRewardResource {
+  resource: keyof Currencies;
+  amount: number;
 }
 
 // --- Game Config (provided by context) ---

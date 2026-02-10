@@ -154,6 +154,10 @@ function flattenLootTableEntry(e: LootTableEntry): Record<string, string> {
     cardPool: e.cardPool,
     weight: String(e.weight),
     newOnly: e.newOnly ? 'true' : '',
+    rewardType: e.rewardType || '',
+    minQty: e.minQty != null ? String(e.minQty) : '',
+    maxQty: e.maxQty != null ? String(e.maxQty) : '',
+    step: e.step != null ? String(e.step) : '',
   };
 }
 

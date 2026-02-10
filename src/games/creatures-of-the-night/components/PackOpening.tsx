@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { CardDefinition, CardTier, CardType, GameConfig, LootTableEntry, OwnedCard, PackGuarantee } from '../types';
+import type { CardDefinition, CardTier, CardType, Currencies, GameConfig, LootTableEntry, OwnedCard, PackGuarantee, PackRewardResource } from '../types';
 import { CARD_TYPE_INFO, TIER_ORDER, UPGRADE_TIER_COLORS } from '../types';
 
 interface PackOpeningProps {
@@ -8,9 +8,17 @@ interface PackOpeningProps {
   ownedCards: OwnedCard[];
   collectionLevel: number;
   onClose: () => void;
-  onConfirm: (cards: CardDefinition[]) => void;
+  onConfirm: (cards: CardDefinition[], resourceRewards?: PackRewardResource[]) => void;
   packId: string;
 }
+
+// Display info for resource types
+const RESOURCE_INFO: Record<string, { label: string; emoji: string; color: string }> = {
+  shadowEssence: { label: 'Shadow Essence', emoji: '\u{1F47B}', color: '#a78bfa' },
+  soulShards: { label: 'Soul Shards', emoji: '\u{1F48E}', color: '#60a5fa' },
+  lunarCrystals: { label: 'Lunar Crystals', emoji: '\u{1F319}', color: '#fbbf24' },
+  voidEnergy: { label: 'Void Energy', emoji: '\u{1F30C}', color: '#c084fc' },
+};
 
 function tierAtLeast(cardTier: CardTier, minTier: CardTier): boolean {
   return TIER_ORDER.indexOf(cardTier) >= TIER_ORDER.indexOf(minTier);
@@ -47,6 +55,12 @@ function applyCardPoolFilter(cards: CardDefinition[], cardPool: string): CardDef
     } else if (seg.startsWith('mintier:')) {
       const minTier = seg.slice(8) as CardTier;
       pool = pool.filter((c) => tierAtLeast(c.tier, minTier));
+    } else if (seg.startsWith('set:')) {
+      const setNum = parseInt(seg.slice(4), 10);
+      pool = pool.filter((c) => c.set === setNum);
+    } else if (seg.startsWith('minset:')) {
+      const minSet = parseInt(seg.slice(7), 10);
+      pool = pool.filter((c) => c.set !== undefined && c.set >= minSet);
     } else if (seg.startsWith('type:')) {
       const types = seg.slice(5).split(',').map((t) => t.trim()) as CardType[];
       pool = pool.filter((c) => types.includes(c.type));
@@ -57,16 +71,34 @@ function applyCardPoolFilter(cards: CardDefinition[], cardPool: string): CardDef
 }
 
 // ============================================================
+// Resource quantity roller
+// ============================================================
+
+function rollQuantity(min: number, max: number, step?: number): number {
+  const raw = min + Math.random() * (max - min);
+  if (step && step > 0) {
+    return Math.round(raw / step) * step;
+  }
+  return Math.round(raw);
+}
+
+// ============================================================
 // Loot Table roller
 // ============================================================
 
-function rollCardsFromLootTable(
+interface LootTableResult {
+  cards: CardDefinition[];
+  resources: PackRewardResource[];
+}
+
+function rollFromLootTable(
   entries: LootTableEntry[],
   allCards: CardDefinition[],
   ownedCardIds: Set<string>,
   cardCount: number,
-): CardDefinition[] {
-  const results: CardDefinition[] = [];
+): LootTableResult {
+  const cards: CardDefinition[] = [];
+  const resources: PackRewardResource[] = [];
 
   // Separate numbered slots from fill slots
   const numberedSlots = entries
@@ -83,18 +115,37 @@ function rollCardsFromLootTable(
     return pickRandomFrom(pool);
   };
 
+  // Helper: process a single entry
+  const processEntry = (entry: LootTableEntry) => {
+    const rt = entry.rewardType || 'card';
+    if (rt !== 'card') {
+      // Resource reward
+      const min = entry.minQty ?? 0;
+      const max = entry.maxQty ?? min;
+      const amount = rollQuantity(min, max, entry.step);
+      if (amount > 0) {
+        resources.push({ resource: rt as keyof Currencies, amount });
+      }
+    } else {
+      // Card reward
+      const pool = applyCardPoolFilter(allCards, entry.cardPool);
+      if (pool.length > 0) {
+        cards.push(pickFromPool(pool, entry.newOnly));
+      } else {
+        cards.push(pickRandomFrom(allCards));
+      }
+    }
+  };
+
   // 1. Process numbered slots
   for (const entry of numberedSlots) {
-    const pool = applyCardPoolFilter(allCards, entry.cardPool);
-    if (pool.length > 0) {
-      results.push(pickFromPool(pool, entry.newOnly));
-    }
+    processEntry(entry);
   }
 
-  // 2. Fill remaining slots using weighted random from fill entries
+  // 2. Fill remaining card slots using weighted random from fill entries
   const totalFillWeight = fillEntries.reduce((sum, e) => sum + e.weight, 0);
 
-  while (results.length < cardCount && fillEntries.length > 0) {
+  while (cards.length < cardCount && fillEntries.length > 0 && totalFillWeight > 0) {
     // Pick a fill entry by weight
     let roll = Math.random() * totalFillWeight;
     let chosenEntry = fillEntries[0];
@@ -105,17 +156,10 @@ function rollCardsFromLootTable(
         break;
       }
     }
-
-    const pool = applyCardPoolFilter(allCards, chosenEntry.cardPool);
-    if (pool.length > 0) {
-      results.push(pickFromPool(pool, chosenEntry.newOnly));
-    } else {
-      // Fallback: pick any card
-      results.push(pickRandomFrom(allCards));
-    }
+    processEntry(chosenEntry);
   }
 
-  return results;
+  return { cards, resources };
 }
 
 // ============================================================
@@ -203,18 +247,18 @@ function pickGuaranteed(
 }
 
 // ============================================================
-// Main rollCards entry point
+// Main rollLoot entry point
 // ============================================================
 
-function rollCards(config: GameConfig, packId: string, collectionLevel: number, ownedCards?: OwnedCard[]): CardDefinition[] {
+function rollLoot(config: GameConfig, packId: string, collectionLevel: number, ownedCards?: OwnedCard[]): LootTableResult {
   const pack = config.packs.find((p) => p.id === packId);
-  if (!pack) return [];
+  if (!pack) return { cards: [], resources: [] };
 
   // Filter cards to only include types the player has unlocked via CL
   const unlockedCards = config.cards.filter(
     (c) => collectionLevel >= (config.typeUnlockCL[c.type] ?? 1)
   );
-  if (unlockedCards.length === 0) return [];
+  if (unlockedCards.length === 0) return { cards: [], resources: [] };
 
   // Check for loot table entries for this pack
   const lootEntries = config.lootTables.filter((e) => e.packId === packId);
@@ -222,11 +266,11 @@ function rollCards(config: GameConfig, packId: string, collectionLevel: number, 
   if (lootEntries.length > 0) {
     // Use loot table system
     const ownedCardIds = new Set(ownedCards?.map((c) => c.definitionId) ?? []);
-    return rollCardsFromLootTable(lootEntries, unlockedCards, ownedCardIds, pack.cardCount);
+    return rollFromLootTable(lootEntries, unlockedCards, ownedCardIds, pack.cardCount);
   }
 
-  // Fallback to legacy tier-weight system
-  return rollCardsLegacy(pack, unlockedCards);
+  // Fallback to legacy tier-weight system (card-only)
+  return { cards: rollCardsLegacy(pack, unlockedCards), resources: [] };
 }
 
 const SHARD_RATES: Record<CardTier, number> = {
@@ -240,15 +284,20 @@ const SHARD_RATES: Record<CardTier, number> = {
 export function PackOpening({ config, ownedCards, collectionLevel, onClose, onConfirm, packId }: PackOpeningProps) {
   const [phase, setPhase] = useState<'sealed' | 'revealing' | 'done'>('sealed');
   const [cards, setCards] = useState<CardDefinition[]>([]);
+  const [resourceRewards, setResourceRewards] = useState<PackRewardResource[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Total reveal items = cards + resources
+  const totalItems = cards.length + resourceRewards.length;
 
   const pack = config.packs.find((p) => p.id === packId);
 
   const handleOpen = () => {
-    const rolled = rollCards(config, packId, collectionLevel, ownedCards);
-    // Sort by tier (highest last for drama)
-    rolled.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
-    setCards(rolled);
+    const result = rollLoot(config, packId, collectionLevel, ownedCards);
+    // Sort cards by tier (highest last for drama)
+    result.cards.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
+    setCards(result.cards);
+    setResourceRewards(result.resources);
     setCurrentIndex(0);
     setPhase('revealing');
   };
@@ -256,23 +305,26 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
   const handleTap = useCallback(() => {
     if (phase !== 'revealing') return;
 
-    // Advance to next card or finish
-    if (currentIndex < cards.length - 1) {
+    // Advance to next item or finish
+    if (currentIndex < totalItems - 1) {
       setCurrentIndex((i) => i + 1);
     } else {
       setPhase('done');
     }
-  }, [phase, currentIndex, cards.length]);
+  }, [phase, currentIndex, totalItems]);
 
   const handleConfirm = () => {
-    onConfirm(cards);
+    onConfirm(cards, resourceRewards.length > 0 ? resourceRewards : undefined);
     onClose();
   };
 
   const isNewCard = (cardDef: CardDefinition) =>
     !ownedCards.some((c) => c.definitionId === cardDef.id);
 
-  const currentCard = cards[currentIndex];
+  // Current item: could be a card or a resource
+  const isShowingCard = currentIndex < cards.length;
+  const currentCard = isShowingCard ? cards[currentIndex] : null;
+  const currentResource = !isShowingCard ? resourceRewards[currentIndex - cards.length] : null;
 
   return (
     <motion.div
@@ -328,12 +380,12 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
           </motion.div>
         )}
 
-        {/* === REVEALING PHASE — one card at a time === */}
-        {phase === 'revealing' && currentCard && (
+        {/* === REVEALING PHASE — one item at a time === */}
+        {phase === 'revealing' && (currentCard || currentResource) && (
           <div className="flex flex-col items-center w-full max-w-xs" onClick={handleTap}>
             {/* Progress */}
             <div className="flex items-center gap-2 mb-4">
-              {cards.map((_, i) => (
+              {Array.from({ length: totalItems }).map((_, i) => (
                 <div
                   key={i}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -346,11 +398,11 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
                 />
               ))}
               <span className="text-xs text-surface-500 ml-1">
-                {currentIndex + 1}/{cards.length}
+                {currentIndex + 1}/{totalItems}
               </span>
             </div>
 
-            {/* Card reveal area */}
+            {/* Reveal area */}
             <div className="relative w-full">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -361,7 +413,11 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
                   transition={{ duration: 0.25 }}
                   className="w-full"
                 >
-                  <RevealedCard card={currentCard} isNew={isNewCard(currentCard)} />
+                  {currentCard ? (
+                    <RevealedCard card={currentCard} isNew={isNewCard(currentCard)} />
+                  ) : currentResource ? (
+                    <RevealedResource reward={currentResource} />
+                  ) : null}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -373,12 +429,12 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
               transition={{ delay: 0.4 }}
               className="text-surface-500 text-sm mt-4 animate-pulse"
             >
-              {currentIndex < cards.length - 1 ? 'Tap for next card' : 'Tap to finish'}
+              {currentIndex < totalItems - 1 ? 'Tap for next' : 'Tap to finish'}
             </motion.p>
           </div>
         )}
 
-        {/* === DONE PHASE — summary of all cards === */}
+        {/* === DONE PHASE — summary of all rewards === */}
         {phase === 'done' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -386,62 +442,129 @@ export function PackOpening({ config, ownedCards, collectionLevel, onClose, onCo
             className="w-full max-w-md space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Summary grid — compact thumbnails */}
-            <div className="grid grid-cols-5 gap-2">
-              {cards.map((card, i) => {
-                const isNew = isNewCard(card);
-                const cardColor = UPGRADE_TIER_COLORS.base;
-                return (
-                  <div
-                    key={i}
-                    className="relative rounded-xl border overflow-hidden"
-                    style={{
-                      borderColor: `${cardColor}60`,
-                      background: `linear-gradient(180deg, ${cardColor}20, rgba(0,0,0,0.4))`,
-                    }}
-                  >
-                    {isNew ? (
-                      <div className="absolute top-0.5 right-0.5 bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
-                        NEW
-                      </div>
-                    ) : (
-                      <div className="absolute top-0.5 right-0.5 bg-blue-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
-                        +{SHARD_RATES[card.tier]}
-                      </div>
-                    )}
-                    <div className="aspect-square flex items-center justify-center">
-                      {card.artUrl ? (
-                        <img src={card.artUrl} alt={card.name} className="w-full h-full object-cover" />
+            {/* Card summary grid */}
+            {cards.length > 0 && (
+              <div className="grid grid-cols-5 gap-2">
+                {cards.map((card, i) => {
+                  const isNew = isNewCard(card);
+                  const cardColor = UPGRADE_TIER_COLORS.base;
+                  return (
+                    <div
+                      key={i}
+                      className="relative rounded-xl border overflow-hidden"
+                      style={{
+                        borderColor: `${cardColor}60`,
+                        background: `linear-gradient(180deg, ${cardColor}20, rgba(0,0,0,0.4))`,
+                      }}
+                    >
+                      {isNew ? (
+                        <div className="absolute top-0.5 right-0.5 bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
+                          NEW
+                        </div>
                       ) : (
-                        <span className="text-2xl">{CARD_TYPE_INFO[card.type].emoji}</span>
+                        <div className="absolute top-0.5 right-0.5 bg-blue-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
+                          +{SHARD_RATES[card.tier]}
+                        </div>
                       )}
+                      <div className="aspect-square flex items-center justify-center">
+                        {card.artUrl ? (
+                          <img src={card.artUrl} alt={card.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">{CARD_TYPE_INFO[card.type].emoji}</span>
+                        )}
+                      </div>
+                      <div className="px-1 pb-1">
+                        <p className="text-[9px] font-medium truncate text-center">{card.name}</p>
+                        <p className="text-[8px] text-center text-surface-400">
+                          {CARD_TYPE_INFO[card.type].label}
+                        </p>
+                      </div>
                     </div>
-                    <div className="px-1 pb-1">
-                      <p className="text-[9px] font-medium truncate text-center">{card.name}</p>
-                      <p className="text-[8px] text-center text-surface-400">
-                        {CARD_TYPE_INFO[card.type].label}
-                      </p>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Resource rewards summary */}
+            {resourceRewards.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {resourceRewards.map((rr, i) => {
+                  const info = RESOURCE_INFO[rr.resource];
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl border"
+                      style={{
+                        borderColor: `${info?.color ?? '#9ca3af'}40`,
+                        background: `${info?.color ?? '#9ca3af'}15`,
+                      }}
+                    >
+                      <span className="text-lg">{info?.emoji ?? '?'}</span>
+                      <div>
+                        <p className="text-sm font-bold" style={{ color: info?.color ?? '#fff' }}>
+                          +{rr.amount.toLocaleString()}
+                        </p>
+                        <p className="text-[10px] text-surface-400">{info?.label ?? rr.resource}</p>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Summary text */}
-            <div className="text-center text-sm text-surface-400">
-              {cards.filter((c) => isNewCard(c)).length} new cards,{' '}
-              {cards.filter((c) => !isNewCard(c)).length} duplicates (converted to Soul Shards)
-            </div>
+            {cards.length > 0 && (
+              <div className="text-center text-sm text-surface-400">
+                {cards.filter((c) => isNewCard(c)).length} new cards,{' '}
+                {cards.filter((c) => !isNewCard(c)).length} duplicates (converted to Soul Shards)
+              </div>
+            )}
 
             <button
               onClick={handleConfirm}
               className="w-full py-3 rounded-xl font-semibold text-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white"
               style={{ boxShadow: '0 0 20px rgba(147, 51, 234, 0.3)' }}
             >
-              Collect Cards
+              {cards.length > 0 ? 'Collect Rewards' : 'Claim Rewards'}
             </button>
           </motion.div>
         )}
+      </div>
+    </motion.div>
+  );
+}
+
+/** Large resource reveal view */
+function RevealedResource({ reward }: { reward: PackRewardResource }) {
+  const info = RESOURCE_INFO[reward.resource] ?? { label: reward.resource, emoji: '?', color: '#9ca3af' };
+  return (
+    <motion.div
+      className="w-full rounded-2xl border-2 overflow-hidden cursor-pointer py-10"
+      style={{
+        borderColor: `${info.color}70`,
+        background: `linear-gradient(180deg, ${info.color}20 0%, rgba(0,0,0,0.5) 100%)`,
+        boxShadow: `0 0 40px ${info.color}30, 0 0 80px ${info.color}15`,
+      }}
+    >
+      <div className="text-center space-y-4">
+        <motion.span
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+          className="inline-block text-7xl"
+        >
+          {info.emoji}
+        </motion.span>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="text-3xl font-bold"
+          style={{ color: info.color }}
+        >
+          +{reward.amount.toLocaleString()}
+        </motion.p>
+        <p className="text-sm text-surface-300 font-medium">{info.label}</p>
       </div>
     </motion.div>
   );
@@ -518,4 +641,4 @@ function RevealedCard({ card, isNew }: { card: CardDefinition; isNew: boolean })
   );
 }
 
-export { rollCards };
+export { rollLoot };

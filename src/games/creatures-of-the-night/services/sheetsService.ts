@@ -313,13 +313,20 @@ function parseLootTables(rows: Record<string, string>[]): LootTableEntry[] {
     .map((row) => {
       const slotRaw = (row['slot'] || '').trim().toLowerCase();
       const slot: number | 'fill' = slotRaw === 'fill' ? 'fill' : parseInt(slotRaw || '0');
-      return {
+      const entry: LootTableEntry = {
         packId: row['packId'] || '',
         slot,
         cardPool: row['cardPool'] || 'any',
         weight: parseFloat(row['weight'] || '1'),
-        newOnly: row['newOnly'] === 'true' || row['newOnly'] === '1' || undefined,
       };
+      if (row['newOnly'] === 'true' || row['newOnly'] === '1') entry.newOnly = true;
+      if (row['rewardType'] && row['rewardType'] !== 'card') {
+        entry.rewardType = row['rewardType'] as LootTableEntry['rewardType'];
+      }
+      if (row['minQty']) entry.minQty = parseFloat(row['minQty']);
+      if (row['maxQty']) entry.maxQty = parseFloat(row['maxQty']);
+      if (row['step']) entry.step = parseFloat(row['step']);
+      return entry;
     })
     .filter((e) => e.packId && (e.slot === 'fill' || (typeof e.slot === 'number' && e.slot > 0)));
 }
