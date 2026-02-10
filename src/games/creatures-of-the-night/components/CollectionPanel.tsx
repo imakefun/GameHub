@@ -154,10 +154,8 @@ export function CollectionPanel({
                 style={{
                   borderWidth: border.borderWidth,
                   borderStyle: 'solid',
-                  borderColor: isUpgradeable ? '#4ade8080' : border.borderColor,
-                  boxShadow: isUpgradeable
-                    ? `${border.boxShadow}, 0 0 10px rgba(74, 222, 128, 0.25), inset 0 0 6px rgba(74, 222, 128, 0.08)`
-                    : border.boxShadow,
+                  borderColor: border.borderColor,
+                  boxShadow: border.boxShadow,
                   opacity: isFatigued ? 0.6 : 1,
                 }}
               >
