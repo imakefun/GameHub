@@ -335,6 +335,18 @@ function parseLootTables(rows: Record<string, string>[]): LootTableEntry[] {
 // Public API
 // ============================================================
 
+export interface SheetLoadEntry {
+  name: string;
+  count: number;
+  source: 'sheets' | 'local';
+  error?: string;
+}
+
+export interface LoadReport {
+  entries: SheetLoadEntry[];
+  cached: boolean;
+}
+
 export interface GameSheetData {
   cards: CardDefinition[];
   packs: PackDefinition[] | null;
@@ -348,6 +360,7 @@ export interface GameSheetData {
   cryptSlotUnlocks: CryptSlotUnlock[] | null;
   lootTables: LootTableEntry[] | null;
   settings: GameSettings;
+  loadReport: LoadReport;
 }
 
 export async function fetchGameData(): Promise<GameSheetData> {
@@ -370,12 +383,16 @@ export async function fetchGameData(): Promise<GameSheetData> {
       cryptSlotUnlocks: cache.cryptSlotUnlocks,
       lootTables: cache.lootTables,
       settings: cache.settings,
+      loadReport: { entries: [], cached: true },
     };
   }
 
   if (!isSheetsConfigured()) {
     throw new Error('Sheets not configured. Set VITE_CREATURES_SHEETS_API.');
   }
+
+  const entries: SheetLoadEntry[] = [];
+  const errors: Record<string, string> = {};
 
   try {
     const [
@@ -392,16 +409,16 @@ export async function fetchGameData(): Promise<GameSheetData> {
       lootTableRows,
     ] = await Promise.all([
       fetchSheet(SHEETS_CONFIG.sheets.cards),
-      fetchSheet(SHEETS_CONFIG.sheets.packs).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.expeditions).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.typeSynergies).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.crossTypeSynergies).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.dailyQuests).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.clRewards).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.featureUnlocks).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.clConfig).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.settings).catch(() => []),
-      fetchSheet(SHEETS_CONFIG.sheets.lootTables).catch(() => []),
+      fetchSheet(SHEETS_CONFIG.sheets.packs).catch((e: Error) => { errors['Packs'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.expeditions).catch((e: Error) => { errors['Expeditions'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.typeSynergies).catch((e: Error) => { errors['Type Synergies'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.crossTypeSynergies).catch((e: Error) => { errors['Cross-Type Synergies'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.dailyQuests).catch((e: Error) => { errors['Daily Quests'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.clRewards).catch((e: Error) => { errors['CL Rewards'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.featureUnlocks).catch((e: Error) => { errors['Feature Unlocks'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.clConfig).catch((e: Error) => { errors['CL Config'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.settings).catch((e: Error) => { errors['Settings'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.lootTables).catch((e: Error) => { errors['Loot Tables'] = e.message; return []; }),
     ]);
 
     const cards = parseCards(cardRows);
@@ -415,6 +432,30 @@ export async function fetchGameData(): Promise<GameSheetData> {
     const clConfig = clConfigRows.length > 0 ? parseCLConfig(clConfigRows) : { typeUnlockCL: null, cryptSlotUnlocks: null };
     const lootTables = lootTableRows.length > 0 ? parseLootTables(lootTableRows) : null;
     const settings = parseSettings(settingsRows);
+
+    // Build load report
+    const track = (name: string, parsed: unknown[] | null, rawRows: unknown[]) => {
+      if (errors[name]) {
+        entries.push({ name, count: 0, source: 'local', error: errors[name] });
+      } else if (parsed && parsed.length > 0) {
+        entries.push({ name, count: parsed.length, source: 'sheets' });
+      } else if (rawRows.length === 0) {
+        entries.push({ name, count: 0, source: 'local' });
+      } else {
+        entries.push({ name, count: 0, source: 'local', error: `${rawRows.length} rows fetched but 0 parsed` });
+      }
+    };
+
+    track('Cards', cards.length > 0 ? cards : null, cardRows);
+    track('Packs', packs, packRows);
+    track('Expeditions', expeditions, expeditionRows);
+    track('Type Synergies', typeSynergies, typeSynergyRows);
+    track('Cross-Type Synergies', crossTypeSynergies, crossTypeSynergyRows);
+    track('Daily Quests', dailyQuests, dailyQuestRows);
+    track('CL Rewards', clRewards, clRewardRows);
+    track('Feature Unlocks', featureUnlocks, featureUnlockRows);
+    track('CL Config', clConfig.typeUnlockCL ? Object.keys(clConfig.typeUnlockCL) : null, clConfigRows);
+    track('Loot Tables', lootTables, lootTableRows);
 
     cache.cards = cards;
     cache.packs = packs;
@@ -430,7 +471,16 @@ export async function fetchGameData(): Promise<GameSheetData> {
     cache.settings = settings;
     cache.lastFetch = now;
 
-    console.log(`[Creatures] Loaded from Sheets: ${cards.length} cards, ${packs?.length ?? 0} packs, ${expeditions?.length ?? 0} expeditions, ${lootTables?.length ?? 0} loot table entries`);
+    const report: LoadReport = { entries, cached: false };
+    const sheetsCount = entries.filter(e => e.source === 'sheets').length;
+    const errorCount = entries.filter(e => e.error).length;
+    console.log(`[Creatures] Sheets load: ${sheetsCount}/${entries.length} from sheets, ${errorCount} errors`);
+    for (const e of entries) {
+      if (e.error) console.warn(`  [${e.name}] ${e.error}`);
+      else if (e.source === 'sheets') console.log(`  [${e.name}] ${e.count} items from sheets`);
+      else console.log(`  [${e.name}] using local fallback`);
+    }
+
     return {
       cards, packs, expeditions, typeSynergies, crossTypeSynergies, dailyQuests,
       clRewards, featureUnlocks,
@@ -438,6 +488,7 @@ export async function fetchGameData(): Promise<GameSheetData> {
       cryptSlotUnlocks: clConfig.cryptSlotUnlocks,
       lootTables,
       settings,
+      loadReport: report,
     };
   } catch (error) {
     console.error('[Creatures] Failed to fetch from Sheets:', error);
