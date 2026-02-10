@@ -360,7 +360,8 @@ function trackQuestProgress(
     if (trigger === 'level_up' && def.id.includes('level')) matches = true;
     if (trigger === 'upgrade' && def.id.includes('level')) matches = true; // upgrade counts as level-up for quests
     if (trigger === 'open_pack' && def.id.includes('pack')) matches = true;
-    if (trigger === 'expedition' && def.id.includes('expedition')) matches = true;
+    if (trigger === 'send_expedition' && def.id === 'send-expedition') matches = true;
+    if (trigger === 'complete_expedition' && def.id === 'complete-3-expeditions') matches = true;
     if (trigger === 'essence' && def.id.includes('essence')) matches = true;
     if (trigger === 'login_night' && def.id.includes('night')) matches = true;
 
@@ -938,7 +939,7 @@ function createGameReducer(config: GameConfig) {
         });
         if (validIndices.length < zone.requirements.minCards) return state;
 
-        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'expedition');
+        const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'send_expedition');
 
         const now = Date.now();
         return {
@@ -1194,7 +1195,7 @@ function createGameReducer(config: GameConfig) {
         }
 
         const dqCollect = trackQuestProgress(
-          state.dailyQuests, config.dailyQuestPool, 'expedition',
+          state.dailyQuests, config.dailyQuestPool, 'complete_expedition',
         );
 
         return {
