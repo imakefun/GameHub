@@ -23,6 +23,7 @@ import { GrimoirePanel } from './components/GrimoirePanel';
 import { PackOpening } from './components/PackOpening';
 import { NewCardReveal } from './components/NewCardReveal';
 import { RewardReveal } from './components/RewardReveal';
+import { CLRoadPage } from './components/CLRoadPage';
 import { QuestRewardReveal } from './components/QuestRewardReveal';
 import { TutorialOverlay, TUTORIAL_STEP_COUNT } from './components/TutorialOverlay';
 import { isNightTime, getLunarPhase } from './hooks/useGameState';
@@ -58,6 +59,7 @@ function CreaturesGame() {
 
   const [activeTab, setActiveTab] = useState<Tab>('crypt');
   const [showSettings, setShowSettings] = useState(false);
+  const [showCLRoad, setShowCLRoad] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState<'all' | CardType>('all');
   const [collectionSort, setCollectionSort] = useState<'type' | 'upgrade'>('upgrade');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -457,10 +459,10 @@ function CreaturesGame() {
               <GrimoirePanel
                 state={state}
                 config={config}
-                onClaimCLReward={handleClaimCLReward}
                 onCompleteQuest={handleCompleteQuest}
                 onClaimWeeklyReward={claimWeeklyReward}
                 onClaimLoginStreakReward={claimLoginStreakReward}
+                onOpenCLRoad={() => setShowCLRoad(true)}
               />
             )}
           </motion.div>
@@ -482,6 +484,18 @@ function CreaturesGame() {
           forceTab={handleTutorialForceTab}
         />
       )}
+
+      {/* CL Road Overlay */}
+      <AnimatePresence>
+        {showCLRoad && (
+          <CLRoadPage
+            state={state}
+            config={config}
+            onClaimReward={handleClaimCLReward}
+            onClose={() => setShowCLRoad(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Expedition Pack Reward Overlay */}
       <AnimatePresence>

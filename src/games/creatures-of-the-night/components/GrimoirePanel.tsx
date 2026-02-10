@@ -6,10 +6,10 @@ import { clRoadPhase1 } from '../data/clConfig';
 interface GrimoirePanelProps {
   state: GameState;
   config: GameConfig;
-  onClaimCLReward: (cl: number) => void;
   onCompleteQuest: (questIndex: number) => void;
   onClaimWeeklyReward: (tier: number) => void;
   onClaimLoginStreakReward: (milestone: number) => void;
+  onOpenCLRoad: () => void;
 }
 
 function formatNumber(n: number): string {
@@ -41,10 +41,10 @@ function formatWeeklyReward(rewards: { shadowEssence?: number; soulShards?: numb
 export function GrimoirePanel({
   state,
   config,
-  onClaimCLReward,
   onCompleteQuest,
   onClaimWeeklyReward,
   onClaimLoginStreakReward,
+  onOpenCLRoad,
 }: GrimoirePanelProps) {
   const night = isNightTime();
   const lunarPhase = getLunarPhase();
@@ -86,84 +86,36 @@ export function GrimoirePanel({
         <span>📖</span> Grimoire
       </h2>
 
-      {/* CL Road - Phase 1 */}
-      <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
-        <h3 className="font-semibold text-sm mb-2">
-          CL Road — Phase 1: Starter
-          <span className="text-surface-400 font-normal ml-2">CL {state.collectionLevel}</span>
-        </h3>
-
-        <div className="h-3 bg-surface-800 rounded-full overflow-hidden mb-3">
+      {/* CL Road Card */}
+      <button
+        onClick={onOpenCLRoad}
+        className="w-full p-4 rounded-xl border border-emerald-500/25 text-left transition-all hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10"
+        style={{ background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.2) 0%, rgba(0, 20, 10, 0.3) 100%)' }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold text-sm bg-gradient-to-r from-emerald-300 to-teal-200 bg-clip-text text-transparent">
+            Collection Level Road
+          </h3>
+          <div className="flex items-center gap-2">
+            {unclaimedRewards.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-black">
+                {unclaimedRewards.length} to claim
+              </span>
+            )}
+            <span className="text-xs text-surface-500">&rsaquo;</span>
+          </div>
+        </div>
+        <div className="h-2.5 bg-surface-800 rounded-full overflow-hidden mb-2">
           <div
-            className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
             style={{ width: `${Math.min(100, (state.collectionLevel / maxCLRoad) * 100)}%` }}
           />
         </div>
-
-        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-          {clRoadPhase1.map((entry) => {
-            const unlocked = state.collectionLevel >= entry.cl;
-            const claimed = state.clRewardsClaimed.includes(entry.cl);
-            const canClaim = unlocked && !claimed;
-
-            return (
-              <div
-                key={entry.cl}
-                className={`flex items-center gap-3 p-2 rounded-lg text-xs transition-all ${
-                  claimed
-                    ? 'bg-surface-800/30 opacity-50'
-                    : canClaim
-                    ? 'bg-amber-500/10 border border-amber-500/30'
-                    : unlocked
-                    ? 'bg-surface-800/30'
-                    : 'bg-surface-800/20 opacity-60'
-                }`}
-              >
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  unlocked ? 'bg-amber-500 text-black' : 'bg-surface-700 text-surface-400'
-                }`}>
-                  {entry.cl}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-medium ${claimed ? 'text-white' : 'text-surface-400'}`}>
-                    {claimed ? entry.cardName : '???'}
-                  </p>
-                  <p className="text-surface-500">{claimed ? 'Collected' : 'New Card'}</p>
-                </div>
-                {canClaim && (
-                  <button
-                    onClick={() => onClaimCLReward(entry.cl)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors flex-shrink-0"
-                  >
-                    Claim
-                  </button>
-                )}
-                {claimed && (
-                  <span className="text-surface-500 text-xs flex-shrink-0">Claimed</span>
-                )}
-              </div>
-            );
-          })}
+        <div className="flex items-center justify-between text-xs text-surface-400">
+          <span>CL <span className="text-emerald-400 font-bold">{state.collectionLevel}</span></span>
+          <span>Phase 1: CL {maxCLRoad}</span>
         </div>
-
-        {unclaimedRewards.filter((r) => r.type !== 'card').length > 0 && (
-          <div className="mt-3 pt-3 border-t border-amber-500/10 space-y-1">
-            <p className="text-xs text-amber-400 font-medium">Bonus Rewards:</p>
-            {unclaimedRewards
-              .filter((r) => r.type !== 'card')
-              .map((reward) => (
-                <button
-                  key={reward.cl}
-                  onClick={() => onClaimCLReward(reward.cl)}
-                  className="w-full flex items-center justify-between p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-xs"
-                >
-                  <span>CL {reward.cl}: {reward.description}</span>
-                  <span className="text-amber-400 font-medium">Claim</span>
-                </button>
-              ))}
-          </div>
-        )}
-      </div>
+      </button>
 
       {/* Cosmic Cycle */}
       <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5">
