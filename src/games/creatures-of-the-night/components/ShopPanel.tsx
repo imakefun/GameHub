@@ -121,7 +121,7 @@ export function ShopPanel({
             </div>
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => handleBuyAndOpen('starter-tome')}
+              onClick={() => onClaimStarterTome()}
               className="px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-amber-500 to-amber-600 text-black text-sm"
             >
               Claim Free
