@@ -25,6 +25,8 @@ interface CollectionPanelProps {
   onSwapCard: (removeIndex: number, placeIndex: number) => void;
   onRemoveCard: (index: number) => void;
   onUpgrade: (index: number, targetTier?: Exclude<UpgradeTier, 'base'>, useLunarCrystals?: boolean) => void;
+  /** Called when UpgradeReveal "Continue" is clicked — triggers CL Road animation */
+  onUpgradeFlowNext?: () => void;
 }
 
 function formatNumber(n: number): string {
@@ -76,6 +78,7 @@ export function CollectionPanel({
   onSwapCard,
   onRemoveCard,
   onUpgrade,
+  onUpgradeFlowNext,
 }: CollectionPanelProps) {
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [swapPickerCardIndex, setSwapPickerCardIndex] = useState<number | null>(null);
@@ -407,7 +410,6 @@ export function CollectionPanel({
                           if (canAfford) {
                             setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: chosenTargetTier });
                             onUpgrade(index, chosenTargetTier);
-                            setSelectedCard(null);
                           } else if (canAffordWithLC) {
                             setShowLCConfirm(true);
                           }
@@ -524,7 +526,6 @@ export function CollectionPanel({
                 setShowLCConfirm(false);
                 setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: target });
                 onUpgrade(index, target, true);
-                setSelectedCard(null);
               }}
             />
           );
@@ -538,7 +539,10 @@ export function CollectionPanel({
             card={upgradeReveal.card}
             fromTier={upgradeReveal.fromTier}
             toTier={upgradeReveal.toTier}
-            onDismiss={() => setUpgradeReveal(null)}
+            onDismiss={() => {
+              setUpgradeReveal(null);
+              onUpgradeFlowNext?.();
+            }}
           />
         )}
       </AnimatePresence>
