@@ -1,4 +1,5 @@
-import type { TypeSynergy, CrossTypeSynergy, FeatureUnlock, CLReward, DailyQuest } from '../types';
+import type { TypeSynergy, CrossTypeSynergy, FeatureUnlock, CLReward, DailyQuest, CardType } from '../types';
+import { typeUnlockCL, cryptSlotUnlocks, clRoadPhase1 } from './clConfig';
 
 // ============================================================
 // Type Synergies (same-type bonuses)
@@ -117,68 +118,78 @@ export const crossTypeSynergies: CrossTypeSynergy[] = [
 // ============================================================
 // Feature Unlocks by Collection Level (CL)
 // ============================================================
-export const featureUnlocks: FeatureUnlock[] = [
-  // CL 1
-  { cl: 1, feature: 'basic-collection', description: 'Collect resources from cards' },
-  { cl: 1, feature: 'pack-opening', description: 'Open card tomes' },
-  { cl: 1, feature: 'beast-type', description: 'Beast cards available' },
-  { cl: 1, feature: 'shadow-type', description: 'Shadow cards available' },
-  { cl: 1, feature: 'spirit-type', description: 'Spirit cards available' },
-  // CL 3
-  { cl: 3, feature: 'shadowkeep', description: 'Collection screen unlocked' },
-  // CL 5
-  { cl: 5, feature: 'misty-woods', description: 'Misty Woods expedition unlocked' },
-  // CL 7
-  { cl: 7, feature: 'day-night-cycle', description: 'Day/Night cycle affects cards' },
-  // CL 10
-  { cl: 10, feature: 'dark-market', description: 'Dark Market trading unlocked' },
-  { cl: 10, feature: 'blood-type', description: 'Blood cards available' },
-  { cl: 10, feature: 'undead-type', description: 'Undead cards available' },
-  // CL 15
-  { cl: 15, feature: 'crypt-slot-4', description: '4th Crypt slot unlocked' },
-  // CL 20
-  { cl: 20, feature: 'forgotten-graveyard', description: 'Forgotten Graveyard expedition unlocked' },
-  { cl: 20, feature: 'fae-type', description: 'Fae cards available' },
-  { cl: 20, feature: 'magic-type', description: 'Magic cards available' },
-  // CL 25
-  { cl: 25, feature: 'crypt-slot-5', description: '5th Crypt slot unlocked' },
-  // CL 30
-  { cl: 30, feature: 'awakening', description: 'Card Awakening system unlocked' },
-  { cl: 30, feature: 'lycanthrope-type', description: 'Lycanthrope cards available' },
-  { cl: 30, feature: 'necromancy-type', description: 'Necromancy cards available' },
-  // CL 40
-  { cl: 40, feature: 'fae-wilds', description: 'Fae Wilds expedition unlocked' },
-  { cl: 40, feature: 'cursed-type', description: 'Cursed cards available' },
-  { cl: 40, feature: 'stone-type', description: 'Stone cards available' },
-  // CL 50
-  { cl: 50, feature: 'crypt-slot-6', description: '6th Crypt slot unlocked' },
-  { cl: 50, feature: 'infernal-type', description: 'Infernal cards available' },
-  // CL 60
-  { cl: 60, feature: 'shadow-realm', description: 'Shadow Realm expedition unlocked' },
-  // CL 75
-  { cl: 75, feature: 'crypt-slot-7', description: '7th Crypt slot unlocked' },
-  // CL 80
-  { cl: 80, feature: 'blood-temple', description: 'Blood Temple expedition unlocked' },
-  // CL 100
-  { cl: 100, feature: 'cursed-lands', description: 'Cursed Lands expedition unlocked' },
-  { cl: 100, feature: 'ancient-catacombs', description: 'Ancient Catacombs expedition unlocked' },
-  // CL 120
-  { cl: 120, feature: 'infernal-depths', description: 'Infernal Depths expedition unlocked' },
-  { cl: 120, feature: 'void-nexus', description: 'Void Nexus expedition unlocked' },
-  // CL 130
-  { cl: 130, feature: 'celestial-spire', description: 'Celestial Spire expedition unlocked' },
-  // CL 150
-  { cl: 150, feature: 'cosmic-void', description: 'Cosmic Void expedition unlocked' },
-  { cl: 150, feature: 'primordial-void', description: 'Primordial Void expedition unlocked' },
-];
+// Type-unlock and crypt-slot entries are auto-derived from clConfig
+// to avoid duplicating CL thresholds in multiple places.
+
+const TYPE_LABELS: Record<CardType, string> = {
+  beast: 'Beast', shadow: 'Shadow', spirit: 'Spirit', fae: 'Fae',
+  blood: 'Blood', magic: 'Magic', necromancy: 'Necromancy', cursed: 'Cursed',
+  lycanthrope: 'Lycanthrope', undead: 'Undead', stone: 'Stone', infernal: 'Infernal',
+};
+
+function buildFeatureUnlocks(): FeatureUnlock[] {
+  const manual: FeatureUnlock[] = [
+    // CL 1
+    { cl: 1, feature: 'basic-collection', description: 'Collect resources from cards' },
+    { cl: 1, feature: 'pack-opening', description: 'Open card tomes' },
+    // CL 3
+    { cl: 3, feature: 'shadowkeep', description: 'Collection screen unlocked' },
+    // CL 5
+    { cl: 5, feature: 'misty-woods', description: 'Misty Woods expedition unlocked' },
+    // CL 7
+    { cl: 7, feature: 'day-night-cycle', description: 'Day/Night cycle affects cards' },
+    // CL 10
+    { cl: 10, feature: 'dark-market', description: 'Dark Market trading unlocked' },
+    // CL 20
+    { cl: 20, feature: 'forgotten-graveyard', description: 'Forgotten Graveyard expedition unlocked' },
+    // CL 30
+    { cl: 30, feature: 'awakening', description: 'Card Awakening system unlocked' },
+    // CL 40
+    { cl: 40, feature: 'fae-wilds', description: 'Fae Wilds expedition unlocked' },
+    // CL 60
+    { cl: 60, feature: 'shadow-realm', description: 'Shadow Realm expedition unlocked' },
+    // CL 80
+    { cl: 80, feature: 'blood-temple', description: 'Blood Temple expedition unlocked' },
+    // CL 100
+    { cl: 100, feature: 'cursed-lands', description: 'Cursed Lands expedition unlocked' },
+    { cl: 100, feature: 'ancient-catacombs', description: 'Ancient Catacombs expedition unlocked' },
+    // CL 120
+    { cl: 120, feature: 'infernal-depths', description: 'Infernal Depths expedition unlocked' },
+    { cl: 120, feature: 'void-nexus', description: 'Void Nexus expedition unlocked' },
+    // CL 130
+    { cl: 130, feature: 'celestial-spire', description: 'Celestial Spire expedition unlocked' },
+    // CL 150
+    { cl: 150, feature: 'cosmic-void', description: 'Cosmic Void expedition unlocked' },
+    { cl: 150, feature: 'primordial-void', description: 'Primordial Void expedition unlocked' },
+  ];
+
+  // Auto-derive type-unlock entries from clConfig.typeUnlockCL
+  for (const [type, cl] of Object.entries(typeUnlockCL)) {
+    const label = TYPE_LABELS[type as CardType] || type;
+    manual.push({ cl, feature: `${type}-type`, description: `${label} cards available` });
+  }
+
+  // Auto-derive crypt-slot entries from clConfig.cryptSlotUnlocks
+  for (const { cl, slot } of cryptSlotUnlocks) {
+    manual.push({ cl, feature: `crypt-slot-${slot}`, description: `${ordinal(slot)} Crypt slot unlocked` });
+  }
+
+  return manual.sort((a, b) => a.cl - b.cl);
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+export const featureUnlocks: FeatureUnlock[] = buildFeatureUnlocks();
 
 // ============================================================
 // Collection Level Rewards — CL Road
 // ============================================================
 // Phase 1 (CL 1-32): Card unlocks from Set 1
 // Higher CL: Currency/tome rewards + future phases
-
-import { clRoadPhase1 } from './clConfig';
 
 function generateCLRewards(): CLReward[] {
   const rewards: CLReward[] = [];

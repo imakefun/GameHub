@@ -55,6 +55,12 @@ function applyCardPoolFilter(cards: CardDefinition[], cardPool: string): CardDef
     } else if (seg.startsWith('mintier:')) {
       const minTier = seg.slice(8) as CardTier;
       pool = pool.filter((c) => tierAtLeast(c.tier, minTier));
+    } else if (seg.startsWith('set:')) {
+      const setNum = parseInt(seg.slice(4), 10);
+      pool = pool.filter((c) => c.set === setNum);
+    } else if (seg.startsWith('minset:')) {
+      const minSet = parseInt(seg.slice(7), 10);
+      pool = pool.filter((c) => c.set !== undefined && c.set >= minSet);
     } else if (seg.startsWith('type:')) {
       const types = seg.slice(5).split(',').map((t) => t.trim()) as CardType[];
       pool = pool.filter((c) => types.includes(c.type));

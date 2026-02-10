@@ -367,11 +367,13 @@ export interface CryptSlotUnlock {
 // rewardType: 'card' (default) or a currency key for resource rewards.
 // cardPool syntax (for card rewards):
 //   "any"                              → any unlocked card
-//   "tier:twilight"                    → exact tier
-//   "minTier:umbral"                  → this tier or higher
+//   "set:1"                            → exact card set
+//   "minSet:3"                         → this set or higher
+//   "tier:twilight"                    → exact tier (legacy)
+//   "minTier:umbral"                   → this tier or higher (legacy)
 //   "type:beast"                       → exact type
 //   "type:beast,spirit"               → one of these types
-//   "minTier:umbral+type:undead,stone" → combined filters
+//   "minSet:5+type:undead,stone"      → combined filters
 //   "set1-rat"                         → specific card ID
 //
 // Resource rewards use minQty / maxQty / step for quantity ranges.
