@@ -7,9 +7,9 @@ import type { CardDefinition } from '../types';
 // are unlocked from the CL Road as the player upgrades cards.
 export const set1Cards: CardDefinition[] = [
   // --- Starter cards (always owned) ---
-  { id: 'set1-rat', name: 'Rat', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 1.5, baseInterval: 15, description: 'A common sewer rat with sharp instincts', flavorText: 'It thrives where others dare not tread.', artUrl: 'Rat' },
-  { id: 'set1-bat', name: 'Bat', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 1.8, baseInterval: 18, description: 'A nocturnal hunter with keen senses', flavorText: 'The darkness is its domain.', artUrl: 'Bat' },
-  { id: 'set1-owl', name: 'Owl', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 2.0, baseInterval: 20, description: 'A wise bird of the night', flavorText: 'Its silent wings carry ancient knowledge.', artUrl: 'Owl' },
+  { id: 'rat', name: 'Rat', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 1.5, baseInterval: 15, description: 'A common sewer rat with sharp instincts', flavorText: 'It thrives where others dare not tread.', artUrl: 'Rat' },
+  { id: 'bat', name: 'Bat', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 1.8, baseInterval: 18, description: 'A nocturnal hunter with keen senses', flavorText: 'The darkness is its domain.', artUrl: 'Bat' },
+  { id: 'owl', name: 'Owl', type: 'beast', tier: 'twilight', set: 1, baseGenerationAmount: 2.0, baseInterval: 20, description: 'A wise bird of the night', flavorText: 'Its silent wings carry ancient knowledge.', artUrl: 'Owl' },
 
   // --- CL Road Phase 1 unlocks ---
   { id: 'set1-shadow-imp', name: 'Shadow Imp', type: 'shadow', tier: 'twilight', set: 1, baseGenerationAmount: 1.8, baseInterval: 14, description: 'A tiny creature of living shadow', flavorText: 'Mischief made manifest.', artUrl: 'Shadow_Imp' },

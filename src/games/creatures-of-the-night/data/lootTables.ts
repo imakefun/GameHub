@@ -17,9 +17,11 @@ import type { LootTableEntry } from '../types';
 
 export const lootTables: LootTableEntry[] = [
   // ============================================================
-  // Free starter
+  // Free starter — exactly 1x Rat, 1x Bat, 1x Owl
   // ============================================================
-  { packId: 'starter-tome', slot: 'fill', cardPool: 'set:1', weight: 100, newOnly: true },
+  { packId: 'starter-tome', slot: 1, cardPool: 'rat', weight: 100 },
+  { packId: 'starter-tome', slot: 2, cardPool: 'bat', weight: 100 },
+  { packId: 'starter-tome', slot: 3, cardPool: 'owl', weight: 100 },
 
   // ============================================================
   // Purchasable packs

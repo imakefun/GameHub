@@ -59,9 +59,9 @@ async function pushSheet(sheetName, rows) {
 // --- Cards ---
 // Set 1 cards
 const set1Cards = [
-  { id: 'set1-rat', name: 'Rat', type: 'beast', tier: 'twilight', set: '1', baseGenerationAmount: '1.5', baseInterval: '15', description: 'A common sewer rat with sharp instincts', flavorText: 'It thrives where others dare not tread.' },
-  { id: 'set1-bat', name: 'Bat', type: 'beast', tier: 'twilight', set: '1', baseGenerationAmount: '1.8', baseInterval: '18', description: 'A nocturnal hunter with keen senses', flavorText: 'The darkness is its domain.' },
-  { id: 'set1-owl', name: 'Owl', type: 'beast', tier: 'twilight', set: '1', baseGenerationAmount: '2.0', baseInterval: '20', description: 'A wise bird of the night', flavorText: 'Its silent wings carry ancient knowledge.' },
+  { id: 'rat', name: 'Rat', type: 'beast', tier: 'twilight', set: '1', baseGenerationAmount: '1.5', baseInterval: '15', description: 'A common sewer rat with sharp instincts', flavorText: 'It thrives where others dare not tread.' },
+  { id: 'bat', name: 'Bat', type: 'beast', tier: 'twilight', set: '1', baseGenerationAmount: '1.8', baseInterval: '18', description: 'A nocturnal hunter with keen senses', flavorText: 'The darkness is its domain.' },
+  { id: 'owl', name: 'Owl', type: 'beast', tier: 'twilight', set: '1', baseGenerationAmount: '2.0', baseInterval: '20', description: 'A wise bird of the night', flavorText: 'Its silent wings carry ancient knowledge.' },
   { id: 'set1-shadow-imp', name: 'Shadow Imp', type: 'shadow', tier: 'twilight', set: '1', baseGenerationAmount: '1.8', baseInterval: '14', description: 'A tiny creature of living shadow', flavorText: 'Mischief made manifest.' },
   { id: 'set1-moon-touched', name: 'Moon-Touched', type: 'spirit', tier: 'twilight', set: '1', baseGenerationAmount: '1.5', baseInterval: '12', description: 'A being blessed by moonlight', flavorText: 'The moon chose this one.' },
   { id: 'set1-shadow-rat', name: 'Shadow Rat', type: 'shadow', tier: 'twilight', set: '1', baseGenerationAmount: '2.0', baseInterval: '18', description: 'A rat cloaked in living shadow', flavorText: 'Where it treads, light fades.' },
