@@ -395,26 +395,12 @@ export function CLRoadPage({ state, config, onClaimReward, onClose, animation }:
   }, [animatedCL, isAnimating, animation?.clFrom, rewards, state.clRewardsClaimed]);
 
   // ---- Auto-scroll to current marker ----
-  const prevMarkerIdx = useRef(markerIndex);
   useEffect(() => {
-    if (markerIndex !== prevMarkerIdx.current || (!isAnimating && markerIndex >= 0)) {
-      prevMarkerIdx.current = markerIndex;
-      const timer = setTimeout(() => {
-        currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, isAnimating ? 50 : 250);
-      return () => clearTimeout(timer);
-    }
-  }, [markerIndex, isAnimating]);
-
-  // Initial scroll on mount (non-animation mode)
-  useEffect(() => {
-    if (!isAnimating) {
-      const timer = setTimeout(() => {
-        currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 250);
-      return () => clearTimeout(timer);
-    }
-  }, [isAnimating]);
+    const timer = setTimeout(() => {
+      currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, isAnimating ? 50 : 250);
+    return () => clearTimeout(timer);
+  }, [displayCL, isAnimating]);
 
   const clGain = animation ? animation.clTo - animation.clFrom : 0;
 
