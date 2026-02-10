@@ -13,6 +13,16 @@ import {
 } from '../types';
 import { UpgradeReveal } from './UpgradeReveal';
 import { LunarCrystalConfirm } from './LunarCrystalConfirm';
+import { getEffectiveGeneration, effectiveInterval } from '../hooks/useGameState';
+
+function sePerSecond(card: OwnedCard, def: CardDefinition): number {
+  return getEffectiveGeneration(card, def) / effectiveInterval(def);
+}
+
+function formatRate(n: number): string {
+  if (n >= 1) return `${n.toFixed(1)}/s`;
+  return `${(n * 60).toFixed(1)}/m`;
+}
 
 interface CollectionPanelProps {
   ownedCards: OwnedCard[];
@@ -614,7 +624,7 @@ export function CollectionPanel({
                     </p>
                     <p className="text-xs text-surface-400">
                       {CARD_TYPE_INFO[newDef.type].emoji} {CARD_TYPE_INFO[newDef.type].label}
-                      {' \u2022 '}{newDef.baseGenerationAmount} SE / {newDef.baseInterval}s
+                      {' \u2022 '}<span className="text-emerald-400 font-semibold">{formatRate(sePerSecond(newCard, newDef))} SE</span>
                     </p>
                   </div>
                   <span className="text-xs text-green-400 font-semibold flex-shrink-0">IN</span>
@@ -659,7 +669,7 @@ export function CollectionPanel({
                           </p>
                           <p className="text-xs text-surface-400">
                             {CARD_TYPE_INFO[placedDef.type].emoji} {CARD_TYPE_INFO[placedDef.type].label}
-                            {' \u2022 '}{placedDef.baseGenerationAmount} SE / {placedDef.baseInterval}s
+                            {' \u2022 '}<span className="text-emerald-400 font-semibold">{formatRate(sePerSecond(placed, placedDef))} SE</span>
                           </p>
                           {hasEssence && (
                             <p className="text-xs text-amber-400 mt-0.5">
