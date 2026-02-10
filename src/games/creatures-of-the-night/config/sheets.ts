@@ -4,7 +4,7 @@
 // Each sheet tab is fetched via ?sheet=SheetName query param
 
 export const SHEETS_CONFIG = {
-  apiUrl: import.meta.env.VITE_CREATURES_SHEETS_API || '',
+  apiUrl: import.meta.env.VITE_CREATURES_SHEETS_API || import.meta.env.VITE_SHEETS_API || '',
 
   sheets: {
     cards: 'Cards',
