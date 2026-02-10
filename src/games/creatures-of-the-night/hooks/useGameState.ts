@@ -169,14 +169,11 @@ function getCardDef(
 }
 
 /** Effective collection interval in seconds (type-spec + night modifier). */
-function effectiveInterval(def: CardDefinition): number {
+export function effectiveInterval(def: CardDefinition): number {
   const spec = TYPE_SPECIALIZATIONS[def.type];
   let interval = def.baseInterval * spec.intervalMultiplier;
   if (isNightTime() && spec.nightIntervalMultiplier) {
     interval *= spec.nightIntervalMultiplier;
-  }
-  if (spec.randomIntervalVariance) {
-    interval *= 1 + (Math.random() * 2 - 1) * spec.randomIntervalVariance;
   }
   return Math.max(1, interval);
 }
@@ -249,26 +246,41 @@ function deriveCLFields(
   return { cryptSlots: slots, unlockedFeatures: unlocks };
 }
 
-/** Full per-second rate for a placed card (all multipliers). */
-function cardRatePerSecond(
+/**
+ * Compute the essence produced per completed interval (all multipliers).
+ * Used by the discrete-interval accumulation model.
+ */
+function essencePerInterval(
   card: OwnedCard,
   def: CardDefinition,
   config: GameConfig,
   ownedCards: OwnedCard[],
   now: number,
 ): number {
-  const amount = getEffectiveGeneration(card, def);
-  const interval = effectiveInterval(def);
-  let rate = amount / interval;
+  let amount = getEffectiveGeneration(card, def);
 
-  rate *= 1 + getCosmicBonus(def.type);
-  rate *= 1 + getSynergyBonus(ownedCards, def.type, config) / 100;
+  amount *= 1 + getCosmicBonus(def.type);
+  amount *= 1 + getSynergyBonus(ownedCards, def.type, config) / 100;
 
   if (card.fatigueUntil && now < card.fatigueUntil) {
-    rate *= 0.5;
+    amount *= 0.5;
   }
 
-  return rate;
+  return amount;
+}
+
+/**
+ * Count how many full intervals have elapsed since lastCollected,
+ * capped at maxSeconds of total elapsed time.
+ */
+function completedIntervals(
+  lastCollected: number,
+  now: number,
+  intervalSec: number,
+  maxSeconds: number,
+): number {
+  const elapsedSec = Math.min((now - lastCollected) / 1000, maxSeconds);
+  return Math.floor(elapsedSec / intervalSec);
 }
 
 /**
@@ -502,7 +514,8 @@ function createGameReducer(config: GameConfig) {
           dailyQuests = trackQuestProgress(dailyQuests, config.dailyQuestPool, 'login_night');
         }
 
-        // --- Accumulate essence for placed cards ---
+        // --- Accumulate essence for placed cards (discrete intervals) ---
+        const maxAccSec = config.settings.offlineMaxHours * 3600;
         let updatedCards: OwnedCard[] = state.ownedCards.map((card) => {
           if (!card.placedInCrypt || card.isOnExpedition) return card;
           if (card.expeditionReturnTime && now < card.expeditionReturnTime)
@@ -511,17 +524,15 @@ function createGameReducer(config: GameConfig) {
           const def = getCardDef(config, card.definitionId);
           if (!def) return card;
 
-          const rate = cardRatePerSecond(
-            card,
-            def,
-            config,
-            state.ownedCards,
-            now,
-          );
+          const interval = effectiveInterval(def);
+          const ticks = completedIntervals(card.lastCollected, now, interval, maxAccSec);
 
+          if (ticks < 1) return { ...card, accumulatedEssence: 0 };
+
+          const perTick = essencePerInterval(card, def, config, state.ownedCards, now);
           return {
             ...card,
-            accumulatedEssence: card.accumulatedEssence + rate * elapsed,
+            accumulatedEssence: ticks * perTick,
           };
         });
 
@@ -1365,38 +1376,33 @@ export function useGameState(config: GameConfig) {
             restored.dailyQuestsLastReset = todayMidnight;
           }
 
-          // Offline essence (capped at offlineMaxHours)
-          const maxOffline = cfg.settings.offlineMaxHours * 3600;
-          const lastTick = typeof parsed.lastTick === 'number' ? parsed.lastTick : Date.now();
-          const offlineSec = Math.min(
-            (Date.now() - lastTick) / 1000,
-            maxOffline,
-          );
+          // Offline essence — discrete intervals, capped at offlineMaxHours
+          // The card's lastCollected is preserved from the save, so
+          // completedIntervals naturally covers the offline period.
+          // Apply offlineEssenceMultiplier to the total.
+          const maxOfflineSec = cfg.settings.offlineMaxHours * 3600;
+          const now = Date.now();
 
-          if (offlineSec > 5) {
-            restored.ownedCards = restored.ownedCards.map((card) => {
-              if (!card.placedInCrypt || card.isOnExpedition) return card;
-              if (
-                card.expeditionReturnTime &&
-                Date.now() < card.expeditionReturnTime
-              )
-                return card;
+          restored.ownedCards = restored.ownedCards.map((card) => {
+            if (!card.placedInCrypt || card.isOnExpedition) return card;
+            if (card.expeditionReturnTime && now < card.expeditionReturnTime)
+              return card;
 
-              const def = getCardDef(cfg, card.definitionId);
-              if (!def) return card;
+            const def = getCardDef(cfg, card.definitionId);
+            if (!def) return card;
 
-              const amount = getEffectiveGeneration(card, def);
-              const interval = effectiveInterval(def);
-              const rate = amount / interval;
-              const offlineEssence =
-                rate * offlineSec * cfg.settings.offlineEssenceMultiplier;
+            const interval = effectiveInterval(def);
+            const ticks = completedIntervals(card.lastCollected, now, interval, maxOfflineSec);
+            if (ticks < 1) return { ...card, accumulatedEssence: 0 };
 
-              return {
-                ...card,
-                accumulatedEssence: card.accumulatedEssence + offlineEssence,
-              };
-            });
-          }
+            const perTick = getEffectiveGeneration(card, def);
+            const offlineEssence = ticks * perTick * cfg.settings.offlineEssenceMultiplier;
+
+            return {
+              ...card,
+              accumulatedEssence: offlineEssence,
+            };
+          });
 
           return restored;
         }

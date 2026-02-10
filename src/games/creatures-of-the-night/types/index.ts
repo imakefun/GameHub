@@ -128,7 +128,6 @@ export interface TypeSpecialization {
   doubleChance?: number;         // chance to double on collection (0-1)
   failChance?: number;           // chance to produce nothing (0-1)
   randomVariance?: number;       // ±variance on amounts (0-1, e.g. 0.5 = ±50%)
-  randomIntervalVariance?: number;
   fullMoonBonus?: number;        // multiplier during full moon
 }
 
@@ -140,7 +139,7 @@ export const TYPE_SPECIALIZATIONS: Record<CardType, TypeSpecialization> = {
   blood: { amountMultiplier: 1.5, intervalMultiplier: 1.5 },
   magic: { amountMultiplier: 1, intervalMultiplier: 1, doubleChance: 0.2 },
   necromancy: { amountMultiplier: 2, intervalMultiplier: 2 },
-  cursed: { amountMultiplier: 1, intervalMultiplier: 1, randomVariance: 0.5, randomIntervalVariance: 0.5 },
+  cursed: { amountMultiplier: 1, intervalMultiplier: 1, randomVariance: 0.5 },
   lycanthrope: { amountMultiplier: 1, intervalMultiplier: 1, nightIntervalMultiplier: 0.5, fullMoonBonus: 1.0 },
   undead: { amountMultiplier: 1, intervalMultiplier: 1 },
   stone: { amountMultiplier: 2.5, intervalMultiplier: 3 },
