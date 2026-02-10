@@ -10,6 +10,7 @@ import type {
   LunarPhase,
   UpgradeTier,
   ActiveExpedition,
+  PackRewardResource,
 } from '../types';
 import {
   TIER_DUPLICATE_SHARDS,
@@ -817,6 +818,34 @@ function createGameReducer(config: GameConfig) {
           }
         }
 
+        // Apply resource rewards from loot table
+        let resourceSE = 0;
+        let resourceLC = 0;
+        let resourceVE = 0;
+        let resourceSS = 0;
+        if (action.resourceRewards) {
+          for (const rr of action.resourceRewards) {
+            switch (rr.resource) {
+              case 'shadowEssence': resourceSE += rr.amount; break;
+              case 'lunarCrystals': resourceLC += rr.amount; break;
+              case 'voidEnergy': resourceVE += rr.amount; break;
+            }
+          }
+          // soulShards not in Currencies — distribute to a random owned card
+          resourceSS = action.resourceRewards
+            .filter(rr => rr.resource === 'soulShards' as string)
+            .reduce((sum, rr) => sum + rr.amount, 0);
+        }
+
+        const allCards = [...cards, ...newOwned];
+        if (resourceSS > 0 && allCards.length > 0) {
+          const shardIdx = Math.floor(Math.random() * allCards.length);
+          allCards[shardIdx] = {
+            ...allCards[shardIdx],
+            soulShards: allCards[shardIdx].soulShards + resourceSS,
+          };
+        }
+
         const dq = trackQuestProgress(state.dailyQuests, config.dailyQuestPool, 'open_pack');
 
         // New card discoveries grant +1 CL each
@@ -829,10 +858,11 @@ function createGameReducer(config: GameConfig) {
         return {
           ...state,
           currencies: {
-            ...state.currencies,
-            voidEnergy: state.currencies.voidEnergy + voidEnergyGained,
+            shadowEssence: state.currencies.shadowEssence + resourceSE,
+            lunarCrystals: state.currencies.lunarCrystals + resourceLC,
+            voidEnergy: state.currencies.voidEnergy + voidEnergyGained + resourceVE,
           },
-          ownedCards: [...cards, ...newOwned],
+          ownedCards: allCards,
           collectionLevel: packNewCL,
           ...packClFields,
           dailyQuests: dq,
@@ -1432,8 +1462,8 @@ export function useGameState(config: GameConfig) {
   );
 
   const openPack = useCallback(
-    (cards: CardDefinition[], packId: string) =>
-      dispatch({ type: 'OPEN_PACK', cards, packId }),
+    (cards: CardDefinition[], packId: string, resourceRewards?: PackRewardResource[]) =>
+      dispatch({ type: 'OPEN_PACK', cards, resourceRewards, packId }),
     [],
   );
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Currencies, GameConfig, OwnedCard, CardDefinition, PackDefinition } from '../types';
+import type { Currencies, GameConfig, OwnedCard, CardDefinition, PackDefinition, PackRewardResource } from '../types';
 import { UPGRADE_TIER_COLORS } from '../types';
 import { PackOpening } from './PackOpening';
 import { getLunarPhase } from '../hooks/useGameState';
@@ -12,7 +12,7 @@ interface ShopPanelProps {
   collectionLevel: number;
   starterTomeClaimed: boolean;
   onPurchasePack: (packId: string) => void;
-  onOpenPack: (cards: CardDefinition[], packId: string) => void;
+  onOpenPack: (cards: CardDefinition[], packId: string, resourceRewards?: PackRewardResource[]) => void;
   onClaimStarterTome: () => void;
 }
 
@@ -175,7 +175,7 @@ export function ShopPanel({
             collectionLevel={collectionLevel}
             packId={openingPackId}
             onClose={() => setOpeningPackId(null)}
-            onConfirm={(cards) => onOpenPack(cards, openingPackId)}
+            onConfirm={(cards, resourceRewards) => onOpenPack(cards, openingPackId, resourceRewards)}
           />
         )}
       </AnimatePresence>

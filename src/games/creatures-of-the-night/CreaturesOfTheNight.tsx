@@ -534,8 +534,8 @@ function CreaturesGame() {
             collectionLevel={state.collectionLevel}
             packId={state.pendingPackRewards[0]}
             onClose={() => dismissPackReward(state.pendingPackRewards[0])}
-            onConfirm={(cards) => {
-              openPack(cards, state.pendingPackRewards[0]);
+            onConfirm={(cards, resourceRewards) => {
+              openPack(cards, state.pendingPackRewards[0], resourceRewards);
               dismissPackReward(state.pendingPackRewards[0]);
             }}
           />

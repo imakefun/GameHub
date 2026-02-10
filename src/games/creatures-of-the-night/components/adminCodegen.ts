@@ -390,6 +390,10 @@ function deflateLootTableEntry(r: Row) {
     weight: num(r.weight, 1),
   };
   if (r.newOnly === 'true' || r.newOnly === '1') entry.newOnly = true;
+  if (r.rewardType && r.rewardType !== 'card') entry.rewardType = r.rewardType;
+  if (r.minQty) entry.minQty = num(r.minQty);
+  if (r.maxQty) entry.maxQty = num(r.maxQty);
+  if (r.step) entry.step = num(r.step);
   return entry;
 }
 
