@@ -33,7 +33,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_SHEETS_API: ${{ secrets.VITE_SHEETS_API }}
           VITE_CREATURES_SHEETS_API: ${{ secrets.VITE_CREATURES_SHEETS_API }}
 
       - name: Setup Pages
