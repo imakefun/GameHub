@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import type { OwnedCard, CardDefinition, UpgradeTier } from '../types';
 import { CARD_TYPE_INFO, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS, UPGRADE_TIER_ORDER } from '../types';
+import { effectiveInterval } from '../hooks/useGameState';
 
 // Higher tiers get thicker, glowing borders
 function borderStyle(tier: UpgradeTier, color: string) {
@@ -178,42 +179,49 @@ export function CardComponent({
         </div>
       )}
 
-      {/* Collect button */}
-      {showEssence && card.placedInCrypt && !isFatigued && (
-        <div className="px-3 pb-3">
-          {hasEssence ? (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCollect?.();
-              }}
-              className="w-full py-2 rounded-lg text-sm font-semibold transition-all"
-              style={{
-                background: `linear-gradient(135deg, ${upgradeColor}, ${upgradeColor}aa)`,
-                color: '#000',
-              }}
-            >
-              Collect {formatNumber(card.accumulatedEssence)}
-            </motion.button>
-          ) : (
-            <div className="w-full rounded-lg bg-surface-800/50 overflow-hidden">
-              <div className="relative h-8 flex items-center justify-center">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-lg transition-all duration-1000"
-                  style={{
-                    width: `${Math.min(100, card.accumulatedEssence * 100)}%`,
-                    background: `linear-gradient(90deg, ${upgradeColor}30, ${upgradeColor}50)`,
-                  }}
-                />
-                <span className="relative text-xs text-surface-400">
-                  Generating... {Math.floor(card.accumulatedEssence * 100)}%
-                </span>
+      {/* Collect button / interval timer */}
+      {showEssence && card.placedInCrypt && !isFatigued && (() => {
+        const interval = effectiveInterval(definition);
+        const elapsedSec = (Date.now() - card.lastCollected) / 1000;
+        const progress = Math.min(1, (elapsedSec % interval) / interval);
+        const secsLeft = Math.max(0, Math.ceil(interval - (elapsedSec % interval)));
+
+        return (
+          <div className="px-3 pb-3">
+            {hasEssence ? (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCollect?.();
+                }}
+                className="w-full py-2 rounded-lg text-sm font-semibold transition-all"
+                style={{
+                  background: `linear-gradient(135deg, ${upgradeColor}, ${upgradeColor}aa)`,
+                  color: '#000',
+                }}
+              >
+                Collect {formatNumber(card.accumulatedEssence)}
+              </motion.button>
+            ) : (
+              <div className="w-full rounded-lg bg-surface-800/50 overflow-hidden">
+                <div className="relative h-8 flex items-center justify-center">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-lg transition-all duration-1000"
+                    style={{
+                      width: `${Math.min(100, progress * 100)}%`,
+                      background: `linear-gradient(90deg, ${upgradeColor}30, ${upgradeColor}50)`,
+                    }}
+                  />
+                  <span className="relative text-xs text-surface-400">
+                    {secsLeft}s
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       {/* Action button for non-placed cards */}
       {!card.placedInCrypt && !card.isOnExpedition && onClick && (
