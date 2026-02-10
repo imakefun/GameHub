@@ -16,6 +16,7 @@ import type {
   GameSettings,
 } from '../types';
 import { fetchGameData, clearCache } from '../services/sheetsService';
+import type { LoadReport } from '../services/sheetsService';
 import { isSheetsConfigured } from '../config/sheets';
 
 import { cards as localCards } from '../data/cards';
@@ -64,6 +65,7 @@ interface GameDataContextType {
   isLoading: boolean;
   error: string | null;
   isUsingSheets: boolean;
+  loadReport: LoadReport | null;
   refresh: () => Promise<void>;
 }
 
@@ -85,10 +87,12 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUsingSheets, setIsUsingSheets] = useState(false);
+  const [loadReport, setLoadReport] = useState<LoadReport | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
+    setLoadReport(null);
 
     if (!isSheetsConfigured()) {
       setIsLoading(false);
@@ -98,6 +102,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
 
     try {
       const data = await fetchGameData();
+      setLoadReport(data.loadReport);
       if (data.cards.length > 0) {
         setCards(enrichArt(data.cards));
       }
@@ -167,7 +172,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <GameDataContext.Provider value={{ config, isLoading, error, isUsingSheets, refresh }}>
+    <GameDataContext.Provider value={{ config, isLoading, error, isUsingSheets, loadReport, refresh }}>
       {children}
     </GameDataContext.Provider>
   );
