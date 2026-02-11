@@ -295,7 +295,7 @@ export function CollectionPanel({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm overflow-hidden"
               onClick={() => setSelectedCard(null)}
             >
               <motion.div
@@ -303,9 +303,10 @@ export function CollectionPanel({
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 40, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[95vh] overflow-y-auto"
+                className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[95vh] overflow-y-auto overscroll-contain"
                 style={{
                   background: `linear-gradient(180deg, ${targetColor}10 0%, rgba(8,0,18,0.98) 40%)`,
+                  maxHeight: '95dvh',
                 }}
               >
                 {/* Large card art - hero section */}
