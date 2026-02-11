@@ -288,13 +288,7 @@ export function CollectionPanel({
           const canAffordShards = card.soulShards >= costs.totalShards;
           const canAfford = canAffordEssence && canAffordShards;
 
-          // LC needed to cover shortfalls
-          const essenceShort = Math.max(0, costs.totalEssence - currencies.shadowEssence);
-          const shardsShort = Math.max(0, costs.totalShards - card.soulShards);
-          const lcForEssence = Math.ceil(essenceShort / LC_ESSENCE_RATE);
-          const lcForShards = Math.ceil(shardsShort / LC_SHARDS_RATE);
-          const lcNeeded = lcForEssence + lcForShards;
-          const canAffordWithLC = !canAfford && currencies.lunarCrystals >= lcNeeded;
+          // (LC shortfall computed in the confirm popup)
 
           return (
             <motion.div
@@ -420,14 +414,11 @@ export function CollectionPanel({
                           if (canAfford) {
                             setUpgradeReveal({ card: def, fromTier: card.upgradeTier, toTier: chosenTargetTier });
                             onUpgrade(index, chosenTargetTier);
-                          } else if (canAffordWithLC) {
+                          } else {
                             setShowLCConfirm(true);
                           }
                         }}
-                        disabled={!canAfford && !canAffordWithLC}
-                        className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all ${
-                          !canAfford && !canAffordWithLC ? 'cursor-not-allowed opacity-60' : ''
-                        }`}
+                        className="w-full py-3.5 rounded-xl text-sm font-bold transition-all"
                         style={{
                           background: canAfford
                             ? `linear-gradient(135deg, ${targetColor}, ${targetColor}bb)`
@@ -448,17 +439,6 @@ export function CollectionPanel({
                           </span>
                         </div>
                       </button>
-                      {!canAfford && !canAffordWithLC && (
-                        <div className="text-center">
-                          <p className="text-xs text-surface-500">
-                            {!canAffordEssence && !canAffordShards
-                              ? `Need ${formatNumber(essenceShort)} more Essence & ${shardsShort} more Shards`
-                              : !canAffordEssence
-                              ? `Need ${formatNumber(essenceShort)} more Essence`
-                              : `Need ${shardsShort} more Shards`}
-                          </p>
-                        </div>
-                      )}
                     </>
                   ) : (
                     <div className="text-center py-3">
