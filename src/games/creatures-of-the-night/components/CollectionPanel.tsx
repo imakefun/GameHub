@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { OwnedCard, GameConfig, CardType, CardDefinition, UpgradeTier } from '../types';
 import {
   CARD_TYPE_INFO,
@@ -500,13 +500,20 @@ export function CollectionPanel({
                     )
                   )}
 
-                  {/* Cancel button */}
-                  <button
-                    onClick={() => setSelectedCard(null)}
-                    className="w-full py-2.5 rounded-xl text-sm font-medium bg-surface-800/80 hover:bg-surface-700 transition-colors border border-surface-700"
-                  >
-                    Cancel
-                  </button>
+                  {/* Close button */}
+                  <div className="flex justify-center pt-1">
+                    <button
+                      onClick={() => setSelectedCard(null)}
+                      className="w-14 h-14 rounded-xl flex items-center justify-center border-2 transition-colors hover:bg-red-500/30"
+                      style={{
+                        background: 'linear-gradient(135deg, #991b1b, #dc2626)',
+                        borderColor: 'rgba(248, 113, 113, 0.3)',
+                        boxShadow: '0 0 20px rgba(220, 38, 38, 0.3)',
+                      }}
+                    >
+                      <X className="w-7 h-7 text-white" />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
