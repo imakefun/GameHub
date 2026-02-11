@@ -249,6 +249,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'collect-5-cards',
     description: 'Collect from 5 cards',
+    triggerType: 'collect_card',
     target: 5,
     difficulty: 'easy',
     rewards: { shadowEssence: 75, soulShards: 8 },
@@ -256,6 +257,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'login-night',
     description: 'Log in during nighttime',
+    triggerType: 'login_night',
     target: 1,
     difficulty: 'easy',
     rewards: { shadowEssence: 50, soulShards: 5 },
@@ -263,6 +265,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'open-1-pack',
     description: 'Open 1 tome',
+    triggerType: 'open_pack',
     target: 1,
     difficulty: 'easy',
     rewards: { shadowEssence: 100, soulShards: 10 },
@@ -270,6 +273,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'level-up-1',
     description: 'Level up a card',
+    triggerType: 'upgrade',
     target: 1,
     difficulty: 'easy',
     rewards: { shadowEssence: 75, soulShards: 7 },
@@ -277,6 +281,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'collect-500-essence',
     description: 'Collect 500 Shadow Essence',
+    triggerType: 'essence',
     target: 500,
     difficulty: 'easy',
     rewards: { shadowEssence: 80, soulShards: 8 },
@@ -284,6 +289,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'send-expedition',
     description: 'Send a card on expedition',
+    triggerType: 'send_expedition',
     target: 1,
     difficulty: 'easy',
     rewards: { shadowEssence: 100, soulShards: 10 },
@@ -292,6 +298,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'collect-15-cards',
     description: 'Collect from 15 cards',
+    triggerType: 'collect_card',
     target: 15,
     difficulty: 'hard',
     rewards: { shadowEssence: 500, soulShards: 30, lunarCrystals: 1 },
@@ -299,6 +306,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'level-up-5',
     description: 'Level up 5 cards',
+    triggerType: 'upgrade',
     target: 5,
     difficulty: 'hard',
     rewards: { shadowEssence: 500, soulShards: 40, lunarCrystals: 1 },
@@ -306,6 +314,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'collect-5000-essence',
     description: 'Collect 5000 Shadow Essence',
+    triggerType: 'essence',
     target: 5000,
     difficulty: 'hard',
     rewards: { shadowEssence: 500, soulShards: 50, lunarCrystals: 1 },
@@ -313,6 +322,7 @@ export const dailyQuestPool: DailyQuest[] = [
   {
     id: 'complete-3-expeditions',
     description: 'Complete 3 expeditions',
+    triggerType: 'complete_expedition',
     target: 3,
     difficulty: 'hard',
     rewards: { shadowEssence: 500, soulShards: 35, lunarCrystals: 1 },

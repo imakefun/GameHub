@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Check, Lock } from 'lucide-react';
 import type { GameState, GameConfig, CardType } from '../types';
 import { CARD_TYPE_INFO } from '../types';
-import { isNightTime, getLunarPhase, WEEKLY_MILESTONES, LOGIN_STREAK_MILESTONES } from '../hooks/useGameState';
+import type { WeeklyMilestone } from '../types';
+import { isNightTime, getLunarPhase } from '../hooks/useGameState';
 import { clRoadPhase1 } from '../data/clConfig';
 
 interface GrimoirePanelProps {
@@ -78,6 +79,7 @@ function WeeklyRewardDetail({
   milestoneIndex,
   weeklyQuestCount,
   weeklyRewardsClaimed,
+  milestones,
   onClaimReward,
   onNavigate,
   onClose,
@@ -85,11 +87,12 @@ function WeeklyRewardDetail({
   milestoneIndex: number;
   weeklyQuestCount: number;
   weeklyRewardsClaimed: number[];
+  milestones: WeeklyMilestone[];
   onClaimReward: (tier: number) => void;
   onNavigate: (index: number) => void;
   onClose: () => void;
 }) {
-  const milestone = WEEKLY_MILESTONES[milestoneIndex];
+  const milestone = milestones[milestoneIndex];
   if (!milestone) return null;
 
   const reached = weeklyQuestCount >= milestone.quests;
@@ -155,7 +158,7 @@ function WeeklyRewardDetail({
           </motion.div>
 
           {/* Right arrow */}
-          {milestoneIndex < WEEKLY_MILESTONES.length - 1 && (
+          {milestoneIndex < milestones.length - 1 && (
             <button
               onClick={() => onNavigate(milestoneIndex + 1)}
               className="absolute right-0 z-10 w-12 h-12 rounded-xl flex items-center justify-center border-2 border-blue-500/30 hover:bg-blue-500/20 transition-colors"
@@ -227,7 +230,7 @@ function WeeklyRewardDetail({
 
           {/* Page indicator */}
           <div className="flex justify-center gap-1.5 pb-4">
-            {WEEKLY_MILESTONES.map((_, i) => (
+            {milestones.map((_, i) => (
               <button
                 key={i}
                 onClick={() => onNavigate(i)}
@@ -237,7 +240,7 @@ function WeeklyRewardDetail({
               />
             ))}
             <span className="text-[10px] text-surface-500 ml-1.5">
-              {milestoneIndex + 1}/{WEEKLY_MILESTONES.length}
+              {milestoneIndex + 1}/{milestones.length}
             </span>
           </div>
         </div>
@@ -302,35 +305,35 @@ export function GrimoirePanel({
     (syn) => (typeCounts[syn.type1] || 0) >= 1 && (typeCounts[syn.type2] || 0) >= 1
   );
 
-  const maxWeekly = WEEKLY_MILESTONES[WEEKLY_MILESTONES.length - 1]?.quests || 25;
+  const maxWeekly = config.weeklyMilestones[config.weeklyMilestones.length - 1]?.quests || 25;
   const maxCLRoad = clRoadPhase1[clRoadPhase1.length - 1]?.cl || 32;
 
   // Compute fill percentage aligned to evenly-spaced milestone node centers
   const weeklyFillPct = (() => {
-    const n = WEEKLY_MILESTONES.length;
+    const n = config.weeklyMilestones.length;
     const count = state.weeklyQuestCount;
     if (n === 0 || count <= 0) return 0;
 
     const nodeCenter = (i: number) => ((i + 0.5) / n) * 100;
-    const lastIdx = WEEKLY_MILESTONES.reduce(
+    const lastIdx = config.weeklyMilestones.reduce(
       (acc, m, i) => (count >= m.quests ? i : acc),
       -1,
     );
 
     if (lastIdx === -1) {
-      return (count / WEEKLY_MILESTONES[0].quests) * nodeCenter(0);
+      return (count / config.weeklyMilestones[0].quests) * nodeCenter(0);
     }
     if (lastIdx === n - 1) return nodeCenter(n - 1);
 
-    const fromQ = WEEKLY_MILESTONES[lastIdx].quests;
-    const toQ = WEEKLY_MILESTONES[lastIdx + 1].quests;
+    const fromQ = config.weeklyMilestones[lastIdx].quests;
+    const toQ = config.weeklyMilestones[lastIdx + 1].quests;
     const frac = (count - fromQ) / (toQ - fromQ);
     return nodeCenter(lastIdx) + frac * (nodeCenter(lastIdx + 1) - nodeCenter(lastIdx));
   })();
 
   // Weekly reward detail modal
   const [weeklyDetailIndex, setWeeklyDetailIndex] = useState<number | null>(null);
-  const weeklyClaimableCount = WEEKLY_MILESTONES.filter(
+  const weeklyClaimableCount = config.weeklyMilestones.filter(
     (m) => state.weeklyQuestCount >= m.quests && !state.weeklyRewardsClaimed.includes(m.quests),
   ).length;
 
@@ -491,7 +494,7 @@ export function GrimoirePanel({
 
           {/* Milestone nodes */}
           <div className="relative flex items-center justify-between px-0">
-            {WEEKLY_MILESTONES.map((milestone, i) => {
+            {config.weeklyMilestones.map((milestone, i) => {
               const claimed = state.weeklyRewardsClaimed.includes(milestone.quests);
               const reached = state.weeklyQuestCount >= milestone.quests;
               const claimable = reached && !claimed;
@@ -501,7 +504,7 @@ export function GrimoirePanel({
                   key={milestone.quests}
                   onClick={() => setWeeklyDetailIndex(i)}
                   className="relative flex flex-col items-center group"
-                  style={{ width: `${100 / WEEKLY_MILESTONES.length}%` }}
+                  style={{ width: `${100 / config.weeklyMilestones.length}%` }}
                 >
                   {/* Badge */}
                   <div
@@ -570,6 +573,7 @@ export function GrimoirePanel({
             milestoneIndex={weeklyDetailIndex}
             weeklyQuestCount={state.weeklyQuestCount}
             weeklyRewardsClaimed={state.weeklyRewardsClaimed}
+            milestones={config.weeklyMilestones}
             onClaimReward={onClaimWeeklyReward}
             onNavigate={setWeeklyDetailIndex}
             onClose={() => setWeeklyDetailIndex(null)}
@@ -627,11 +631,11 @@ export function GrimoirePanel({
       </div>
 
       {/* Login Streak */}
-      {LOGIN_STREAK_MILESTONES.some((m) => !state.loginStreakRewardsClaimed.includes(m.days)) && (
+      {config.loginStreakMilestones.some((m) => !state.loginStreakRewardsClaimed.includes(m.days)) && (
         <div className="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5">
           <h3 className="font-semibold text-sm mb-2">Login Streak: {state.playerStats.loginStreak} day{state.playerStats.loginStreak !== 1 ? 's' : ''}</h3>
           <div className="space-y-2">
-            {LOGIN_STREAK_MILESTONES.map((m) => {
+            {config.loginStreakMilestones.map((m) => {
               const claimed = state.loginStreakRewardsClaimed.includes(m.days);
               const reached = state.playerStats.loginStreak >= m.days;
               return (

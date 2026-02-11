@@ -20,6 +20,8 @@ export const SHEETS_CONFIG = {
     lootTables: 'LootTables',
     upgradeTiers: 'UpgradeTiers',
     typeSpecializations: 'TypeSpecializations',
+    weeklyMilestones: 'WeeklyMilestones',
+    loginStreakMilestones: 'LoginStreakMilestones',
   },
 
   cacheDuration: 5 * 60 * 1000, // 5 minutes

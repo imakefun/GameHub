@@ -20,38 +20,6 @@ import {
 
 const STORAGE_KEY = 'creatures-of-the-night-save';
 
-// LC cost to buy extra crypt slots beyond CL-unlocked ones
-const EXTRA_CRYPT_SLOT_LC_COST = 15;
-const MAX_PURCHASED_CRYPT_SLOTS = 3; // can buy up to 3 extra (max 10 total)
-
-// Login streak milestones that grant Lunar Crystals
-const LOGIN_STREAK_MILESTONES: { days: number; lunarCrystals: number }[] = [
-  { days: 7, lunarCrystals: 5 },
-  { days: 14, lunarCrystals: 5 },
-  { days: 30, lunarCrystals: 15 },
-  { days: 60, lunarCrystals: 20 },
-  { days: 90, lunarCrystals: 30 },
-];
-
-export { LOGIN_STREAK_MILESTONES, EXTRA_CRYPT_SLOT_LC_COST, MAX_PURCHASED_CRYPT_SLOTS };
-
-// Void energy from breaking Eternal duplicates
-const ETERNAL_DUPLICATE_VOID_ENERGY = 10;
-
-// Weekly milestone tiers per the spec: 5/10/15/20/25 quests
-const WEEKLY_MILESTONES: {
-  quests: number;
-  rewards: { shadowEssence?: number; soulShards?: number; lunarCrystals?: number; tome?: string };
-}[] = [
-  { quests: 5, rewards: { tome: 'standard-tome' } },
-  { quests: 10, rewards: { soulShards: 100, tome: 'standard-tome' } },
-  { quests: 15, rewards: { soulShards: 200, tome: 'enhanced-tome' } },
-  { quests: 20, rewards: { lunarCrystals: 3, tome: 'premium-tome' } },
-  { quests: 25, rewards: { lunarCrystals: 5, tome: 'premium-tome' } },
-];
-
-export { WEEKLY_MILESTONES };
-
 // ============================================================
 // Exported Helpers
 // ============================================================
@@ -238,7 +206,7 @@ function deriveCLFields(
   purchasedCryptSlots: number = 0,
 ): Pick<GameState, 'cryptSlots' | 'unlockedFeatures'> {
   const baseSlots = cryptSlotsForCL(cl, config.settings.maxCryptSlots, config.cryptSlotUnlocks);
-  const slots = Math.min(baseSlots + purchasedCryptSlots, config.settings.maxCryptSlots + MAX_PURCHASED_CRYPT_SLOTS);
+  const slots = Math.min(baseSlots + purchasedCryptSlots, config.settings.maxCryptSlots + config.maxPurchasedCryptSlots);
   const unlocks = [...currentUnlocks];
   for (const fu of config.featureUnlocks) {
     if (cl >= fu.cl && !unlocks.includes(fu.feature)) {
@@ -319,6 +287,8 @@ function getTodayMidnight(): number {
 
 function assignDailyQuests(
   pool: GameConfig['dailyQuestPool'],
+  easyCount: number,
+  hardCount: number,
 ): GameState['dailyQuests'] {
   const easy = pool.filter((q) => q.difficulty === 'easy');
   const hard = pool.filter((q) => q.difficulty === 'hard');
@@ -333,8 +303,8 @@ function assignDailyQuests(
   };
 
   const picked = [
-    ...shuffled(easy).slice(0, 4),
-    ...shuffled(hard).slice(0, 2),
+    ...shuffled(easy).slice(0, easyCount),
+    ...shuffled(hard).slice(0, hardCount),
   ];
 
   return picked.map((q) => ({
@@ -357,15 +327,11 @@ function trackQuestProgress(
     const def = pool.find((p) => p.id === q.questId);
     if (!def) return q;
 
-    let matches = false;
-    if (trigger === 'collect_card' && def.id.includes('collect')) matches = true;
-    if (trigger === 'level_up' && def.id.includes('level')) matches = true;
-    if (trigger === 'upgrade' && def.id.includes('level')) matches = true; // upgrade counts as level-up for quests
-    if (trigger === 'open_pack' && def.id.includes('pack')) matches = true;
-    if (trigger === 'send_expedition' && def.id === 'send-expedition') matches = true;
-    if (trigger === 'complete_expedition' && def.id === 'complete-3-expeditions') matches = true;
-    if (trigger === 'essence' && def.id.includes('essence')) matches = true;
-    if (trigger === 'login_night' && def.id.includes('night')) matches = true;
+    // Match via the data-driven triggerType field
+    // 'upgrade' also counts for legacy 'level_up' triggers
+    const matches = def.triggerType === trigger
+      || (trigger === 'level_up' && def.triggerType === 'upgrade')
+      || (trigger === 'upgrade' && def.triggerType === 'upgrade');
 
     if (!matches) return q;
 
@@ -467,7 +433,7 @@ function createInitialState(config: GameConfig): GameState {
     completedExpeditions: [],
     starterTomeClaimed: false,
     unlockedFeatures: startClFields.unlockedFeatures,
-    dailyQuests: assignDailyQuests(config.dailyQuestPool),
+    dailyQuests: assignDailyQuests(config.dailyQuestPool, config.dailyQuestEasyCount, config.dailyQuestHardCount),
     dailyQuestsLastReset: getTodayMidnight(),
     weeklyQuestCount: 0,
     weeklyRewardsClaimed: [],
@@ -502,7 +468,7 @@ function createGameReducer(config: GameConfig) {
 
         const todayMidnight = getTodayMidnight();
         if (todayMidnight > dailyQuestsLastReset) {
-          dailyQuests = assignDailyQuests(config.dailyQuestPool);
+          dailyQuests = assignDailyQuests(config.dailyQuestPool, config.dailyQuestEasyCount, config.dailyQuestHardCount);
           dailyQuestsLastReset = todayMidnight;
 
           const dayOfWeek = new Date(now).getDay();
@@ -816,7 +782,7 @@ function createGameReducer(config: GameConfig) {
 
           if (existIdx >= 0) {
             if (cardDef.tier === 'eternal') {
-              voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
+              voidEnergyGained += config.eternalDuplicateVoidEnergy;
             }
             const shards = config.tierDuplicateShards[cardDef.tier];
             cards[existIdx] = {
@@ -825,7 +791,7 @@ function createGameReducer(config: GameConfig) {
             };
           } else if (newIdx >= 0) {
             if (cardDef.tier === 'eternal') {
-              voidEnergyGained += ETERNAL_DUPLICATE_VOID_ENERGY;
+              voidEnergyGained += config.eternalDuplicateVoidEnergy;
             }
             const shards = config.tierDuplicateShards[cardDef.tier];
             newOwned[newIdx] = {
@@ -1086,7 +1052,7 @@ function createGameReducer(config: GameConfig) {
       case 'CLAIM_WEEKLY_REWARD': {
         if (state.weeklyRewardsClaimed.includes(action.tier)) return state;
 
-        const milestone = WEEKLY_MILESTONES.find((m) => m.quests === action.tier);
+        const milestone = config.weeklyMilestones.find((m) => m.quests === action.tier);
         if (!milestone || state.weeklyQuestCount < milestone.quests) return state;
 
         const newCur = { ...state.currencies };
@@ -1242,8 +1208,8 @@ function createGameReducer(config: GameConfig) {
 
       // ======================== BUY_CRYPT_SLOT ========================
       case 'BUY_CRYPT_SLOT': {
-        if (state.purchasedCryptSlots >= MAX_PURCHASED_CRYPT_SLOTS) return state;
-        if (state.currencies.lunarCrystals < EXTRA_CRYPT_SLOT_LC_COST) return state;
+        if (state.purchasedCryptSlots >= config.maxPurchasedCryptSlots) return state;
+        if (state.currencies.lunarCrystals < config.extraCryptSlotLCCost) return state;
 
         const newPurchased = state.purchasedCryptSlots + 1;
         const clFields = deriveCLFields(
@@ -1257,7 +1223,7 @@ function createGameReducer(config: GameConfig) {
           ...state,
           currencies: {
             ...state.currencies,
-            lunarCrystals: state.currencies.lunarCrystals - EXTRA_CRYPT_SLOT_LC_COST,
+            lunarCrystals: state.currencies.lunarCrystals - config.extraCryptSlotLCCost,
           },
           purchasedCryptSlots: newPurchased,
           cryptSlots: clFields.cryptSlots,
@@ -1269,7 +1235,7 @@ function createGameReducer(config: GameConfig) {
         const { milestone } = action;
         if (state.loginStreakRewardsClaimed.includes(milestone)) return state;
 
-        const streakReward = LOGIN_STREAK_MILESTONES.find((m) => m.days === milestone);
+        const streakReward = config.loginStreakMilestones.find((m) => m.days === milestone);
         if (!streakReward) return state;
         if (state.playerStats.loginStreak < milestone) return state;
 
@@ -1370,12 +1336,12 @@ export function useGameState(config: GameConfig) {
           // Daily quest reset if needed
           const todayMidnight = getTodayMidnight();
           if (todayMidnight > restored.dailyQuestsLastReset) {
-            restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool);
+            restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool, cfg.dailyQuestEasyCount, cfg.dailyQuestHardCount);
             restored.dailyQuestsLastReset = todayMidnight;
           }
 
           if (!restored.dailyQuests || restored.dailyQuests.length === 0) {
-            restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool);
+            restored.dailyQuests = assignDailyQuests(cfg.dailyQuestPool, cfg.dailyQuestEasyCount, cfg.dailyQuestHardCount);
             restored.dailyQuestsLastReset = todayMidnight;
           }
 
