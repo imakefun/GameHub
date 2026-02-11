@@ -305,6 +305,29 @@ export function GrimoirePanel({
   const maxWeekly = WEEKLY_MILESTONES[WEEKLY_MILESTONES.length - 1]?.quests || 25;
   const maxCLRoad = clRoadPhase1[clRoadPhase1.length - 1]?.cl || 32;
 
+  // Compute fill percentage aligned to evenly-spaced milestone node centers
+  const weeklyFillPct = (() => {
+    const n = WEEKLY_MILESTONES.length;
+    const count = state.weeklyQuestCount;
+    if (n === 0 || count <= 0) return 0;
+
+    const nodeCenter = (i: number) => ((i + 0.5) / n) * 100;
+    const lastIdx = WEEKLY_MILESTONES.reduce(
+      (acc, m, i) => (count >= m.quests ? i : acc),
+      -1,
+    );
+
+    if (lastIdx === -1) {
+      return (count / WEEKLY_MILESTONES[0].quests) * nodeCenter(0);
+    }
+    if (lastIdx === n - 1) return nodeCenter(n - 1);
+
+    const fromQ = WEEKLY_MILESTONES[lastIdx].quests;
+    const toQ = WEEKLY_MILESTONES[lastIdx + 1].quests;
+    const frac = (count - fromQ) / (toQ - fromQ);
+    return nodeCenter(lastIdx) + frac * (nodeCenter(lastIdx + 1) - nodeCenter(lastIdx));
+  })();
+
   // Weekly reward detail modal
   const [weeklyDetailIndex, setWeeklyDetailIndex] = useState<number | null>(null);
   const weeklyClaimableCount = WEEKLY_MILESTONES.filter(
@@ -460,7 +483,7 @@ export function GrimoirePanel({
           <div
             className="absolute left-3 top-1/2 -translate-y-1/2 h-2 rounded-full transition-all duration-700"
             style={{
-              width: `calc(${Math.min(100, (state.weeklyQuestCount / maxWeekly) * 100)}% * (100% - 24px) / 100%)`,
+              width: `max(0px, calc(${weeklyFillPct}% - 12px))`,
               background: 'linear-gradient(90deg, #06b6d4, #3b82f6, #8b5cf6)',
               boxShadow: '0 0 12px rgba(56, 189, 248, 0.4)',
             }}
