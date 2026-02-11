@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, HelpCircle, Lock, Check } from 'lucide-react';
 import type { GameState, GameConfig, CLReward, UpgradeTier } from '../types';
-import { UPGRADE_COSTS, UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS } from '../types';
+import { UPGRADE_TIER_LABELS, UPGRADE_TIER_COLORS } from '../types';
 
 // ============================================================
 // Reward display config
@@ -68,7 +68,7 @@ function playAnimationComplete() {
 
 const UPGRADE_TIERS: Exclude<UpgradeTier, 'base'>[] = ['twilight', 'dusk', 'midnight', 'umbral', 'eternal', 'cosmic'];
 
-function HelpModal({ onClose }: { onClose: () => void }) {
+function HelpModal({ onClose, config }: { onClose: () => void; config: GameConfig }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -105,7 +105,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         </p>
         <div className="px-5 pb-4 space-y-2">
           {UPGRADE_TIERS.map((tier) => {
-            const cost = UPGRADE_COSTS[tier];
+            const cost = config.upgradeCosts[tier];
             return (
               <div
                 key={tier}
@@ -653,7 +653,7 @@ export function CLRoadPage({ state, config, onClaimReward, onClose, animation }:
 
       {/* ===== Help Modal ===== */}
       <AnimatePresence>
-        {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+        {showHelp && <HelpModal onClose={() => setShowHelp(false)} config={config} />}
       </AnimatePresence>
     </motion.div>
   );

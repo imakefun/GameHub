@@ -519,6 +519,35 @@ const settingsRows = [
   { key: 'maxCryptSlots', value: '7' },
   { key: 'offlineMaxHours', value: '8' },
   { key: 'offlineEssenceMultiplier', value: '0.5' },
+  { key: 'lcEssenceRate', value: '100' },
+  { key: 'lcShardsRate', value: '10' },
+];
+
+// --- Upgrade Tiers (costs + production bonus + duplicate shards) ---
+const upgradeTiers = [
+  { tier: 'base', shadowEssence: '', shards: '', clGain: '', productionBonus: '1.0', duplicateShards: '' },
+  { tier: 'twilight', shadowEssence: '25', shards: '5', clGain: '1', productionBonus: '1.05', duplicateShards: '5' },
+  { tier: 'dusk', shadowEssence: '100', shards: '10', clGain: '2', productionBonus: '1.10', duplicateShards: '15' },
+  { tier: 'midnight', shadowEssence: '200', shards: '20', clGain: '4', productionBonus: '1.20', duplicateShards: '30' },
+  { tier: 'umbral', shadowEssence: '300', shards: '30', clGain: '6', productionBonus: '1.30', duplicateShards: '60' },
+  { tier: 'eternal', shadowEssence: '400', shards: '40', clGain: '8', productionBonus: '1.45', duplicateShards: '120' },
+  { tier: 'cosmic', shadowEssence: '500', shards: '50', clGain: '10', productionBonus: '1.65', duplicateShards: '' },
+];
+
+// --- Type Specializations ---
+const typeSpecRows = [
+  { type: 'beast', amountMultiplier: '1', intervalMultiplier: '1' },
+  { type: 'spirit', amountMultiplier: '0.5', intervalMultiplier: '0.5' },
+  { type: 'shadow', amountMultiplier: '1', intervalMultiplier: '1', nightIntervalMultiplier: '0.5' },
+  { type: 'fae', amountMultiplier: '1', intervalMultiplier: '1', randomVariance: '0.5' },
+  { type: 'blood', amountMultiplier: '1.5', intervalMultiplier: '1.5' },
+  { type: 'magic', amountMultiplier: '1', intervalMultiplier: '1', doubleChance: '0.2' },
+  { type: 'necromancy', amountMultiplier: '2', intervalMultiplier: '2' },
+  { type: 'cursed', amountMultiplier: '1', intervalMultiplier: '1', randomVariance: '0.5' },
+  { type: 'lycanthrope', amountMultiplier: '1', intervalMultiplier: '1', nightIntervalMultiplier: '0.5', fullMoonBonus: '1.0' },
+  { type: 'undead', amountMultiplier: '1', intervalMultiplier: '1' },
+  { type: 'stone', amountMultiplier: '2.5', intervalMultiplier: '3' },
+  { type: 'infernal', amountMultiplier: '1.25', intervalMultiplier: '1', failChance: '0.05' },
 ];
 
 // ============================================================
@@ -539,6 +568,8 @@ async function main() {
   await pushSheet('FeatureUnlocks', featureUnlocks);
   await pushSheet('CLConfig', clConfig);
   await pushSheet('Settings', settingsRows);
+  await pushSheet('UpgradeTiers', upgradeTiers);
+  await pushSheet('TypeSpecializations', typeSpecRows);
 
   console.log('\nDone! Your spreadsheet is now populated with all game data.');
   console.log('Edit values in Google Sheets, then the app will read from SheetDB.');

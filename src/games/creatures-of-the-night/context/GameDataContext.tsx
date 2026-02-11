@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
   CardDefinition,
+  CardTier,
   CardType,
   PackDefinition,
   ExpeditionZone,
@@ -14,6 +15,17 @@ import type {
   LootTableEntry,
   GameConfig,
   GameSettings,
+  UpgradeTier,
+  UpgradeCost,
+  TypeSpecialization,
+} from '../types';
+import {
+  UPGRADE_COSTS,
+  UPGRADE_TIER_PRODUCTION_BONUS,
+  TIER_DUPLICATE_SHARDS,
+  TYPE_SPECIALIZATIONS,
+  LC_ESSENCE_RATE,
+  LC_SHARDS_RATE,
 } from '../types';
 import { fetchGameData, clearCache } from '../services/sheetsService';
 import type { LoadReport } from '../services/sheetsService';
@@ -84,6 +96,12 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [cryptSlotUnlocks, setCryptSlotUnlocks] = useState<CryptSlotUnlock[]>(localCryptSlotUnlocks);
   const [lootTables, setLootTables] = useState<LootTableEntry[]>(localLootTables);
   const [settings, setSettings] = useState<GameSettings>(localSettings);
+  const [upgradeCosts, setUpgradeCosts] = useState<Record<Exclude<UpgradeTier, 'base'>, UpgradeCost>>(UPGRADE_COSTS);
+  const [upgradeTierProductionBonus, setUpgradeTierProductionBonus] = useState<Record<UpgradeTier, number>>(UPGRADE_TIER_PRODUCTION_BONUS);
+  const [tierDuplicateShards, setTierDuplicateShards] = useState<Record<CardTier, number>>(TIER_DUPLICATE_SHARDS);
+  const [typeSpecializations, setTypeSpecializations] = useState<Record<CardType, TypeSpecialization>>(TYPE_SPECIALIZATIONS);
+  const [lcEssenceRate, setLcEssenceRate] = useState<number>(LC_ESSENCE_RATE);
+  const [lcShardsRate, setLcShardsRate] = useState<number>(LC_SHARDS_RATE);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUsingSheets, setIsUsingSheets] = useState(false);
@@ -137,6 +155,16 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
         setLootTables(data.lootTables);
       }
       setSettings(data.settings);
+      if (data.upgradeTiers) {
+        setUpgradeCosts(data.upgradeTiers.upgradeCosts);
+        setUpgradeTierProductionBonus(data.upgradeTiers.upgradeTierProductionBonus);
+        setTierDuplicateShards(data.upgradeTiers.tierDuplicateShards);
+      }
+      if (data.typeSpecializations) {
+        setTypeSpecializations(data.typeSpecializations);
+      }
+      if (data.lcEssenceRate != null) setLcEssenceRate(data.lcEssenceRate);
+      if (data.lcShardsRate != null) setLcShardsRate(data.lcShardsRate);
       setIsUsingSheets(true);
     } catch (err) {
       console.error('[Creatures] Using local data:', err);
@@ -169,6 +197,12 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     cryptSlotUnlocks,
     lootTables,
     settings,
+    upgradeCosts,
+    upgradeTierProductionBonus,
+    tierDuplicateShards,
+    typeSpecializations,
+    lcEssenceRate,
+    lcShardsRate,
   };
 
   return (

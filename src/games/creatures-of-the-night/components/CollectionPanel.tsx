@@ -7,16 +7,13 @@ import {
   UPGRADE_TIER_ORDER,
   UPGRADE_TIER_LABELS,
   UPGRADE_TIER_COLORS,
-  UPGRADE_COSTS,
-  LC_ESSENCE_RATE,
-  LC_SHARDS_RATE,
 } from '../types';
 import { UpgradeReveal } from './UpgradeReveal';
 import { LunarCrystalConfirm } from './LunarCrystalConfirm';
 import { getEffectiveGeneration, effectiveInterval } from '../hooks/useGameState';
 
-function sePerSecond(card: OwnedCard, def: CardDefinition): number {
-  return getEffectiveGeneration(card, def) / effectiveInterval(def);
+function sePerSecond(card: OwnedCard, def: CardDefinition, config: GameConfig): number {
+  return getEffectiveGeneration(card, def, config) / effectiveInterval(def, config);
 }
 
 function formatRate(n: number): string {
@@ -55,7 +52,7 @@ function borderStyle(tier: UpgradeTier, color: string) {
 }
 
 // Compute cumulative costs from currentTier to targetTier
-function getCumulativeCost(currentTier: UpgradeTier, targetTier: UpgradeTier) {
+function getCumulativeCost(currentTier: UpgradeTier, targetTier: UpgradeTier, config: GameConfig) {
   const currentIdx = UPGRADE_TIER_ORDER.indexOf(currentTier);
   const targetIdx = UPGRADE_TIER_ORDER.indexOf(targetTier);
   let totalEssence = 0;
@@ -63,7 +60,7 @@ function getCumulativeCost(currentTier: UpgradeTier, targetTier: UpgradeTier) {
   let totalCL = 0;
   for (let i = currentIdx + 1; i <= targetIdx; i++) {
     const tier = UPGRADE_TIER_ORDER[i] as Exclude<UpgradeTier, 'base'>;
-    const c = UPGRADE_COSTS[tier];
+    const c = config.upgradeCosts[tier];
     totalEssence += c.shadowEssence;
     totalShards += c.shards;
     totalCL += c.clGain;
@@ -109,7 +106,7 @@ export function CollectionPanel({
     const nextIdx = UPGRADE_TIER_ORDER.indexOf(card.upgradeTier) + 1;
     if (nextIdx >= UPGRADE_TIER_ORDER.length) return false;
     const nextTier = UPGRADE_TIER_ORDER[nextIdx] as Exclude<UpgradeTier, 'base'>;
-    const cost = UPGRADE_COSTS[nextTier];
+    const cost = config.upgradeCosts[nextTier];
     return currencies.shadowEssence >= cost.shadowEssence && card.soulShards >= cost.shards;
   };
 
@@ -280,7 +277,7 @@ export function CollectionPanel({
 
           // Cumulative costs for selected target
           const costs = chosenTargetTier
-            ? getCumulativeCost(card.upgradeTier, chosenTargetTier)
+            ? getCumulativeCost(card.upgradeTier, chosenTargetTier, config)
             : { totalEssence: 0, totalShards: 0, totalCL: 0 };
 
           // Affordability
@@ -510,11 +507,11 @@ export function CollectionPanel({
           const offset = Math.min(targetTierOffset, availTiers.length - 1);
           const target = availTiers[Math.max(0, offset)];
           if (!target) return null;
-          const cumCosts = getCumulativeCost(card.upgradeTier, target);
+          const cumCosts = getCumulativeCost(card.upgradeTier, target, config);
           const eShort = Math.max(0, cumCosts.totalEssence - currencies.shadowEssence);
           const sShort = Math.max(0, cumCosts.totalShards - card.soulShards);
-          const lcEssence = Math.ceil(eShort / LC_ESSENCE_RATE);
-          const lcShards = Math.ceil(sShort / LC_SHARDS_RATE);
+          const lcEssence = Math.ceil(eShort / config.lcEssenceRate);
+          const lcShards = Math.ceil(sShort / config.lcShardsRate);
           return (
             <LunarCrystalConfirm
               shortfall={{ essenceShort: eShort, shardsShort: sShort }}
@@ -537,6 +534,7 @@ export function CollectionPanel({
             card={upgradeReveal.card}
             fromTier={upgradeReveal.fromTier}
             toTier={upgradeReveal.toTier}
+            config={config}
             onDismiss={() => {
               setUpgradeReveal(null);
               onUpgradeFlowNext?.();
@@ -612,7 +610,7 @@ export function CollectionPanel({
                     </p>
                     <p className="text-xs text-surface-400">
                       {CARD_TYPE_INFO[newDef.type].emoji} {CARD_TYPE_INFO[newDef.type].label}
-                      {' \u2022 '}<span className="text-emerald-400 font-semibold">{formatRate(sePerSecond(newCard, newDef))} SE</span>
+                      {' \u2022 '}<span className="text-emerald-400 font-semibold">{formatRate(sePerSecond(newCard, newDef, config))} SE</span>
                     </p>
                   </div>
                   <span className="text-xs text-green-400 font-semibold flex-shrink-0">IN</span>
@@ -657,7 +655,7 @@ export function CollectionPanel({
                           </p>
                           <p className="text-xs text-surface-400">
                             {CARD_TYPE_INFO[placedDef.type].emoji} {CARD_TYPE_INFO[placedDef.type].label}
-                            {' \u2022 '}<span className="text-emerald-400 font-semibold">{formatRate(sePerSecond(placed, placedDef))} SE</span>
+                            {' \u2022 '}<span className="text-emerald-400 font-semibold">{formatRate(sePerSecond(placed, placedDef, config))} SE</span>
                           </p>
                           {hasEssence && (
                             <p className="text-xs text-amber-400 mt-0.5">

@@ -410,6 +410,13 @@ export interface GameConfig {
   cryptSlotUnlocks: CryptSlotUnlock[];
   lootTables: LootTableEntry[];
   settings: GameSettings;
+  // Economy config (sheet-overridable)
+  upgradeCosts: Record<Exclude<UpgradeTier, 'base'>, UpgradeCost>;
+  upgradeTierProductionBonus: Record<UpgradeTier, number>;
+  tierDuplicateShards: Record<CardTier, number>;
+  typeSpecializations: Record<CardType, TypeSpecialization>;
+  lcEssenceRate: number;
+  lcShardsRate: number;
 }
 
 export interface GameSettings {

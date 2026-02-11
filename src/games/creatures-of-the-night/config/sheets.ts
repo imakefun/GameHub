@@ -18,6 +18,8 @@ export const SHEETS_CONFIG = {
     clConfig: 'CLConfig',
     settings: 'Settings',
     lootTables: 'LootTables',
+    upgradeTiers: 'UpgradeTiers',
+    typeSpecializations: 'TypeSpecializations',
   },
 
   cacheDuration: 5 * 60 * 1000, // 5 minutes
