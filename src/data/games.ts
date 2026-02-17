@@ -227,6 +227,20 @@ export const games: Game[] = [
     difficulty: 'medium',
     playUrl: '/play/capitalism-sim',
   },
+  {
+    id: 'forage-or-die',
+    title: 'Forage or Die',
+    description: 'A binary-choice survival game. Lost in the wilderness, you must eat to survive — but can you tell the difference between what feeds you and what kills you? 29 real species. 7 encounters per run. No two journeys alike.',
+    thumbnail: 'https://images.unsplash.com/photo-1518882570536-1b821614e98e?w=400&h=300&fit=crop',
+    category: 'adventure',
+    tags: ['survival', 'foraging', 'educational', 'nature', 'roguelike'],
+    playCount: 0,
+    rating: 5.0,
+    featured: true,
+    createdAt: '2026-02-17',
+    difficulty: 'medium',
+    playUrl: '/play/forage-or-die',
+  },
 ];
 
 export const leaderboards: Record<string, LeaderboardEntry[]> = {
