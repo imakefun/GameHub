@@ -4,7 +4,6 @@ export interface PlayerStats {
   hunger: number;
   health: number;
   hydration: number;
-  clarity: number;
 }
 
 export interface ForageOption {
@@ -17,7 +16,6 @@ export interface ForageOption {
     hunger: number;
     health: number;
     hydration: number;
-    clarity: number;
   };
   outcome: string;
   safe: boolean;

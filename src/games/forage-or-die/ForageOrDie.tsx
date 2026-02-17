@@ -31,19 +31,6 @@ function getGenericLabel(emoji: string): string {
   return map[emoji] || 'Unknown Species';
 }
 
-function scrambleText(text: string, intensity: number): string {
-  return text
-    .split('')
-    .map((ch) => {
-      if (/[a-zA-Z]/.test(ch) && Math.random() < intensity) {
-        const offset = Math.floor(Math.random() * 5) - 2;
-        return String.fromCharCode(ch.charCodeAt(0) + offset);
-      }
-      return ch;
-    })
-    .join('');
-}
-
 // ─── Styles (inline, dark naturalist theme) ────────────────
 
 const FONT_FAMILY = "'EB Garamond', 'Georgia', serif";
@@ -73,17 +60,13 @@ const fadeInKeyframes = `
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes foragePulse {
-  0%, 100% { opacity: 0.6; }
-  50%      { opacity: 1; }
-}
 `;
 
 // ─── Component ─────────────────────────────────────────────
 
 export default function ForageOrDie() {
   const [gameState, setGameState] = useState<GameState>('title');
-  const [stats, setStats] = useState<PlayerStats>({ hunger: 50, health: 100, hydration: 60, clarity: 100 });
+  const [stats, setStats] = useState<PlayerStats>({ hunger: 50, health: 100, hydration: 60 });
   const [day, setDay] = useState(1);
   const [runEncounters, setRunEncounters] = useState<Encounter[]>([]);
   const [displayOrder, setDisplayOrder] = useState<boolean[]>([]); // true = swap A/B positions
@@ -118,7 +101,7 @@ export default function ForageOrDie() {
     const swaps = selected.map(() => Math.random() < 0.5);
     setRunEncounters(selected);
     setDisplayOrder(swaps);
-    setStats({ hunger: 50, health: 100, hydration: 60, clarity: 100 });
+    setStats({ hunger: 50, health: 100, hydration: 60 });
     setDay(1);
     setJournal([]);
     setLastChoice(null);
@@ -146,7 +129,6 @@ export default function ForageOrDie() {
         hunger: clamp(stats.hunger - 8, 0, 100),
         health: stats.health,
         hydration: clamp(stats.hydration - 5, 0, 100),
-        clarity: stats.clarity,
       };
 
       // Apply item effects
@@ -154,7 +136,6 @@ export default function ForageOrDie() {
         hunger: clamp(afterDrain.hunger + option.effects.hunger, 0, 100),
         health: clamp(afterDrain.health + option.effects.health, 0, 100),
         hydration: clamp(afterDrain.hydration + option.effects.hydration, 0, 100),
-        clarity: clamp(afterDrain.clarity + option.effects.clarity, 0, 100),
       };
 
       setStats(newStats);
@@ -206,23 +187,6 @@ export default function ForageOrDie() {
     if (day >= ENCOUNTERS_PER_RUN) return 'See If You Survived';
     return 'Next Day →';
   }, [stats, day]);
-
-  // Clarity distortion CSS
-  const clarityFilter = useMemo(() => {
-    if (stats.clarity >= 40) return 'none';
-    const hue = (100 - stats.clarity) * 2;
-    const sat = 1.5 + (100 - stats.clarity) / 50;
-    return `hue-rotate(${hue}deg) saturate(${sat})`;
-  }, [stats.clarity]);
-
-  const emojiBlur = useMemo(() => {
-    if (stats.clarity >= 40) return 0;
-    return (100 - stats.clarity) / 30;
-  }, [stats.clarity]);
-
-  const descBlur = useMemo(() => {
-    return stats.clarity < 30 ? 0.5 : 0;
-  }, [stats.clarity]);
 
   // ─── Render helpers ──────────────────────────────────────
 
@@ -290,29 +254,11 @@ export default function ForageOrDie() {
       {renderStatBar('🟡', 'Hunger', stats.hunger, '#d4a834')}
       {renderStatBar('🔴', 'Health', stats.health, '#c0392b')}
       {renderStatBar('🔵', 'Hydration', stats.hydration, '#3498db')}
-      {renderStatBar('🟣', 'Clarity', stats.clarity, '#9b59b6')}
-      {stats.clarity < 40 && (
-        <div
-          style={{
-            width: '100%',
-            textAlign: 'center',
-            fontSize: '12px',
-            color: '#e74c3c',
-            animation: 'foragePulse 2s infinite',
-            marginTop: '4px',
-          }}
-        >
-          ⚠ VISION DISTORTED
-        </div>
-      )}
     </div>
   );
 
   const renderChoiceCard = (option: ForageOption, side: 'left' | 'right') => {
-    const label =
-      stats.clarity < 25
-        ? scrambleText(getGenericLabel(option.emoji), 0.3)
-        : getGenericLabel(option.emoji);
+    const label = getGenericLabel(option.emoji);
 
     return (
       <button
@@ -349,7 +295,6 @@ export default function ForageOrDie() {
         <div
           style={{
             fontSize: '40px',
-            filter: emojiBlur > 0 ? `blur(${emojiBlur}px)` : 'none',
           }}
         >
           {option.emoji}
@@ -362,7 +307,6 @@ export default function ForageOrDie() {
             fontSize: '14px',
             lineHeight: '1.6',
             color: TEXT_DIM,
-            filter: descBlur > 0 ? `blur(${descBlur}px)` : 'none',
           }}
         >
           {option.description}
@@ -493,7 +437,6 @@ export default function ForageOrDie() {
           width: '100%',
           maxWidth: '700px',
           animation: 'forageFadeIn 0.6s ease',
-          filter: clarityFilter,
         }}
       >
         {renderStatsPanel()}
@@ -563,7 +506,6 @@ export default function ForageOrDie() {
           width: '100%',
           maxWidth: '700px',
           animation: 'forageFadeIn 0.6s ease',
-          filter: clarityFilter,
         }}
       >
         {renderStatsPanel()}
@@ -734,7 +676,6 @@ export default function ForageOrDie() {
           { icon: '🟡', label: 'Hunger', value: stats.hunger },
           { icon: '🔴', label: 'Health', value: stats.health },
           { icon: '🔵', label: 'Hydration', value: stats.hydration },
-          { icon: '🟣', label: 'Clarity', value: stats.clarity },
         ].map((s) => (
           <div
             key={s.label}
