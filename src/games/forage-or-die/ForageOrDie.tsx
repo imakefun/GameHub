@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, PlayerStats, ForageOption, JournalEntry, Encounter } from './types';
 import { encounters, ENCOUNTERS_PER_RUN, TOTAL_ENCOUNTERS } from './encounters';
+import { BiomeScene, OutcomeScene } from './illustrations';
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -441,6 +442,10 @@ export default function ForageOrDie() {
       >
         {renderStatsPanel()}
 
+        <div style={{ marginBottom: '16px' }}>
+          <BiomeScene biome={currentEncounter.biome} />
+        </div>
+
         <div
           style={{
             fontSize: '13px',
@@ -510,7 +515,9 @@ export default function ForageOrDie() {
       >
         {renderStatsPanel()}
 
-        <div style={{ fontSize: '48px', marginBottom: '12px' }}>{safe ? '✅' : '☠️'}</div>
+        <div style={{ marginBottom: '12px' }}>
+          <OutcomeScene safe={safe} encounterId={currentEncounter?.id ?? 0} />
+        </div>
 
         <h2
           style={{
