@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { GameState, PlayerStats, ForageOption, JournalEntry, Encounter } from './types';
 import { encounters, ENCOUNTERS_PER_RUN, TOTAL_ENCOUNTERS } from './encounters';
-import { BiomeScene, OutcomeScene } from './illustrations';
+import { BiomeScene, ItemImage, OutcomeScene } from './illustrations';
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -293,12 +293,8 @@ export default function ForageOrDie() {
           minWidth: '0',
         }}
       >
-        <div
-          style={{
-            fontSize: '40px',
-          }}
-        >
-          {option.emoji}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <ItemImage name={option.name} />
         </div>
         <div style={{ fontSize: '16px', fontWeight: 600, color: TEXT_CREAM }}>
           {label}
