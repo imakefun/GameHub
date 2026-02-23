@@ -11,6 +11,7 @@ import { GemMiner } from './games/gem-miner/GemMiner';
 import { CreaturesOfTheNight } from './games/creatures-of-the-night/CreaturesOfTheNight';
 import { AdminPanel } from './games/creatures-of-the-night/components/AdminPanel';
 import ForageOrDie from './games/forage-or-die/ForageOrDie';
+import { TheatreSim } from './games/theatre-sim/TheatreSim';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/play/creatures-of-the-night" element={<CreaturesOfTheNight />} />
         <Route path="/play/creatures-of-the-night/admin" element={<AdminPanel />} />
         <Route path="/play/forage-or-die" element={<ForageOrDie />} />
+        <Route path="/play/theatre-sim" element={<TheatreSim />} />
       </Routes>
     </HashRouter>
   );

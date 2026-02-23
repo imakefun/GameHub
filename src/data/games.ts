@@ -241,6 +241,20 @@ export const games: Game[] = [
     difficulty: 'medium',
     playUrl: '/play/forage-or-die',
   },
+  {
+    id: 'theatre-sim',
+    title: 'Starlight Cinema',
+    description: 'Take over an abandoned movie theatre and restore it to its former glory! Manage screens, staff, concessions, and ticket pricing. License blockbuster films, upgrade to IMAX and Dolby, then expand your empire by acquiring franchise locations across the region.',
+    thumbnail: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=300&fit=crop',
+    category: 'idle',
+    tags: ['simulation', 'management', 'theatre', 'idle', 'tycoon', 'business'],
+    playCount: 0,
+    rating: 5.0,
+    featured: true,
+    createdAt: '2026-02-22',
+    difficulty: 'medium',
+    playUrl: '/play/theatre-sim',
+  },
 ];
 
 export const leaderboards: Record<string, LeaderboardEntry[]> = {
