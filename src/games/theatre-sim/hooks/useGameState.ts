@@ -11,6 +11,7 @@ import type {
   StaffRole,
   ScreenQuality,
 } from '../types';
+import type { Loan } from '../types';
 import {
   movies as allMovies,
   staffTemplates,
@@ -21,6 +22,7 @@ import {
   restorationTasks as defaultRestorationTasks,
   franchiseLocations as defaultFranchiseLocations,
   milestones as defaultMilestones,
+  cutscenes,
   OPENING_REQUIREMENTS,
 } from '../data';
 
@@ -29,12 +31,30 @@ const TICK_INTERVAL = 1000; // 1 second
 const HOURS_PER_TICK = 1; // 1 game hour per tick
 const BASE_CUSTOMER_RATE = 8; // base customers per showtime per screen
 
+// ============ Loan Constants ============
+const LOAN_PRINCIPAL = 600000;
+const LOAN_INTEREST_RATE = 0.08; // 8% annual
+const LOAN_DAILY_PAYMENT = 500; // $500/day — manageable but present
+const STARTING_CASH = 100000;
+
+function createInitialLoan(): Loan {
+  return {
+    principal: LOAN_PRINCIPAL,
+    remaining: LOAN_PRINCIPAL,
+    interestRate: LOAN_INTEREST_RATE,
+    dailyPayment: LOAN_DAILY_PAYMENT,
+    totalPaid: 0,
+    paidOff: false,
+  };
+}
+
 // ============ Initial State ============
 function createInitialState(): GameState {
   return {
     phase: 'restoration',
-    resources: { money: 5000, reputation: 0 },
+    resources: { money: STARTING_CASH, reputation: 0 },
     time: { day: 1, hour: 8 },
+    loan: createInitialLoan(),
     theatre: {
       screens: [
         { id: 'screen-1', name: 'Screen 1', seats: 80, quality: 'basic' as ScreenQuality, condition: 20, currentMovieId: null, showtimeHours: [14, 17, 20], ticketPrice: 8, unlocked: true, upgrading: false, upgradeCompletesAt: null },
@@ -72,6 +92,8 @@ function createInitialState(): GameState {
     tutorialStep: 0,
     messageLog: [],
     financialHistory: [],
+    cutscenesSeen: [],
+    activeCutscene: 'intro', // Start with intro cutscene
   };
 }
 
@@ -315,6 +337,50 @@ function checkMilestones(state: GameState): GameState {
   };
 }
 
+// ============ Cutscene Triggers ============
+function checkCutsceneTriggers(state: GameState): GameState {
+  if (state.activeCutscene) return state;
+
+  for (const cs of cutscenes) {
+    if (state.cutscenesSeen.includes(cs.id)) continue;
+
+    let shouldTrigger = false;
+
+    switch (cs.id) {
+      case 'intro':
+        // Handled on initial state — activeCutscene is set to 'intro'
+        break;
+      case 'grand-opening':
+        shouldTrigger = isTheatreOpen(state) && state.theatre.screens.some(s => s.currentMovieId) && !state.cutscenesSeen.includes('grand-opening');
+        break;
+      case 'first-profit':
+        shouldTrigger = state.dailyReports.some(r => r.profit > 0);
+        break;
+      case 'second-screen':
+        shouldTrigger = state.theatre.screens.filter(s => s.unlocked && s.currentMovieId).length >= 2;
+        break;
+      case 'premium-upgrade':
+        shouldTrigger = state.theatre.screens.some(s => s.quality === 'premium' || s.quality === 'imax' || s.quality === 'dolby');
+        break;
+      case 'loan-paid-off':
+        shouldTrigger = state.loan.paidOff;
+        break;
+      case 'franchise-start':
+        shouldTrigger = state.franchiseLocations.some(f => f.owned);
+        break;
+      case 'cinema-empire':
+        shouldTrigger = state.franchiseLocations.every(f => f.owned);
+        break;
+    }
+
+    if (shouldTrigger) {
+      return { ...state, activeCutscene: cs.id };
+    }
+  }
+
+  return state;
+}
+
 // Random events that can trigger
 const RANDOM_EVENTS = [
   { id: 'critic-review', title: 'Glowing Review!', description: 'A local critic praises your theatre.', icon: '📰', effect: { customerMultiplier: 1.3 }, duration: 3 },
@@ -438,6 +504,31 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           money: Math.floor((newState.resources.money - dailyExpenses) * 100) / 100,
         };
 
+        // Loan payment
+        if (!newState.loan.paidOff && newState.loan.remaining > 0) {
+          // Daily interest accrual
+          const dailyInterest = (newState.loan.remaining * newState.loan.interestRate) / 365;
+          const payment = Math.min(newState.loan.dailyPayment, newState.loan.remaining + dailyInterest);
+          const principalPortion = Math.max(0, payment - dailyInterest);
+
+          newState.resources = {
+            ...newState.resources,
+            money: Math.floor((newState.resources.money - payment) * 100) / 100,
+          };
+
+          const newRemaining = Math.max(0, newState.loan.remaining - principalPortion);
+          newState.loan = {
+            ...newState.loan,
+            remaining: Math.floor(newRemaining * 100) / 100,
+            totalPaid: Math.floor((newState.loan.totalPaid + payment) * 100) / 100,
+            paidOff: newRemaining <= 0,
+          };
+
+          if (newRemaining <= 0 && !newState.cutscenesSeen.includes('loan-paid-off')) {
+            newState.messageLog = [...newState.messageLog, addMessage(newState, 'The loan is paid off! You own the Starlight free and clear!', '🎉', 'milestone')].slice(-50);
+          }
+        }
+
         // Screen condition degrades
         newState.theatre = {
           ...newState.theatre,
@@ -560,6 +651,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Check milestones
       newState = checkMilestones(newState);
+
+      // Check cutscene triggers (only if no cutscene is active)
+      if (!newState.activeCutscene) {
+        newState = checkCutsceneTriggers(newState);
+      }
 
       return newState;
     }
@@ -872,6 +968,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case 'TRIGGER_CUTSCENE': {
+      if (state.cutscenesSeen.includes(action.cutsceneId)) return state;
+      return { ...state, activeCutscene: action.cutsceneId };
+    }
+
+    case 'COMPLETE_CUTSCENE': {
+      return {
+        ...state,
+        activeCutscene: null,
+        cutscenesSeen: [...state.cutscenesSeen, action.cutsceneId],
+      };
+    }
+
     case 'ADVANCE_TUTORIAL': {
       return { ...state, tutorialStep: state.tutorialStep + 1 };
     }
@@ -913,19 +1022,21 @@ function generateFinancialSummary(state: GameState, report: DailyReport): Financ
     return sum + (movie ? movie.licenseCost / 7 : 0);
   }, 0);
   const maintenanceCosts = state.theatre.screens.filter(s => s.unlocked && s.currentMovieId).length * 50;
+  const loanPayment = state.loan.paidOff ? 0 : state.loan.dailyPayment;
   const franchiseRev = state.franchiseLocations.filter(f => f.owned && f.manager).reduce((sum, f) => sum + f.dailyRevenue, 0);
 
+  const totalExp = Math.floor(staffCosts + licenseCosts + maintenanceCosts + loanPayment);
   return {
     ticketRevenue: report.ticketRevenue,
     concessionRevenue: report.concessionRevenue,
     franchiseRevenue: franchiseRev,
     staffCosts: Math.floor(staffCosts),
     licenseCosts: Math.floor(licenseCosts),
-    maintenanceCosts: Math.floor(maintenanceCosts),
+    maintenanceCosts: Math.floor(maintenanceCosts + loanPayment),
     upgradeCosts: 0,
     totalRevenue: report.totalRevenue + franchiseRev,
-    totalExpenses: Math.floor(staffCosts + licenseCosts + maintenanceCosts),
-    netProfit: report.totalRevenue + franchiseRev - Math.floor(staffCosts + licenseCosts + maintenanceCosts),
+    totalExpenses: totalExp,
+    netProfit: report.totalRevenue + franchiseRev - totalExp,
   };
 }
 
@@ -941,6 +1052,7 @@ export function useGameState() {
         return {
           ...initial,
           ...parsed,
+          loan: { ...initial.loan, ...parsed.loan },
           theatre: { ...initial.theatre, ...parsed.theatre },
           stats: { ...initial.stats, ...parsed.stats },
         };
@@ -986,6 +1098,7 @@ export function useGameState() {
   const assignFranchiseManager = useCallback((locationId: string, managerId: string) => dispatch({ type: 'ASSIGN_FRANCHISE_MANAGER', locationId, managerId }), []);
   const dismissMessage = useCallback((messageId: string) => dispatch({ type: 'DISMISS_MESSAGE', messageId }), []);
   const advanceTutorial = useCallback(() => dispatch({ type: 'ADVANCE_TUTORIAL' }), []);
+  const completeCutscene = useCallback((cutsceneId: string) => dispatch({ type: 'COMPLETE_CUTSCENE', cutsceneId }), []);
   const resetGame = useCallback(() => dispatch({ type: 'RESET_GAME' }), []);
 
   return {
@@ -1009,6 +1122,7 @@ export function useGameState() {
     assignFranchiseManager,
     dismissMessage,
     advanceTutorial,
+    completeCutscene,
     resetGame,
     isTheatreOpen: isTheatreOpen(state),
     getUnlockScreenCost,

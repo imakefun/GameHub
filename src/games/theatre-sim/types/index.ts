@@ -194,6 +194,32 @@ export interface EventEffect {
   reputationChange?: number;
 }
 
+// ============ Loan ============
+export interface Loan {
+  principal: number; // original amount borrowed
+  remaining: number; // how much is left to pay
+  interestRate: number; // annual rate (e.g. 0.08 = 8%)
+  dailyPayment: number; // fixed daily payment amount
+  totalPaid: number; // total paid so far
+  paidOff: boolean;
+}
+
+// ============ Cutscenes ============
+export interface CutsceneBeat {
+  text: string;
+  speaker?: string; // who is speaking, if dialogue
+  imagePlaceholder: string; // description for what image should go here
+  imageSrc?: string; // actual image path — plug in later
+  mood?: 'neutral' | 'dramatic' | 'hopeful' | 'tense' | 'triumphant';
+}
+
+export interface CutsceneSequence {
+  id: string;
+  title: string;
+  beats: CutsceneBeat[];
+  triggerCondition: string; // human-readable description
+}
+
 // ============ Financial Tracking ============
 export interface FinancialSummary {
   ticketRevenue: number;
@@ -222,6 +248,7 @@ export interface GameState {
   phase: GamePhase;
   resources: Resources;
   time: GameTime;
+  loan: Loan;
   theatre: TheatreState;
   staff: StaffMember[];
   currentMovies: string[]; // ids of licensed movies
@@ -234,6 +261,8 @@ export interface GameState {
   tutorialStep: number;
   messageLog: GameMessage[];
   financialHistory: FinancialSummary[];
+  cutscenesSeen: string[]; // ids of cutscenes that have been shown
+  activeCutscene: string | null; // id of currently playing cutscene
 }
 
 export interface GameStats {
@@ -298,6 +327,9 @@ export type GameAction =
   // Franchise
   | { type: 'PURCHASE_FRANCHISE'; locationId: string }
   | { type: 'ASSIGN_FRANCHISE_MANAGER'; locationId: string; managerId: string }
+  // Cutscenes
+  | { type: 'TRIGGER_CUTSCENE'; cutsceneId: string }
+  | { type: 'COMPLETE_CUTSCENE'; cutsceneId: string }
   // Meta
   | { type: 'DISMISS_MESSAGE'; messageId: string }
   | { type: 'ADVANCE_TUTORIAL' }

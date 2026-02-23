@@ -6,3 +6,4 @@ export { ConcessionsPanel } from './ConcessionsPanel';
 export { UpgradesPanel } from './UpgradesPanel';
 export { FinancialsPanel } from './FinancialsPanel';
 export { FranchisePanel } from './FranchisePanel';
+export { Cutscene } from './Cutscene';
