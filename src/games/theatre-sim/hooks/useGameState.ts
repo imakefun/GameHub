@@ -1049,13 +1049,20 @@ export function useGameState() {
         const parsed = JSON.parse(saved);
         // Merge with defaults to handle schema changes
         const initial = createInitialState();
-        return {
+        const merged = {
           ...initial,
           ...parsed,
+          resources: { ...initial.resources, ...parsed.resources },
           loan: { ...initial.loan, ...parsed.loan },
           theatre: { ...initial.theatre, ...parsed.theatre },
           stats: { ...initial.stats, ...parsed.stats },
         };
+        // Migrate old saves that started with $5,000 instead of $100,000
+        if (!parsed.loan || parsed.loan.principal === undefined) {
+          merged.resources.money = merged.resources.money + (STARTING_CASH - 5000);
+          merged.loan = initial.loan;
+        }
+        return merged;
       } catch {
         return createInitialState();
       }
