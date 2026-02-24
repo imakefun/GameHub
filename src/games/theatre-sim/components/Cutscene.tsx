@@ -26,15 +26,15 @@ export function Cutscene({ sequence, onComplete }: Props) {
   const [beatIndex, setBeatIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
-  const [fadeIn, setFadeIn] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   const beat = sequence.beats[beatIndex];
   const isLastBeat = beatIndex === sequence.beats.length - 1;
   const mood = beat?.mood ?? 'neutral';
 
-  // Fade in on mount
+  // Fade in content after parent's black overlay has covered the screen
   useEffect(() => {
-    const t = setTimeout(() => setFadeIn(true), 50);
+    const t = setTimeout(() => setVisible(true), 100);
     return () => clearTimeout(t);
   }, []);
 
@@ -70,8 +70,7 @@ export function Cutscene({ sequence, onComplete }: Props) {
     }
 
     if (isLastBeat) {
-      setFadeIn(false);
-      setTimeout(onComplete, 400);
+      onComplete();
     } else {
       setBeatIndex(prev => prev + 1);
     }
@@ -95,8 +94,8 @@ export function Cutscene({ sequence, onComplete }: Props) {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] bg-gradient-to-b ${moodGradients[mood]} flex flex-col items-center justify-center transition-opacity duration-500 ${
-        fadeIn ? 'opacity-100' : 'opacity-0'
+      className={`fixed inset-0 z-[100] bg-gradient-to-b ${moodGradients[mood]} flex flex-col items-center justify-center transition-opacity duration-300 ${
+        visible ? 'opacity-100' : 'opacity-0'
       }`}
       onClick={advance}
     >
