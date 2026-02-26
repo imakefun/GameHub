@@ -11,11 +11,13 @@ import {
   UpgradesPanel,
   FinancialsPanel,
   FranchisePanel,
+  ReviewsPanel,
   Cutscene,
 } from './components';
 import { cutscenes } from './data';
+import { getDayNameShort } from './types';
 
-type Tab = 'restoration' | 'screens' | 'staff' | 'movies' | 'concessions' | 'upgrades' | 'financials' | 'franchise';
+type Tab = 'restoration' | 'screens' | 'staff' | 'movies' | 'concessions' | 'upgrades' | 'financials' | 'reviews' | 'franchise';
 
 interface TabDef {
   id: Tab;
@@ -32,6 +34,7 @@ const allTabs: TabDef[] = [
   { id: 'staff', label: 'Staff', icon: '👥', description: 'Hire and manage employees', phase: ['restoration', 'expansion', 'franchise'] },
   { id: 'concessions', label: 'Concessions', icon: '🍿', description: 'Food, drinks & combos', phase: ['expansion', 'franchise'] },
   { id: 'upgrades', label: 'Upgrades', icon: '⬆️', description: 'Improve your theatre', phase: ['expansion', 'franchise'] },
+  { id: 'reviews', label: 'Reviews', icon: '⭐', description: 'Customer ratings & feedback', phase: ['expansion', 'franchise'] },
   { id: 'financials', label: 'Financials', icon: '📊', description: 'Revenue, expenses & loan', phase: ['expansion', 'franchise'] },
   { id: 'franchise', label: 'Empire', icon: '🏢', description: 'Expand to new locations', phase: ['franchise'] },
 ];
@@ -193,9 +196,20 @@ export function TheatreSim() {
                 </span>
                 <span className="text-[9px] text-slate-500">rep</span>
               </div>
+              {state.overallRating > 0 && state.reviews.length > 0 && (
+                <>
+                  <div className="w-px h-6 bg-slate-700" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-yellow-400 font-medium text-sm">
+                      {state.overallRating.toFixed(1)}★
+                    </span>
+                    <span className="text-[9px] text-slate-500">rating</span>
+                  </div>
+                </>
+              )}
               <div className="w-px h-6 bg-slate-700 hidden sm:block" />
               <span className="text-slate-400 text-xs hidden sm:block">
-                Day {state.time.day} • {state.time.hour > 12 ? `${state.time.hour - 12}pm` : state.time.hour === 12 ? '12pm' : `${state.time.hour}am`}
+                {getDayNameShort(state.time.day)} Day {state.time.day} • {state.time.hour > 12 ? `${state.time.hour - 12}pm` : state.time.hour === 12 ? '12pm' : `${state.time.hour}am`}
               </span>
             </div>
 
@@ -449,7 +463,7 @@ export function TheatreSim() {
         {activeTab === 'screens' && (
           <ScreensPanel
             screens={state.theatre.screens}
-            currentMovies={state.currentMovies}
+            licensedMovies={state.licensedMovies}
             money={state.resources.money}
             day={state.time.day}
             onAssignMovie={assignMovie}
@@ -488,6 +502,9 @@ export function TheatreSim() {
             state={state}
             onPurchaseUpgrade={purchaseUpgrade}
           />
+        )}
+        {activeTab === 'reviews' && (
+          <ReviewsPanel state={state} />
         )}
         {activeTab === 'financials' && (
           <FinancialsPanel state={state} />

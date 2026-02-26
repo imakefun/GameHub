@@ -15,6 +15,26 @@ export interface GameTime {
   hour: number; // 0-23 current hour of the day
 }
 
+// Day-of-week helpers
+export function getDayOfWeek(day: number): number {
+  return (day - 1) % 7; // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+}
+
+export function getDayName(day: number): string {
+  const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  return names[getDayOfWeek(day)];
+}
+
+export function getDayNameShort(day: number): string {
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return names[getDayOfWeek(day)];
+}
+
+export function isWeekend(day: number): boolean {
+  const dow = getDayOfWeek(day);
+  return dow >= 5;
+}
+
 // ============ Theatre ============
 export interface TheatreUpgrade {
   id: string;
@@ -65,12 +85,19 @@ export interface Movie {
   title: string;
   genre: MovieGenre;
   icon: string;
-  popularity: number; // 1-100, decays over time
-  licenseCost: number; // weekly cost to show this movie
+  popularity: number; // 1-100, base popularity at release
+  licenseCost: number; // one-time cost to license
   minReputation: number; // reputation needed to get this movie
-  releaseWeek: number; // day when it becomes available
-  durationWeeks: number; // how many weeks it stays in circulation
+  releaseWeek: number; // week when it becomes available (0 = game start)
+  durationWeeks: number; // how long the license lasts
   qualityRating: number; // 1-5 stars, affects satisfaction
+}
+
+/** A movie the player has licensed — tracks when it was picked up and when it expires */
+export interface LicensedMovie {
+  movieId: string;
+  licensedDay: number;
+  expiresDay: number;
 }
 
 // ============ Staff ============
@@ -115,6 +142,18 @@ export interface ConcessionStand {
   capacity: number; // how many items can be stocked
   level: number; // upgrades increase capacity
   upgradeCost: number;
+}
+
+// ============ Customer Reviews ============
+export type ReviewCategory = 'cleanliness' | 'service' | 'experience' | 'value' | 'facilities';
+
+export interface CustomerReview {
+  id: string;
+  day: number;
+  rating: number; // 1-5 stars
+  text: string;
+  authorName: string;
+  category: ReviewCategory; // primary issue/praise
 }
 
 // ============ Customers ============
@@ -196,20 +235,20 @@ export interface EventEffect {
 
 // ============ Loan ============
 export interface Loan {
-  principal: number; // original amount borrowed
-  remaining: number; // how much is left to pay
+  principal: number;
+  remaining: number;
   interestRate: number; // annual rate (e.g. 0.08 = 8%)
-  dailyPayment: number; // fixed daily payment amount
-  totalPaid: number; // total paid so far
+  dailyPayment: number;
+  totalPaid: number;
   paidOff: boolean;
 }
 
 // ============ Cutscenes ============
 export interface CutsceneBeat {
   text: string;
-  speaker?: string; // who is speaking, if dialogue
-  imagePlaceholder: string; // description for what image should go here
-  imageSrc?: string; // actual image path — plug in later
+  speaker?: string;
+  imagePlaceholder: string;
+  imageSrc?: string;
   mood?: 'neutral' | 'dramatic' | 'hopeful' | 'tense' | 'triumphant';
 }
 
@@ -217,7 +256,7 @@ export interface CutsceneSequence {
   id: string;
   title: string;
   beats: CutsceneBeat[];
-  triggerCondition: string; // human-readable description
+  triggerCondition: string;
 }
 
 // ============ Financial Tracking ============
@@ -237,11 +276,11 @@ export interface FinancialSummary {
 // ============ Game State ============
 export interface TheatreState {
   screens: Screen[];
-  upgrades: string[]; // ids of purchased upgrades
+  upgrades: string[];
   concessionStand: ConcessionStand;
-  concessionMenu: string[]; // ids of unlocked concession items
+  concessionMenu: string[];
   restorationTasks: RestorationTask[];
-  condition: number; // overall theatre condition 0-100
+  condition: number; // 0-100
 }
 
 export interface GameState {
@@ -251,18 +290,21 @@ export interface GameState {
   loan: Loan;
   theatre: TheatreState;
   staff: StaffMember[];
-  currentMovies: string[]; // ids of licensed movies
+  licensedMovies: LicensedMovie[];
   dailyReports: DailyReport[];
   franchiseLocations: FranchiseLocation[];
-  milestones: string[]; // ids of achieved milestones
+  milestones: string[];
   activeEvents: GameEvent[];
+  reviews: CustomerReview[];
+  overallRating: number; // 1-5, calculated from recent reviews
   stats: GameStats;
   lastTick: number;
   tutorialStep: number;
   messageLog: GameMessage[];
   financialHistory: FinancialSummary[];
-  cutscenesSeen: string[]; // ids of cutscenes that have been shown
-  activeCutscene: string | null; // id of currently playing cutscene
+  cutscenesSeen: string[];
+  activeCutscene: string | null;
+  dailyCustomerCount: number; // customers today, reset each day
 }
 
 export interface GameStats {
@@ -286,26 +328,11 @@ export interface GameMessage {
   type: 'info' | 'success' | 'warning' | 'milestone';
 }
 
-// ============ Game Config ============
-export interface GameConfig {
-  movies: Movie[];
-  staffTemplates: StaffTemplate[];
-  screenUpgrades: ScreenUpgrade[];
-  theatreUpgrades: TheatreUpgrade[];
-  concessionItems: ConcessionItem[];
-  restorationTasks: RestorationTask[];
-  franchiseLocations: FranchiseLocation[];
-  milestones: Milestone[];
-}
-
 // ============ Actions ============
 export type GameAction =
-  // Time
   | { type: 'TICK'; now: number }
   | { type: 'ADVANCE_HOUR' }
-  // Restoration
   | { type: 'START_RESTORATION'; taskId: string }
-  // Screens
   | { type: 'ASSIGN_MOVIE'; screenId: string; movieId: string }
   | { type: 'REMOVE_MOVIE'; screenId: string }
   | { type: 'SET_TICKET_PRICE'; screenId: string; price: number }
@@ -313,24 +340,17 @@ export type GameAction =
   | { type: 'UPGRADE_SCREEN'; screenId: string; upgradeId: string }
   | { type: 'UNLOCK_SCREEN'; screenId: string }
   | { type: 'REPAIR_SCREEN'; screenId: string }
-  // Staff
   | { type: 'HIRE_STAFF'; role: StaffRole }
   | { type: 'FIRE_STAFF'; staffId: string }
-  // Movies
   | { type: 'LICENSE_MOVIE'; movieId: string }
   | { type: 'DROP_MOVIE'; movieId: string }
-  // Concessions
   | { type: 'UNLOCK_CONCESSION'; itemId: string }
   | { type: 'UPGRADE_CONCESSION_STAND' }
-  // Theatre upgrades
   | { type: 'PURCHASE_UPGRADE'; upgradeId: string }
-  // Franchise
   | { type: 'PURCHASE_FRANCHISE'; locationId: string }
   | { type: 'ASSIGN_FRANCHISE_MANAGER'; locationId: string; managerId: string }
-  // Cutscenes
   | { type: 'TRIGGER_CUTSCENE'; cutsceneId: string }
   | { type: 'COMPLETE_CUTSCENE'; cutsceneId: string }
-  // Meta
   | { type: 'DISMISS_MESSAGE'; messageId: string }
   | { type: 'ADVANCE_TUTORIAL' }
   | { type: 'RESET_GAME' };

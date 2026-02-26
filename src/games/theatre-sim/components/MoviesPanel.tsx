@@ -19,41 +19,52 @@ const genreColors: Record<string, string> = {
 };
 
 export function MoviesPanel({ state, onLicenseMovie, onDropMovie }: Props) {
-  const { currentMovies, resources } = state;
-  const weeklyLicenseCost = currentMovies.reduce((sum, mid) => {
-    const movie = allMovies.find(m => m.id === mid);
-    return sum + (movie?.licenseCost ?? 0);
-  }, 0);
+  const { licensedMovies, resources } = state;
+  const licensedIds = licensedMovies.map(lm => lm.movieId);
 
   // Filter available movies based on reputation and release week
   const availableMovies = allMovies.filter(m =>
-    !currentMovies.includes(m.id) &&
+    !licensedIds.includes(m.id) &&
     resources.reputation >= m.minReputation &&
     state.time.day >= m.releaseWeek * 7
   );
 
-  const licensedMovies = currentMovies
-    .map(id => allMovies.find(m => m.id === id))
-    .filter(Boolean) as typeof allMovies;
+  const licensedMovieDetails = licensedMovies
+    .map(lm => {
+      const movie = allMovies.find(m => m.id === lm.movieId);
+      return movie ? { ...lm, movie } : null;
+    })
+    .filter(Boolean) as { movieId: string; licensedDay: number; expiresDay: number; movie: typeof allMovies[0] }[];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-white">Movies</h3>
-        <span className="text-sm text-amber-400">${weeklyLicenseCost.toLocaleString()}/week in licenses</span>
+        <span className="text-sm text-slate-400">{licensedMovies.length} licensed</span>
       </div>
 
       {/* Currently licensed */}
-      {licensedMovies.length > 0 && (
+      {licensedMovieDetails.length > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wider">Licensed Movies</h4>
           <div className="space-y-2">
-            {licensedMovies.map(movie => {
-              const screenCount = state.theatre.screens.filter(s => s.currentMovieId === movie.id).length;
+            {licensedMovieDetails.map(({ movieId, expiresDay, licensedDay, movie }) => {
+              const screenCount = state.theatre.screens.filter(s => s.currentMovieId === movieId).length;
+              const daysLeft = expiresDay - state.time.day;
+              const totalDays = expiresDay - licensedDay;
+              const progress = totalDays > 0 ? Math.max(0, Math.min(1, (state.time.day - licensedDay) / totalDays)) : 1;
+
+              // Popularity decay display
+              const currentPop = Math.floor(movie.popularity * Math.max(0.4, 1 - progress * 0.6));
+
+              const isExpiringSoon = daysLeft <= 7;
+
               return (
                 <div
-                  key={movie.id}
-                  className="bg-slate-800/50 rounded-lg p-3 border border-green-800/30 flex items-center gap-3"
+                  key={movieId}
+                  className={`bg-slate-800/50 rounded-lg p-3 border ${
+                    isExpiringSoon ? 'border-amber-700/50' : 'border-green-800/30'
+                  } flex items-center gap-3`}
                 >
                   <span className="text-2xl">{movie.icon}</span>
                   <div className="flex-1 min-w-0">
@@ -64,16 +75,40 @@ export function MoviesPanel({ state, onLicenseMovie, onDropMovie }: Props) {
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs">
-                      <span className="text-slate-400">Pop: {movie.popularity}</span>
+                      <span className="text-slate-400">
+                        Pop: {currentPop}
+                        {currentPop < movie.popularity && (
+                          <span className="text-slate-600"> (was {movie.popularity})</span>
+                        )}
+                      </span>
                       <span className="text-slate-400">{'★'.repeat(movie.qualityRating)}</span>
-                      <span className="text-amber-400">${movie.licenseCost}/week</span>
                       {screenCount > 0 && (
                         <span className="text-green-400">Showing on {screenCount} screen{screenCount > 1 ? 's' : ''}</span>
                       )}
                     </div>
+                    {/* Expiry bar */}
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex-1 bg-slate-700 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            daysLeft <= 3 ? 'bg-red-500' :
+                            daysLeft <= 7 ? 'bg-amber-500' :
+                            'bg-green-500'
+                          }`}
+                          style={{ width: `${(1 - progress) * 100}%` }}
+                        />
+                      </div>
+                      <span className={`text-[10px] whitespace-nowrap ${
+                        daysLeft <= 3 ? 'text-red-400' :
+                        daysLeft <= 7 ? 'text-amber-400' :
+                        'text-slate-500'
+                      }`}>
+                        {daysLeft}d left
+                      </span>
+                    </div>
                   </div>
                   <button
-                    onClick={() => onDropMovie(movie.id)}
+                    onClick={() => onDropMovie(movieId)}
                     className="text-xs px-2 py-1 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
                   >
                     Drop
@@ -112,7 +147,8 @@ export function MoviesPanel({ state, onLicenseMovie, onDropMovie }: Props) {
                   <div className="flex items-center gap-3 mt-1 text-xs">
                     <span className="text-slate-400">Popularity: {movie.popularity}</span>
                     <span className="text-slate-400">{'★'.repeat(movie.qualityRating)}{'☆'.repeat(5 - movie.qualityRating)}</span>
-                    <span className="text-amber-400">${movie.licenseCost}/week</span>
+                    <span className="text-amber-400">${movie.licenseCost.toLocaleString()}</span>
+                    <span className="text-slate-500">{movie.durationWeeks}w license</span>
                   </div>
                 </div>
                 <button
@@ -135,7 +171,7 @@ export function MoviesPanel({ state, onLicenseMovie, onDropMovie }: Props) {
       {/* Locked movies preview */}
       {(() => {
         const locked = allMovies.filter(m =>
-          !currentMovies.includes(m.id) &&
+          !licensedIds.includes(m.id) &&
           (resources.reputation < m.minReputation || state.time.day < m.releaseWeek * 7)
         );
         if (locked.length === 0) return null;

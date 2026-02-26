@@ -10,8 +10,12 @@ import type {
   FinancialSummary,
   StaffRole,
   ScreenQuality,
+  LicensedMovie,
+  CustomerReview,
+  ReviewCategory,
 } from '../types';
 import type { Loan } from '../types';
+import { getDayOfWeek } from '../types';
 import {
   movies as allMovies,
   staffTemplates,
@@ -24,6 +28,8 @@ import {
   milestones as defaultMilestones,
   cutscenes,
   OPENING_REQUIREMENTS,
+  randomReviewerName,
+  pickReviewText,
 } from '../data';
 
 const STORAGE_KEY = 'theatre-sim-save';
@@ -71,11 +77,14 @@ function createInitialState(): GameState {
       condition: 15,
     },
     staff: [],
-    currentMovies: [],
+    licensedMovies: [],
     dailyReports: [],
     franchiseLocations: defaultFranchiseLocations.map(f => ({ ...f })),
     milestones: [],
     activeEvents: [],
+    reviews: [],
+    overallRating: 3,
+    dailyCustomerCount: 0,
     stats: {
       totalRevenue: 0,
       totalTicketsSold: 0,
@@ -136,20 +145,93 @@ function countStaffByRole(staff: StaffMember[], role: StaffRole): number {
   return staff.filter(s => s.role === role).length;
 }
 
+// ============ New Gameplay Helpers ============
+
+/** Get movie popularity with decay over its license period */
+function getMoviePopularity(movieId: string, licensedMovies: LicensedMovie[], currentDay: number): number {
+  const movie = allMovies.find(m => m.id === movieId);
+  if (!movie) return 0;
+  const licensed = licensedMovies.find(lm => lm.movieId === movieId);
+  if (!licensed) return movie.popularity;
+  const totalDays = licensed.expiresDay - licensed.licensedDay;
+  if (totalDays <= 0) return movie.popularity;
+  const elapsed = currentDay - licensed.licensedDay;
+  const progress = Math.max(0, Math.min(1, elapsed / totalDays));
+  // Popularity decays: 100% at start → 40% at expiry
+  const decayFactor = Math.max(0.4, 1 - progress * 0.6);
+  return Math.floor(movie.popularity * decayFactor);
+}
+
+/** Day-of-week customer multiplier */
+function getDayOfWeekMultiplier(day: number): number {
+  const dow = getDayOfWeek(day);
+  const multipliers = [0.6, 0.6, 0.7, 0.8, 1.3, 1.8, 1.5]; // Mon-Sun
+  return multipliers[dow];
+}
+
+/** Time-of-day customer multiplier */
+function getTimeOfDayMultiplier(hour: number): number {
+  if (hour < 12) return 0.5;
+  if (hour < 16) return 0.8;
+  if (hour < 21) return 1.2;
+  return 0.7;
+}
+
+/** Fair ticket price based on movie quality and screen quality */
+function getFairPrice(movieQuality: number, screenQuality: ScreenQuality): number {
+  const qualityMult = getScreenQualityMultiplier(screenQuality);
+  return Math.max(5, Math.floor(movieQuality * 2.5 * qualityMult));
+}
+
+/** Price demand curve: how ticket price relative to fair price affects attendance */
+function getPriceDemandMultiplier(ticketPrice: number, fairPrice: number): number {
+  if (fairPrice <= 0) return 1;
+  const ratio = ticketPrice / fairPrice;
+  if (ratio <= 1) {
+    // Underpriced: slight attendance boost
+    return Math.min(1.3, 1 + (1 - ratio) * 0.5);
+  } else {
+    // Overpriced: significant attendance penalty
+    return Math.max(0.2, 1 / Math.pow(ratio, 1.2));
+  }
+}
+
+/** Overall rating effect on customer count */
+function getRatingMultiplier(rating: number): number {
+  // Rating 1 → 0.5x, Rating 3 → 0.85x, Rating 5 → 1.15x
+  return 0.35 + rating * 0.16;
+}
+
 function getCustomerCount(state: GameState, screen: Screen): number {
   if (!screen.currentMovieId || !screen.unlocked || screen.upgrading) return 0;
 
   const movie = allMovies.find(m => m.id === screen.currentMovieId);
   if (!movie) return 0;
 
-  // Base rate scaled by movie popularity
-  let customers = Math.floor(BASE_CUSTOMER_RATE * (movie.popularity / 50));
+  // Use decaying popularity instead of base
+  const currentPopularity = getMoviePopularity(screen.currentMovieId, state.licensedMovies, state.time.day);
+
+  // Base rate scaled by current movie popularity
+  let customers = Math.floor(BASE_CUSTOMER_RATE * (currentPopularity / 50));
 
   // Screen quality bonus
   customers = Math.floor(customers * getScreenQualityMultiplier(screen.quality) * 0.7);
 
-  // Reputation bonus (0-100% boost)
-  customers = Math.floor(customers * (1 + state.resources.reputation / 100));
+  // Day-of-week multiplier (weekends are busier)
+  customers = Math.floor(customers * getDayOfWeekMultiplier(state.time.day));
+
+  // Time-of-day multiplier (prime time is busier)
+  customers = Math.floor(customers * getTimeOfDayMultiplier(state.time.hour));
+
+  // Price demand curve
+  const fairPrice = getFairPrice(movie.qualityRating, screen.quality);
+  customers = Math.floor(customers * getPriceDemandMultiplier(screen.ticketPrice, fairPrice));
+
+  // Overall rating effect (reviews/Yelp)
+  customers = Math.floor(customers * getRatingMultiplier(state.overallRating));
+
+  // Reputation bonus (0-50% boost instead of 0-100%)
+  customers = Math.floor(customers * (1 + state.resources.reputation / 200));
 
   // Theatre condition penalty
   if (state.theatre.condition < 50) {
@@ -185,7 +267,10 @@ function getCustomerCount(state: GameState, screen: Screen): number {
     const upgrade = theatreUpgrades.find(u => u.id === uid);
     if (upgrade) capacityBonus += upgrade.customerCapacityBonus;
   }
-  customers += Math.floor(capacityBonus / state.theatre.screens.filter(s => s.unlocked).length);
+  const unlockedCount = state.theatre.screens.filter(s => s.unlocked).length;
+  if (unlockedCount > 0) {
+    customers += Math.floor(capacityBonus / unlockedCount);
+  }
 
   // Event multipliers
   for (const event of state.activeEvents) {
@@ -195,7 +280,7 @@ function getCustomerCount(state: GameState, screen: Screen): number {
   }
 
   // Cap at seat count
-  return Math.min(customers, screen.seats);
+  return Math.min(Math.max(0, customers), screen.seats);
 }
 
 function calculateConcessionRevenue(state: GameState, totalCustomers: number): number {
@@ -227,12 +312,6 @@ function calculateDailyExpenses(state: GameState): number {
     expenses += s.wage;
   }
 
-  // Movie license costs (weekly, divided by 7)
-  for (const movieId of state.currentMovies) {
-    const movie = allMovies.find(m => m.id === movieId);
-    if (movie) expenses += movie.licenseCost / 7;
-  }
-
   // Maintenance (based on number of active screens)
   const activeScreens = state.theatre.screens.filter(s => s.unlocked && s.currentMovieId);
   expenses += activeScreens.length * 50;
@@ -253,6 +332,131 @@ function determinePhase(state: GameState): GamePhase {
   return 'expansion';
 }
 
+// ============ Review Generation ============
+function generateDailyReviews(state: GameState): CustomerReview[] {
+  if (state.dailyCustomerCount === 0) return [];
+
+  // Base review rate: 7%, more at extremes
+  let reviewRate = 0.07;
+  if (state.overallRating <= 2) reviewRate = 0.12;
+  if (state.overallRating >= 4.5) reviewRate = 0.10;
+
+  const numReviews = Math.max(1, Math.floor(state.dailyCustomerCount * reviewRate * (0.5 + Math.random())));
+
+  // Detect issues and their severity
+  const issues: { category: ReviewCategory; severity: number }[] = [];
+
+  // Cleanliness: janitors and theatre condition
+  const janitors = countStaffByRole(state.staff, 'janitor');
+  if (janitors === 0 && isTheatreOpen(state)) {
+    issues.push({ category: 'cleanliness', severity: 3 });
+  } else if (state.theatre.condition < 25) {
+    issues.push({ category: 'cleanliness', severity: 2 });
+  } else if (state.theatre.condition < 45) {
+    issues.push({ category: 'cleanliness', severity: 1 });
+  }
+
+  // Service: staff morale
+  const hiredStaff = state.staff.filter(s => s.role !== 'janitor' && s.role !== 'projectionist');
+  const avgMorale = hiredStaff.length > 0
+    ? hiredStaff.reduce((sum, s) => sum + s.morale, 0) / hiredStaff.length
+    : 50;
+  if (avgMorale < 20) {
+    issues.push({ category: 'service', severity: 3 });
+  } else if (avgMorale < 35) {
+    issues.push({ category: 'service', severity: 2 });
+  } else if (avgMorale < 50) {
+    issues.push({ category: 'service', severity: 1 });
+  }
+
+  // Experience: projectionists
+  const projectionists = countStaffByRole(state.staff, 'projectionist');
+  const activeScreens = state.theatre.screens.filter(s => s.unlocked && s.currentMovieId && !s.upgrading).length;
+  if (projectionists === 0 && activeScreens > 0) {
+    issues.push({ category: 'experience', severity: 3 });
+  } else if (projectionists < activeScreens) {
+    issues.push({ category: 'experience', severity: 1 });
+  }
+
+  // Value: overpricing
+  let totalPriceRatio = 0;
+  let priceCount = 0;
+  for (const screen of state.theatre.screens) {
+    if (!screen.currentMovieId || !screen.unlocked) continue;
+    const movie = allMovies.find(m => m.id === screen.currentMovieId);
+    if (!movie) continue;
+    const fair = getFairPrice(movie.qualityRating, screen.quality);
+    totalPriceRatio += screen.ticketPrice / fair;
+    priceCount++;
+  }
+  if (priceCount > 0) {
+    const avgRatio = totalPriceRatio / priceCount;
+    if (avgRatio > 1.5) issues.push({ category: 'value', severity: 3 });
+    else if (avgRatio > 1.2) issues.push({ category: 'value', severity: 2 });
+    else if (avgRatio > 1.05) issues.push({ category: 'value', severity: 1 });
+  }
+
+  // Facilities: screen conditions
+  const unlockedScreens = state.theatre.screens.filter(s => s.unlocked);
+  const avgCondition = unlockedScreens.length > 0
+    ? unlockedScreens.reduce((sum, s) => sum + s.condition, 0) / unlockedScreens.length
+    : 50;
+  if (avgCondition < 20) issues.push({ category: 'facilities', severity: 3 });
+  else if (avgCondition < 40) issues.push({ category: 'facilities', severity: 2 });
+  else if (avgCondition < 55) issues.push({ category: 'facilities', severity: 1 });
+
+  const reviews: CustomerReview[] = [];
+  for (let i = 0; i < numReviews; i++) {
+    let rating: number;
+    let category: ReviewCategory;
+
+    if (issues.length > 0 && Math.random() < 0.6) {
+      // 60% chance to complain about a detected issue
+      const issue = issues[Math.floor(Math.random() * issues.length)];
+      category = issue.category;
+      // severity 3 → 1 star, severity 2 → 2 stars, severity 1 → 3 stars (with some randomness)
+      rating = Math.max(1, Math.min(5, 4 - issue.severity + (Math.random() < 0.3 ? 1 : 0)));
+    } else {
+      // Positive or neutral review — pick a random category
+      const categories: ReviewCategory[] = ['cleanliness', 'service', 'experience', 'value', 'facilities'];
+      category = categories[Math.floor(Math.random() * categories.length)];
+      // Base rating on overall quality metrics
+      const qualityScore = (
+        (state.theatre.condition / 100) +
+        (state.resources.reputation / 100) +
+        (avgMorale / 100) +
+        (avgCondition / 100)
+      ) / 4;
+      if (qualityScore > 0.7) rating = Math.random() < 0.6 ? 5 : 4;
+      else if (qualityScore > 0.5) rating = Math.random() < 0.5 ? 4 : 3;
+      else if (qualityScore > 0.3) rating = Math.random() < 0.5 ? 3 : 2;
+      else rating = Math.random() < 0.4 ? 2 : 1;
+    }
+
+    rating = Math.max(1, Math.min(5, Math.round(rating)));
+
+    reviews.push({
+      id: `review-${state.time.day}-${i}`,
+      day: state.time.day,
+      rating,
+      text: pickReviewText(rating, category),
+      authorName: randomReviewerName(),
+      category,
+    });
+  }
+
+  return reviews;
+}
+
+/** Calculate overall rating from recent reviews (last 50) */
+function calculateOverallRating(reviews: CustomerReview[]): number {
+  const recent = reviews.slice(-50);
+  if (recent.length === 0) return 3;
+  const avg = recent.reduce((sum, r) => sum + r.rating, 0) / recent.length;
+  return Math.round(avg * 10) / 10;
+}
+
+// ============ Milestone Checks ============
 function checkMilestones(state: GameState): GameState {
   const newMilestones = [...state.milestones];
   const newMessages = [...state.messageLog];
@@ -289,8 +493,8 @@ function checkMilestones(state: GameState): GameState {
         achieved = state.theatre.concessionMenu.length >= 10;
         break;
       case 'blockbuster': {
-        achieved = state.currentMovies.some(mid => {
-          const movie = allMovies.find(m => m.id === mid);
+        achieved = state.licensedMovies.some(lm => {
+          const movie = allMovies.find(m => m.id === lm.movieId);
           return movie && movie.popularity >= 80;
         });
         break;
@@ -348,7 +552,6 @@ function checkCutsceneTriggers(state: GameState): GameState {
 
     switch (cs.id) {
       case 'intro':
-        // Handled on initial state — activeCutscene is set to 'intro'
         break;
       case 'grand-opening':
         shouldTrigger = isTheatreOpen(state) && state.theatre.screens.some(s => s.currentMovieId) && !state.cutscenesSeen.includes('grand-opening');
@@ -459,8 +662,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           if (screen.showtimeHours.includes(newState.time.hour)) {
             // Check if there's a projectionist available
             const projectionists = countStaffByRole(newState.staff, 'projectionist');
-            const activeScreenCount = activeScreens.length;
-            if (projectionists < activeScreenCount && projectionists === 0) continue;
+            if (projectionists === 0) continue;
 
             const customers = getCustomerCount(newState, screen);
             const ticketRev = customers * screen.ticketPrice;
@@ -487,6 +689,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           money: Math.floor((newState.resources.money + totalHourlyRevenue) * 100) / 100,
         };
 
+        // Track daily customer count for review generation
+        newState.dailyCustomerCount = (newState.dailyCustomerCount || 0) + hourlyCustomers;
+
         newState.stats = {
           ...newState.stats,
           totalRevenue: newState.stats.totalRevenue + totalHourlyRevenue,
@@ -497,6 +702,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Day change processing
       if (dayChanged) {
+        // Generate reviews from yesterday's customers (before resetting count)
+        if (newState.dailyCustomerCount > 0 && isTheatreOpen(newState)) {
+          const newReviews = generateDailyReviews(newState);
+          newState.reviews = [...newState.reviews.slice(-200), ...newReviews];
+          newState.overallRating = calculateOverallRating(newState.reviews);
+        }
+
+        // Movie expiry — remove expired licenses and clear screens
+        const expiredMovies = newState.licensedMovies.filter(lm => newDay >= lm.expiresDay);
+        if (expiredMovies.length > 0) {
+          const expiredIds = expiredMovies.map(lm => lm.movieId);
+          newState.licensedMovies = newState.licensedMovies.filter(lm => newDay < lm.expiresDay);
+          newState.theatre = {
+            ...newState.theatre,
+            screens: newState.theatre.screens.map(s =>
+              s.currentMovieId && expiredIds.includes(s.currentMovieId)
+                ? { ...s, currentMovieId: null }
+                : s
+            ),
+          };
+          for (const lm of expiredMovies) {
+            const movie = allMovies.find(m => m.id === lm.movieId);
+            if (movie) {
+              newState.messageLog = [...newState.messageLog, addMessage(newState, `License expired for "${movie.title}"`, '📋', 'warning')].slice(-50);
+            }
+          }
+        }
+
         // Calculate daily expenses
         const dailyExpenses = calculateDailyExpenses(newState);
         newState.resources = {
@@ -506,7 +739,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         // Loan payment
         if (!newState.loan.paidOff && newState.loan.remaining > 0) {
-          // Daily interest accrual
           const dailyInterest = (newState.loan.remaining * newState.loan.interestRate) / 365;
           const payment = Math.min(newState.loan.dailyPayment, newState.loan.remaining + dailyInterest);
           const principalPortion = Math.max(0, payment - dailyInterest);
@@ -548,7 +780,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             condition: Math.min(100, newState.theatre.condition + conditionGain),
           };
         } else if (isTheatreOpen(newState)) {
-          // Without janitors, condition degrades
           newState.theatre = {
             ...newState.theatre,
             condition: Math.max(0, newState.theatre.condition - 3),
@@ -567,7 +798,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (newState.theatre.condition > 70 && isTheatreOpen(newState)) {
           const showingMovies = newState.theatre.screens.filter(s => s.currentMovieId).length;
           if (showingMovies > 0) {
-            const gain = Math.min(0.5, showingMovies * 0.1);
+            // Rating affects reputation growth: good rating = faster rep gain
+            const ratingFactor = state.overallRating >= 4 ? 1.5 : state.overallRating >= 3 ? 1.0 : 0.5;
+            const gain = Math.min(0.5, showingMovies * 0.1 * ratingFactor);
             newState.resources = {
               ...newState.resources,
               reputation: Math.min(100, newState.resources.reputation + gain),
@@ -577,14 +810,37 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         // Staff morale and skill changes
         const managers = countStaffByRole(newState.staff, 'manager');
+        const activeScreenCount = newState.theatre.screens.filter(s => s.unlocked && s.currentMovieId && !s.upgrading).length;
+
         newState.staff = newState.staff.map(s => {
           let morale = s.morale;
           let skill = s.skill;
 
-          // Morale tends toward 50 naturally, +5 if manager exists
+          // Morale tends toward 50 naturally, +3 if manager exists
           if (managers > 0) morale = Math.min(100, morale + 3);
           if (morale > 50) morale -= 1;
           else if (morale < 50) morale += 1;
+
+          // Workload-based morale effects: understaffed roles get morale penalty
+          if (s.role === 'projectionist') {
+            const projectionists = countStaffByRole(newState.staff, 'projectionist');
+            if (projectionists > 0 && activeScreenCount / projectionists > 2) {
+              morale -= 3; // overworked
+            }
+          }
+          if (s.role === 'cashier') {
+            const cashiers = countStaffByRole(newState.staff, 'cashier');
+            if (cashiers === 1 && activeScreenCount > 2) {
+              morale -= 2; // overworked
+            }
+          }
+          if (s.role === 'janitor') {
+            if (newState.theatre.condition < 30) {
+              morale -= 2; // overwhelmed by mess
+            }
+          }
+
+          morale = Math.max(0, Math.min(100, morale));
 
           // Skill slowly improves
           const template = staffTemplates.find(t => t.role === s.role);
@@ -594,6 +850,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
           return { ...s, morale, skill, daysEmployed: s.daysEmployed + 1 };
         });
+
+        // Staff quitting: morale < 20 = 10% chance to quit each day
+        const quitters: StaffMember[] = [];
+        newState.staff = newState.staff.filter(s => {
+          if (s.morale < 20 && Math.random() < 0.1) {
+            quitters.push(s);
+            return false;
+          }
+          return true;
+        });
+        for (const q of quitters) {
+          newState.messageLog = [...newState.messageLog, addMessage(newState, `${q.name} (${q.role}) quit due to low morale!`, '😤', 'warning')].slice(-50);
+        }
 
         // Generate daily report
         const todayReport = generateDailyReport(newState, dailyExpenses);
@@ -610,6 +879,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           peakDailyRevenue: Math.max(newState.stats.peakDailyRevenue, todayReport.totalRevenue),
           peakReputation: Math.max(newState.stats.peakReputation, newState.resources.reputation),
         };
+
+        // Reset daily customer count for new day
+        newState.dailyCustomerCount = 0;
 
         // Random events (5% chance per day after opening)
         if (isTheatreOpen(newState) && Math.random() < 0.05 && newState.activeEvents.length === 0) {
@@ -669,7 +941,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (state.resources.money < task.cost) return state;
 
-      // Check if another task of same category is already in progress
       const sameTypeInProgress = state.theatre.restorationTasks.some(
         t => t.inProgress && t.category === task.category
       );
@@ -691,7 +962,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'ASSIGN_MOVIE': {
       const screen = state.theatre.screens.find(s => s.id === action.screenId);
       if (!screen || !screen.unlocked || screen.upgrading) return state;
-      if (!state.currentMovies.includes(action.movieId)) return state;
+      if (!state.licensedMovies.some(lm => lm.movieId === action.movieId)) return state;
 
       return {
         ...state,
@@ -849,21 +1120,27 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const movie = allMovies.find(m => m.id === action.movieId);
       if (!movie) return state;
       if (state.resources.reputation < movie.minReputation) return state;
-      if (state.currentMovies.includes(action.movieId)) return state;
+      if (state.licensedMovies.some(lm => lm.movieId === action.movieId)) return state;
       if (state.resources.money < movie.licenseCost) return state;
+
+      const licensedMovie: LicensedMovie = {
+        movieId: action.movieId,
+        licensedDay: state.time.day,
+        expiresDay: state.time.day + movie.durationWeeks * 7,
+      };
 
       return {
         ...state,
         resources: { ...state.resources, money: state.resources.money - movie.licenseCost },
-        currentMovies: [...state.currentMovies, action.movieId],
-        messageLog: [...state.messageLog, addMessage(state, `Licensed "${movie.title}"!`, movie.icon, 'success')].slice(-50),
+        licensedMovies: [...state.licensedMovies, licensedMovie],
+        messageLog: [...state.messageLog, addMessage(state, `Licensed "${movie.title}" for ${movie.durationWeeks} weeks!`, movie.icon, 'success')].slice(-50),
       };
     }
 
     case 'DROP_MOVIE': {
       return {
         ...state,
-        currentMovies: state.currentMovies.filter(id => id !== action.movieId),
+        licensedMovies: state.licensedMovies.filter(lm => lm.movieId !== action.movieId),
         theatre: {
           ...state.theatre,
           screens: state.theatre.screens.map(s =>
@@ -998,7 +1275,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
 function generateDailyReport(state: GameState, expenses: number): DailyReport {
   const lastReport = state.dailyReports[state.dailyReports.length - 1];
-  // Approximate from stats delta (simplified)
   const ticketRev = Math.max(0, (state.stats.totalRevenue - (lastReport?.ticketRevenue ?? 0)) * 0.7);
   const concRev = Math.max(0, (state.stats.totalRevenue - (lastReport?.ticketRevenue ?? 0)) * 0.3);
 
@@ -1011,16 +1287,13 @@ function generateDailyReport(state: GameState, expenses: number): DailyReport {
     expenses: Math.floor(expenses),
     profit: Math.floor(ticketRev + concRev - expenses),
     avgSatisfaction: Math.min(100, state.theatre.condition * 0.5 + state.resources.reputation * 0.5),
-    customerCount: 0,
+    customerCount: state.dailyCustomerCount || 0,
   };
 }
 
 function generateFinancialSummary(state: GameState, report: DailyReport): FinancialSummary {
   const staffCosts = state.staff.reduce((sum, s) => sum + s.wage, 0);
-  const licenseCosts = state.currentMovies.reduce((sum, mid) => {
-    const movie = allMovies.find(m => m.id === mid);
-    return sum + (movie ? movie.licenseCost / 7 : 0);
-  }, 0);
+  const licenseCosts = 0; // License costs are now one-time, not recurring
   const maintenanceCosts = state.theatre.screens.filter(s => s.unlocked && s.currentMovieId).length * 50;
   const loanPayment = state.loan.paidOff ? 0 : state.loan.dailyPayment;
   const franchiseRev = state.franchiseLocations.filter(f => f.owned && f.manager).reduce((sum, f) => sum + f.dailyRevenue, 0);
@@ -1047,7 +1320,6 @@ export function useGameState() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Merge with defaults to handle schema changes
         const initial = createInitialState();
         const merged = {
           ...initial,
@@ -1062,6 +1334,21 @@ export function useGameState() {
           merged.resources.money = merged.resources.money + (STARTING_CASH - 5000);
           merged.loan = initial.loan;
         }
+        // Migrate currentMovies (string[]) → licensedMovies (LicensedMovie[])
+        if (parsed.currentMovies && !parsed.licensedMovies) {
+          merged.licensedMovies = (parsed.currentMovies as string[]).map((movieId: string) => {
+            const movie = allMovies.find(m => m.id === movieId);
+            return {
+              movieId,
+              licensedDay: parsed.time?.day ?? 1,
+              expiresDay: (parsed.time?.day ?? 1) + (movie ? movie.durationWeeks * 7 : 28),
+            };
+          });
+        }
+        // Ensure new fields exist
+        if (merged.reviews === undefined) merged.reviews = [];
+        if (merged.overallRating === undefined) merged.overallRating = 3;
+        if (merged.dailyCustomerCount === undefined) merged.dailyCustomerCount = 0;
         return merged;
       } catch {
         return createInitialState();
