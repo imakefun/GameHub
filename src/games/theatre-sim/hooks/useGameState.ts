@@ -15,11 +15,12 @@ import type {
   ReviewCategory,
 } from '../types';
 import type { Loan } from '../types';
-import { getDayOfWeek } from '../types';
+import { getDayOfWeek, getStaffLevel, getFairWage } from '../types';
 import {
   movies as allMovies,
   staffTemplates,
   staffNames,
+  staffTraits,
   screenUpgrades,
   theatreUpgrades,
   concessionItems as allConcessions,
@@ -30,6 +31,7 @@ import {
   OPENING_REQUIREMENTS,
   randomReviewerName,
   pickReviewText,
+  generateHiringPool,
 } from '../data';
 
 const STORAGE_KEY = 'theatre-sim-save';
@@ -77,6 +79,8 @@ function createInitialState(): GameState {
       condition: 15,
     },
     staff: [],
+    hiringPool: generateHiringPool(),
+    lastPoolRefresh: 1,
     licensedMovies: [],
     dailyReports: [],
     franchiseLocations: defaultFranchiseLocations.map(f => ({ ...f })),
@@ -808,16 +812,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
 
-        // Staff morale and skill changes
+        // Staff morale, XP, leveling, and raise requests
         const managers = countStaffByRole(newState.staff, 'manager');
         const activeScreenCount = newState.theatre.screens.filter(s => s.unlocked && s.currentMovieId && !s.upgrading).length;
 
         newState.staff = newState.staff.map(s => {
           let morale = s.morale;
           let skill = s.skill;
+          let experience = s.experience;
+          let raiseRequestDay = s.raiseRequestDay;
 
-          // Morale tends toward 50 naturally, +3 if manager exists
-          if (managers > 0) morale = Math.min(100, morale + 3);
+          // Morale tends toward 50 naturally, +5 if manager exists
+          if (managers > 0) morale = Math.min(100, morale + 5);
           if (morale > 50) morale -= 1;
           else if (morale < 50) morale += 1;
 
@@ -842,26 +848,79 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
           morale = Math.max(0, Math.min(100, morale));
 
-          // Skill slowly improves
+          // XP gain: base 1/day, trait modifiers
+          let xpGain = 1;
+          if (s.trait === 'hardworker') xpGain *= 1.2;
+          if (s.trait === 'ambitious') xpGain *= 1.3;
+          if (s.trait === 'lazy') xpGain *= 0.85;
+          experience += xpGain;
+
+          // Level up check
+          const newLevel = getStaffLevel(experience);
           const template = staffTemplates.find(t => t.role === s.role);
+
+          // Skill improves with experience
           if (template && skill < template.maxSkill) {
-            skill = Math.min(template.maxSkill, skill + 0.5);
+            const skillGain = 0.5 + (newLevel - 1) * 0.1; // higher level = slightly faster skill gain
+            skill = Math.min(template.maxSkill, skill + skillGain);
           }
 
-          return { ...s, morale, skill, daysEmployed: s.daysEmployed + 1 };
+          // Raise request logic: every 14 days, check if underpaid
+          if (template && s.daysEmployed > 0 && s.daysEmployed % 14 === 0 && raiseRequestDay === null) {
+            const fairWage = getFairWage(template.baseWage, newLevel);
+            if (s.wage < fairWage) {
+              raiseRequestDay = newDay;
+            }
+          }
+          // Ambitious staff check more often (every 10 days)
+          if (template && s.trait === 'ambitious' && s.daysEmployed > 0 && s.daysEmployed % 10 === 0 && raiseRequestDay === null) {
+            const fairWage = getFairWage(template.baseWage, newLevel);
+            if (s.wage < fairWage) {
+              raiseRequestDay = newDay;
+            }
+          }
+
+          // Underpaid morale penalty
+          if (template) {
+            const fairWage = getFairWage(template.baseWage, newLevel);
+            if (s.wage < fairWage * 0.85) {
+              morale -= 3; // significantly underpaid
+            } else if (s.wage < fairWage) {
+              morale -= 1; // slightly underpaid
+            }
+          }
+
+          morale = Math.max(0, Math.min(100, morale));
+
+          return { ...s, morale, skill, experience, level: newLevel, daysEmployed: s.daysEmployed + 1, raiseRequestDay };
         });
 
-        // Staff quitting: morale < 20 = 10% chance to quit each day
+        // Staff quitting: morale < 20 = 10% chance, OR ignored raise request for 7+ days
         const quitters: StaffMember[] = [];
         newState.staff = newState.staff.filter(s => {
+          // Low morale quit
           if (s.morale < 20 && Math.random() < 0.1) {
             quitters.push(s);
             return false;
           }
+          // Ignored raise request quit: after 7 days of waiting, 15% daily chance
+          if (s.raiseRequestDay !== null && (newDay - s.raiseRequestDay) >= 7) {
+            if (Math.random() < 0.15) {
+              quitters.push(s);
+              return false;
+            }
+          }
           return true;
         });
         for (const q of quitters) {
-          newState.messageLog = [...newState.messageLog, addMessage(newState, `${q.name} (${q.role}) quit due to low morale!`, '😤', 'warning')].slice(-50);
+          const reason = q.raiseRequestDay !== null ? 'quit over pay!' : 'quit due to low morale!';
+          newState.messageLog = [...newState.messageLog, addMessage(newState, `${q.name} (${q.role}) ${reason}`, '😤', 'warning')].slice(-50);
+        }
+
+        // Auto-refresh hiring pool every 7 days
+        if (newDay - (newState.lastPoolRefresh || 1) >= 7) {
+          newState.hiringPool = generateHiringPool();
+          newState.lastPoolRefresh = newDay;
         }
 
         // Generate daily report
@@ -1020,6 +1079,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (screen.quality !== upgrade.fromQuality) return state;
       if (state.resources.money < upgrade.cost) return state;
       if (screen.upgrading) return state;
+      // Gate: must have at least 2 unlocked screens before upgrading
+      const unlockedScreenCount = state.theatre.screens.filter(s => s.unlocked).length;
+      if (unlockedScreenCount < 2) return state;
 
       return {
         ...state,
@@ -1086,15 +1148,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!template) return state;
 
       const name = staffNames[Math.floor(Math.random() * staffNames.length)];
+      const trait = staffTraits[Math.floor(Math.random() * staffTraits.length)];
       const newStaff: StaffMember = {
         id: `staff-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name,
         role: action.role,
         skill: template.startingSkill,
+        level: 1,
+        experience: 0,
         wage: template.baseWage,
         morale: 60,
         hired: true,
         daysEmployed: 0,
+        trait: trait.id,
+        raiseRequestDay: null,
       };
 
       return {
@@ -1102,6 +1169,77 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         staff: [...state.staff, newStaff],
         stats: { ...state.stats, totalStaffHired: state.stats.totalStaffHired + 1 },
         messageLog: [...state.messageLog, addMessage(state, `Hired ${name} as ${template.name}`, template.icon, 'info')].slice(-50),
+      };
+    }
+
+    case 'HIRE_FROM_POOL': {
+      const candidate = state.hiringPool.find(c => c.id === action.candidateId);
+      if (!candidate) return state;
+      const template = staffTemplates.find(t => t.role === candidate.role);
+      if (!template) return state;
+
+      const newStaff: StaffMember = {
+        id: `staff-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: candidate.name,
+        role: candidate.role,
+        skill: candidate.skill,
+        level: candidate.level,
+        experience: candidate.experience,
+        wage: candidate.minimumWage,
+        morale: candidate.morale,
+        hired: true,
+        daysEmployed: 0,
+        trait: candidate.trait,
+        raiseRequestDay: null,
+      };
+
+      return {
+        ...state,
+        staff: [...state.staff, newStaff],
+        hiringPool: state.hiringPool.filter(c => c.id !== action.candidateId),
+        stats: { ...state.stats, totalStaffHired: state.stats.totalStaffHired + 1 },
+        messageLog: [...state.messageLog, addMessage(state, `Hired ${candidate.name} as ${template.name} (Lv.${candidate.level})`, template.icon, 'success')].slice(-50),
+      };
+    }
+
+    case 'GRANT_RAISE': {
+      const member = state.staff.find(s => s.id === action.staffId);
+      if (!member) return state;
+      const template = staffTemplates.find(t => t.role === member.role);
+      if (!template) return state;
+      const fairWage = getFairWage(template.baseWage, member.level);
+
+      return {
+        ...state,
+        staff: state.staff.map(s =>
+          s.id === action.staffId
+            ? { ...s, wage: fairWage, raiseRequestDay: null, morale: Math.min(100, s.morale + 15) }
+            : s
+        ),
+        messageLog: [...state.messageLog, addMessage(state, `Gave ${member.name} a raise to $${fairWage}/day`, '💰', 'info')].slice(-50),
+      };
+    }
+
+    case 'DENY_RAISE': {
+      const member = state.staff.find(s => s.id === action.staffId);
+      if (!member) return state;
+
+      return {
+        ...state,
+        staff: state.staff.map(s =>
+          s.id === action.staffId
+            ? { ...s, raiseRequestDay: null, morale: Math.max(0, s.morale - 20) }
+            : s
+        ),
+        messageLog: [...state.messageLog, addMessage(state, `Denied ${member.name}'s raise request. They're not happy...`, '😠', 'warning')].slice(-50),
+      };
+    }
+
+    case 'REFRESH_POOL': {
+      return {
+        ...state,
+        hiringPool: generateHiringPool(),
+        lastPoolRefresh: state.time.day,
       };
     }
 
@@ -1349,6 +1487,21 @@ export function useGameState() {
         if (merged.reviews === undefined) merged.reviews = [];
         if (merged.overallRating === undefined) merged.overallRating = 3;
         if (merged.dailyCustomerCount === undefined) merged.dailyCustomerCount = 0;
+        // Migrate staff: add new fields if missing
+        if (merged.staff) {
+          merged.staff = merged.staff.map((s: StaffMember) => ({
+            ...s,
+            level: s.level ?? getStaffLevel(s.experience ?? 0),
+            experience: s.experience ?? 0,
+            trait: s.trait ?? staffTraits[Math.floor(Math.random() * staffTraits.length)].id,
+            raiseRequestDay: s.raiseRequestDay ?? null,
+          }));
+        }
+        // Ensure hiring pool exists
+        if (!merged.hiringPool || merged.hiringPool.length === 0) {
+          merged.hiringPool = generateHiringPool();
+        }
+        if (merged.lastPoolRefresh === undefined) merged.lastPoolRefresh = merged.time?.day ?? 1;
         return merged;
       } catch {
         return createInitialState();
@@ -1382,7 +1535,11 @@ export function useGameState() {
   const unlockScreen = useCallback((screenId: string) => dispatch({ type: 'UNLOCK_SCREEN', screenId }), []);
   const repairScreen = useCallback((screenId: string) => dispatch({ type: 'REPAIR_SCREEN', screenId }), []);
   const hireStaff = useCallback((role: StaffRole) => dispatch({ type: 'HIRE_STAFF', role }), []);
+  const hireFromPool = useCallback((candidateId: string) => dispatch({ type: 'HIRE_FROM_POOL', candidateId }), []);
   const fireStaff = useCallback((staffId: string) => dispatch({ type: 'FIRE_STAFF', staffId }), []);
+  const grantRaise = useCallback((staffId: string) => dispatch({ type: 'GRANT_RAISE', staffId }), []);
+  const denyRaise = useCallback((staffId: string) => dispatch({ type: 'DENY_RAISE', staffId }), []);
+  const refreshPool = useCallback(() => dispatch({ type: 'REFRESH_POOL' }), []);
   const licenseMovie = useCallback((movieId: string) => dispatch({ type: 'LICENSE_MOVIE', movieId }), []);
   const dropMovie = useCallback((movieId: string) => dispatch({ type: 'DROP_MOVIE', movieId }), []);
   const unlockConcession = useCallback((itemId: string) => dispatch({ type: 'UNLOCK_CONCESSION', itemId }), []);
@@ -1406,7 +1563,11 @@ export function useGameState() {
     unlockScreen,
     repairScreen,
     hireStaff,
+    hireFromPool,
     fireStaff,
+    grantRaise,
+    denyRaise,
+    refreshPool,
     licenseMovie,
     dropMovie,
     unlockConcession,

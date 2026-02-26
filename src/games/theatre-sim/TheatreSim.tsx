@@ -55,8 +55,11 @@ export function TheatreSim() {
     upgradeScreen,
     unlockScreen,
     repairScreen,
-    hireStaff,
+    hireFromPool,
     fireStaff,
+    grantRaise,
+    denyRaise,
+    refreshPool,
     licenseMovie,
     dropMovie,
     unlockConcession,
@@ -436,8 +439,13 @@ export function TheatreSim() {
         {activeTab === 'staff' && (
           <StaffPanel
             staff={state.staff}
-            onHire={hireStaff}
+            hiringPool={state.hiringPool}
+            day={state.time.day}
+            onHireFromPool={hireFromPool}
             onFire={fireStaff}
+            onGrantRaise={grantRaise}
+            onDenyRaise={denyRaise}
+            onRefreshPool={refreshPool}
           />
         )}
         {activeTab === 'movies' && (

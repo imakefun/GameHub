@@ -107,11 +107,28 @@ export interface StaffMember {
   id: string;
   name: string;
   role: StaffRole;
-  skill: number; // 1-100, improves over time
+  skill: number; // 1-100, improves with experience
+  level: number; // 1-5
+  experience: number; // accumulated XP, drives leveling
   wage: number; // daily wage
   morale: number; // 0-100
   hired: boolean;
   daysEmployed: number;
+  trait: string; // personality trait
+  raiseRequestDay: number | null; // day a raise was requested, null if none
+}
+
+export interface StaffCandidate {
+  id: string;
+  name: string;
+  role: StaffRole;
+  skill: number;
+  level: number;
+  experience: number;
+  minimumWage: number;
+  morale: number;
+  trait: string;
+  traitDescription: string;
 }
 
 export interface StaffTemplate {
@@ -123,6 +140,26 @@ export interface StaffTemplate {
   startingSkill: number;
   maxSkill: number;
   effect: string; // what this role does
+}
+
+// Staff leveling
+export const LEVEL_THRESHOLDS = [0, 20, 50, 100, 180];
+export const LEVEL_NAMES = ['Rookie', 'Regular', 'Skilled', 'Expert', 'Master'];
+
+export function getStaffLevel(experience: number): number {
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (experience >= LEVEL_THRESHOLDS[i]) return i + 1;
+  }
+  return 1;
+}
+
+export function getFairWage(baseWage: number, level: number): number {
+  return Math.floor(baseWage * (1 + (level - 1) * 0.25));
+}
+
+export function getXpToNextLevel(level: number): number | null {
+  if (level >= 5) return null;
+  return LEVEL_THRESHOLDS[level]; // threshold for NEXT level
 }
 
 // ============ Concessions ============
@@ -290,6 +327,8 @@ export interface GameState {
   loan: Loan;
   theatre: TheatreState;
   staff: StaffMember[];
+  hiringPool: StaffCandidate[];
+  lastPoolRefresh: number; // day when pool was last refreshed
   licensedMovies: LicensedMovie[];
   dailyReports: DailyReport[];
   franchiseLocations: FranchiseLocation[];
@@ -341,7 +380,11 @@ export type GameAction =
   | { type: 'UNLOCK_SCREEN'; screenId: string }
   | { type: 'REPAIR_SCREEN'; screenId: string }
   | { type: 'HIRE_STAFF'; role: StaffRole }
+  | { type: 'HIRE_FROM_POOL'; candidateId: string }
   | { type: 'FIRE_STAFF'; staffId: string }
+  | { type: 'GRANT_RAISE'; staffId: string }
+  | { type: 'DENY_RAISE'; staffId: string }
+  | { type: 'REFRESH_POOL' }
   | { type: 'LICENSE_MOVIE'; movieId: string }
   | { type: 'DROP_MOVIE'; movieId: string }
   | { type: 'UNLOCK_CONCESSION'; itemId: string }

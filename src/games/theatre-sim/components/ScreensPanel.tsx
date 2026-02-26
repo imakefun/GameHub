@@ -43,6 +43,7 @@ export function ScreensPanel({
   const [showMoviePicker, setShowMoviePicker] = useState<string | null>(null);
 
   const activeScreens = screens.filter(s => s.unlocked && s.currentMovieId && !s.upgrading).length;
+  const totalUnlocked = screens.filter(s => s.unlocked).length;
   const licensedIds = licensedMovies.map(lm => lm.movieId);
 
   return (
@@ -265,29 +266,33 @@ export function ScreensPanel({
                   {upgrades.length > 0 && (
                     <div className="space-y-2 pt-2 border-t border-slate-700/50">
                       <span className="text-xs text-slate-500 uppercase tracking-wider">Available Upgrades</span>
-                      {upgrades.map(upgrade => (
-                        <div key={upgrade.id} className="flex items-center justify-between bg-slate-900/40 rounded-lg p-2">
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span>{upgrade.icon}</span>
-                              <span className="text-sm font-medium text-white">{upgrade.name}</span>
+                      {totalUnlocked < 2 ? (
+                        <p className="text-xs text-amber-400/70 italic">Unlock a second screen to access upgrades.</p>
+                      ) : (
+                        upgrades.map(upgrade => (
+                          <div key={upgrade.id} className="flex items-center justify-between bg-slate-900/40 rounded-lg p-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span>{upgrade.icon}</span>
+                                <span className="text-sm font-medium text-white">{upgrade.name}</span>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-0.5">{upgrade.description}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{upgrade.daysToComplete} days • {upgrade.seatsChange > 0 ? '+' : ''}{upgrade.seatsChange} seats</p>
                             </div>
-                            <p className="text-xs text-slate-400 mt-0.5">{upgrade.description}</p>
-                            <p className="text-xs text-slate-500 mt-0.5">{upgrade.daysToComplete} days • {upgrade.seatsChange > 0 ? '+' : ''}{upgrade.seatsChange} seats</p>
+                            <button
+                              onClick={() => onUpgradeScreen(screen.id, upgrade.id)}
+                              disabled={money < upgrade.cost}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ml-3 ${
+                                money >= upgrade.cost
+                                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                              }`}
+                            >
+                              ${upgrade.cost.toLocaleString()}
+                            </button>
                           </div>
-                          <button
-                            onClick={() => onUpgradeScreen(screen.id, upgrade.id)}
-                            disabled={money < upgrade.cost}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ml-3 ${
-                              money >= upgrade.cost
-                                ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                            }`}
-                          >
-                            ${upgrade.cost.toLocaleString()}
-                          </button>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
