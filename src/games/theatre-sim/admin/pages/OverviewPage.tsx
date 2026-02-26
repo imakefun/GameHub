@@ -67,6 +67,8 @@ export function OverviewPage({ state }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Cash" value={`$${state.resources.money.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color="text-green-400" />
         <StatCard label="Reputation" value={`${state.resources.reputation.toFixed(1)} / 100`} color="text-amber-400" />
+        <StatCard label="Customer Rating" value={`${state.overallRating.toFixed(1)} / 5.0`} sub={`${state.reviews.length} reviews`} color="text-yellow-400" />
+        <StatCard label="Licensed Movies" value={`${state.licensedMovies.length}`} sub={`${state.dailyCustomerCount} visitors today`} color="text-cyan-400" />
         <StatCard label="Loan Remaining" value={state.loan.paidOff ? 'Paid Off' : `$${state.loan.remaining.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color={state.loan.paidOff ? 'text-green-400' : 'text-red-400'} />
         <StatCard label="Total Revenue" value={`$${state.stats.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} color="text-cyan-400" />
       </div>

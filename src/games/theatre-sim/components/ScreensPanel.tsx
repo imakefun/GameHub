@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { Screen, ScreenQuality } from '../types';
+import type { Screen, ScreenQuality, LicensedMovie } from '../types';
 import { movies as allMovies, screenUpgrades } from '../data';
 
 interface Props {
   screens: Screen[];
-  currentMovies: string[];
+  licensedMovies: LicensedMovie[];
   money: number;
   day: number;
   onAssignMovie: (screenId: string, movieId: string) => void;
@@ -34,7 +34,7 @@ const qualityBg: Record<ScreenQuality, string> = {
 };
 
 export function ScreensPanel({
-  screens, currentMovies, money, day,
+  screens, licensedMovies, money, day,
   onAssignMovie, onRemoveMovie, onSetTicketPrice,
   onUpgradeScreen, onUnlockScreen, onRepairScreen,
   getUnlockCost, getRepairCost,
@@ -43,6 +43,7 @@ export function ScreensPanel({
   const [showMoviePicker, setShowMoviePicker] = useState<string | null>(null);
 
   const activeScreens = screens.filter(s => s.unlocked && s.currentMovieId && !s.upgrading).length;
+  const licensedIds = licensedMovies.map(lm => lm.movieId);
 
   return (
     <div className="space-y-4">
@@ -54,6 +55,8 @@ export function ScreensPanel({
       <div className="grid gap-3">
         {screens.map((screen, index) => {
           const movie = screen.currentMovieId ? allMovies.find(m => m.id === screen.currentMovieId) : null;
+          const licensed = screen.currentMovieId ? licensedMovies.find(lm => lm.movieId === screen.currentMovieId) : null;
+          const daysLeft = licensed ? licensed.expiresDay - day : 0;
           const isSelected = selectedScreen === screen.id;
           const upgrades = screenUpgrades.filter(u => u.fromQuality === screen.quality);
           const repairCost = screen.unlocked ? getRepairCost(screen) : 0;
@@ -117,9 +120,18 @@ export function ScreensPanel({
                           Upgrading... {screen.upgradeCompletesAt ? `${screen.upgradeCompletesAt - day}d left` : ''}
                         </p>
                       ) : movie ? (
-                        <p className="text-xs text-slate-400">
-                          {movie.icon} {movie.title} — ${screen.ticketPrice.toFixed(2)}/ticket
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-400">
+                            {movie.icon} {movie.title} — ${screen.ticketPrice.toFixed(2)}/ticket
+                          </p>
+                          {daysLeft > 0 && daysLeft <= 7 && (
+                            <span className={`text-[10px] px-1 py-0.5 rounded ${
+                              daysLeft <= 3 ? 'bg-red-900/40 text-red-400' : 'bg-amber-900/40 text-amber-400'
+                            }`}>
+                              {daysLeft}d left
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <p className="text-xs text-slate-500">No movie assigned</p>
                       )}
@@ -154,6 +166,11 @@ export function ScreensPanel({
                     {movie ? (
                       <>
                         <span className="text-sm text-slate-300">Now showing: {movie.icon} {movie.title}</span>
+                        {licensed && (
+                          <span className={`text-xs ${daysLeft <= 3 ? 'text-red-400' : daysLeft <= 7 ? 'text-amber-400' : 'text-slate-500'}`}>
+                            (expires in {daysLeft}d)
+                          </span>
+                        )}
                         <button
                           onClick={() => onRemoveMovie(screen.id)}
                           className="text-xs px-2 py-1 bg-red-900/40 text-red-400 rounded hover:bg-red-900/60"
@@ -172,26 +189,30 @@ export function ScreensPanel({
                   </div>
 
                   {/* Movie picker */}
-                  {showMoviePicker === screen.id && currentMovies.length > 0 && (
+                  {showMoviePicker === screen.id && licensedIds.length > 0 && (
                     <div className="bg-slate-900/50 rounded-lg p-2 space-y-1">
-                      {currentMovies.map(mid => {
-                        const m = allMovies.find(mv => mv.id === mid);
+                      {licensedMovies.map(lm => {
+                        const m = allMovies.find(mv => mv.id === lm.movieId);
                         if (!m) return null;
-                        const isAssigned = screens.some(s => s.currentMovieId === mid);
+                        const isAssigned = screens.some(s => s.currentMovieId === lm.movieId);
+                        const lmDaysLeft = lm.expiresDay - day;
                         return (
                           <button
-                            key={mid}
-                            onClick={() => { onAssignMovie(screen.id, mid); setShowMoviePicker(null); }}
+                            key={lm.movieId}
+                            onClick={() => { onAssignMovie(screen.id, lm.movieId); setShowMoviePicker(null); }}
                             className="w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700/50 text-left"
                           >
                             <span>{m.icon}</span>
                             <span className="text-sm text-white flex-1">{m.title}</span>
                             <span className="text-xs text-slate-400">Pop: {m.popularity}</span>
+                            <span className={`text-[10px] ${lmDaysLeft <= 7 ? 'text-amber-400' : 'text-slate-500'}`}>
+                              {lmDaysLeft}d
+                            </span>
                             {isAssigned && <span className="text-[10px] text-yellow-500">SHOWING</span>}
                           </button>
                         );
                       })}
-                      {currentMovies.length === 0 && (
+                      {licensedIds.length === 0 && (
                         <p className="text-xs text-slate-500 p-2">No movies licensed. Visit the Movies tab.</p>
                       )}
                     </div>
