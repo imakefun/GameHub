@@ -26,15 +26,16 @@ export function Cutscene({ sequence, onComplete }: Props) {
   const [beatIndex, setBeatIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
-  const [visible, setVisible] = useState(false);
+  // Phase: 'fadingIn' → 'visible' → 'fadingOut' → calls onComplete
+  const [phase, setPhase] = useState<'fadingIn' | 'visible' | 'fadingOut'>('fadingIn');
 
   const beat = sequence.beats[beatIndex];
   const isLastBeat = beatIndex === sequence.beats.length - 1;
   const mood = beat?.mood ?? 'neutral';
 
-  // Fade in content after parent's black overlay has covered the screen
+  // Fade in on mount
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 100);
+    const t = setTimeout(() => setPhase('visible'), 50);
     return () => clearTimeout(t);
   }, []);
 
@@ -61,7 +62,21 @@ export function Cutscene({ sequence, onComplete }: Props) {
     return () => clearInterval(interval);
   }, [beat, beatIndex]);
 
+  // Handle fade-out completion
+  useEffect(() => {
+    if (phase === 'fadingOut') {
+      const t = setTimeout(() => onComplete(), 600);
+      return () => clearTimeout(t);
+    }
+  }, [phase, onComplete]);
+
+  const finish = useCallback(() => {
+    setPhase('fadingOut');
+  }, []);
+
   const advance = useCallback(() => {
+    if (phase === 'fadingOut') return;
+
     if (isTyping) {
       // Skip typewriter — show full text immediately
       setDisplayedText(beat.text);
@@ -70,11 +85,11 @@ export function Cutscene({ sequence, onComplete }: Props) {
     }
 
     if (isLastBeat) {
-      onComplete();
+      finish();
     } else {
       setBeatIndex(prev => prev + 1);
     }
-  }, [isTyping, isLastBeat, onComplete, beat]);
+  }, [isTyping, isLastBeat, finish, beat, phase]);
 
   // Keyboard support
   useEffect(() => {
@@ -83,25 +98,27 @@ export function Cutscene({ sequence, onComplete }: Props) {
         e.preventDefault();
         advance();
       } else if (e.key === 'Escape') {
-        onComplete();
+        finish();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [advance, onComplete]);
+  }, [advance, finish]);
 
   if (!beat) return null;
 
+  // The entire component IS the black background + content.
+  // It fades in (black covers game) and fades out (game reappears).
   return (
     <div
-      className={`fixed inset-0 z-[100] bg-gradient-to-b ${moodGradients[mood]} flex flex-col items-center justify-center transition-opacity duration-300 ${
-        visible ? 'opacity-100' : 'opacity-0'
+      className={`fixed inset-0 z-[100] bg-gradient-to-b ${moodGradients[mood]} flex flex-col items-center justify-center transition-opacity duration-500 ${
+        phase === 'fadingIn' ? 'opacity-0' : phase === 'fadingOut' ? 'opacity-0' : 'opacity-100'
       }`}
       onClick={advance}
     >
       {/* Skip button */}
       <button
-        onClick={(e) => { e.stopPropagation(); onComplete(); }}
+        onClick={(e) => { e.stopPropagation(); finish(); }}
         className="absolute top-4 right-4 text-xs text-slate-600 hover:text-slate-400 transition-colors px-3 py-1.5 rounded-lg border border-slate-800/50 hover:border-slate-700/50 z-10"
       >
         Skip

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, RotateCcw, X, Menu } from 'lucide-react';
 import { useGameState } from './hooks/useGameState';
@@ -87,49 +87,14 @@ export function TheatreSim() {
   const recentMessages = state.messageLog.slice(-5).reverse();
   const unreadCount = state.messageLog.filter(m => m.type === 'milestone' || m.type === 'success').length;
 
-  // Active cutscene
+  // Active cutscene — the Cutscene component handles its own fade transitions
   const activeCutsceneData = state.activeCutscene
     ? cutscenes.find(c => c.id === state.activeCutscene)
     : null;
 
-  // Cutscene fade-to-black state machine
-  // hidden → fadingToBlack → cutscenePlaying → fadingFromBlack → hidden
-  const [cutscenePhase, setCutscenePhase] = useState<
-    'hidden' | 'fadingToBlack' | 'cutscenePlaying' | 'fadingFromBlack'
-  >(activeCutsceneData ? 'cutscenePlaying' : 'hidden');
-  const prevCutsceneId = useRef(state.activeCutscene);
-
-  // Detect when a new cutscene is triggered → fade to black first
-  useEffect(() => {
-    if (state.activeCutscene && state.activeCutscene !== prevCutsceneId.current) {
-      prevCutsceneId.current = state.activeCutscene;
-      setCutscenePhase('fadingToBlack');
-      const t = setTimeout(() => setCutscenePhase('cutscenePlaying'), 600);
-      return () => clearTimeout(t);
-    }
-    // Handle initial load with an active cutscene
-    if (state.activeCutscene && prevCutsceneId.current === state.activeCutscene && cutscenePhase === 'hidden') {
-      prevCutsceneId.current = state.activeCutscene;
-      setCutscenePhase('fadingToBlack');
-      const t = setTimeout(() => setCutscenePhase('cutscenePlaying'), 600);
-      return () => clearTimeout(t);
-    }
-  }, [state.activeCutscene, cutscenePhase]);
-
-  const handleCutsceneComplete = () => {
-    const id = state.activeCutscene;
-    // Fade cutscene to black, then dismiss and fade back to game
-    setCutscenePhase('fadingFromBlack');
-    setTimeout(() => {
-      if (id) completeCutscene(id);
-      prevCutsceneId.current = null;
-      // Small delay to let the game render underneath before fading in
-      setTimeout(() => setCutscenePhase('hidden'), 50);
-    }, 600);
+  const handleCutsceneComplete = (cutsceneId: string) => {
+    completeCutscene(cutsceneId);
   };
-
-  const showBlackOverlay = cutscenePhase === 'fadingToBlack' || cutscenePhase === 'fadingFromBlack';
-  const showCutscene = cutscenePhase === 'cutscenePlaying' && activeCutsceneData;
 
   // Loan progress
   const loanProgress = state.loan.paidOff
@@ -138,19 +103,11 @@ export function TheatreSim() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
-      {/* Fade-to-black overlay */}
-      <div
-        className={`fixed inset-0 z-[99] bg-black pointer-events-none transition-opacity duration-500 ${
-          showBlackOverlay ? 'opacity-100' : cutscenePhase === 'cutscenePlaying' ? 'opacity-0' : 'opacity-0'
-        }`}
-        style={{ display: cutscenePhase === 'hidden' ? 'none' : undefined }}
-      />
-
-      {/* Active Cutscene Overlay */}
-      {showCutscene && (
+      {/* Active Cutscene — renders its own black background behind content */}
+      {activeCutsceneData && (
         <Cutscene
           sequence={activeCutsceneData}
-          onComplete={handleCutsceneComplete}
+          onComplete={() => handleCutsceneComplete(activeCutsceneData.id)}
         />
       )}
 
