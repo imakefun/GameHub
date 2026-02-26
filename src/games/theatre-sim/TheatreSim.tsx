@@ -63,6 +63,8 @@ export function TheatreSim() {
     licenseMovie,
     dropMovie,
     unlockConcession,
+    restockConcession,
+    setConcessionPrice,
     upgradeConcessionStand,
     purchaseUpgrade,
     purchaseFranchise,
@@ -459,6 +461,8 @@ export function TheatreSim() {
           <ConcessionsPanel
             state={state}
             onUnlockItem={unlockConcession}
+            onRestock={restockConcession}
+            onSetPrice={setConcessionPrice}
             onUpgradeStand={upgradeConcessionStand}
           />
         )}

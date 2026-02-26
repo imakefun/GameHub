@@ -168,16 +168,25 @@ export interface ConcessionItem {
   name: string;
   icon: string;
   category: 'snack' | 'drink' | 'combo' | 'premium';
-  cost: number; // cost to stock per unit
-  price: number; // selling price
-  popularity: number; // 1-100, affects how often customers buy
+  cost: number; // cost to stock per unit (wholesale)
+  basePrice: number; // suggested selling price
+  popularity: number; // 1-100, base demand at fair price
   unlockCost: number; // one-time cost to add to menu
-  unlocked: boolean;
+  requiredScreens: number; // unlocked screens needed to unlock this item
+  requiredWorkers: number; // concession workers needed to unlock this item
+}
+
+/** Per-item inventory tracking in the player's concession stand */
+export interface ConcessionStock {
+  itemId: string;
+  stock: number; // current units in inventory
+  sellingPrice: number; // player-set price per unit
+  totalSold: number; // lifetime units sold
 }
 
 export interface ConcessionStand {
-  capacity: number; // how many items can be stocked
-  level: number; // upgrades increase capacity
+  maxStock: number; // max total units across all items
+  level: number; // upgrades increase maxStock
   upgradeCost: number;
 }
 
@@ -315,7 +324,7 @@ export interface TheatreState {
   screens: Screen[];
   upgrades: string[];
   concessionStand: ConcessionStand;
-  concessionMenu: string[];
+  concessionStock: ConcessionStock[];
   restorationTasks: RestorationTask[];
   condition: number; // 0-100
 }
@@ -388,6 +397,8 @@ export type GameAction =
   | { type: 'LICENSE_MOVIE'; movieId: string }
   | { type: 'DROP_MOVIE'; movieId: string }
   | { type: 'UNLOCK_CONCESSION'; itemId: string }
+  | { type: 'RESTOCK_CONCESSION'; itemId: string; quantity: number }
+  | { type: 'SET_CONCESSION_PRICE'; itemId: string; price: number }
   | { type: 'UPGRADE_CONCESSION_STAND' }
   | { type: 'PURCHASE_UPGRADE'; upgradeId: string }
   | { type: 'PURCHASE_FRANCHISE'; locationId: string }

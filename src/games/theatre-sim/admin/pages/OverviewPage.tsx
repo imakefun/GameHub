@@ -37,7 +37,7 @@ export function OverviewPage({ state }: Props) {
   const totalStaff = state.staff.length;
   const completedTasks = state.theatre.restorationTasks.filter(t => t.completed).length;
   const totalTasks = state.theatre.restorationTasks.length;
-  const unlockedConcessions = state.theatre.concessionMenu.length;
+  const unlockedConcessions = state.theatre.concessionStock.length;
   const ownedFranchises = state.franchiseLocations.filter(f => f.owned).length;
   const totalFranchises = state.franchiseLocations.length;
   const lastReport = state.dailyReports[state.dailyReports.length - 1];
