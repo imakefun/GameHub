@@ -13,13 +13,15 @@ import type {
   LicensedMovie,
   CustomerReview,
   ReviewCategory,
+  ConcessionStock,
 } from '../types';
 import type { Loan } from '../types';
-import { getDayOfWeek } from '../types';
+import { getDayOfWeek, getStaffLevel, getFairWage } from '../types';
 import {
   movies as allMovies,
   staffTemplates,
   staffNames,
+  staffTraits,
   screenUpgrades,
   theatreUpgrades,
   concessionItems as allConcessions,
@@ -30,6 +32,7 @@ import {
   OPENING_REQUIREMENTS,
   randomReviewerName,
   pickReviewText,
+  generateHiringPool,
 } from '../data';
 
 const STORAGE_KEY = 'theatre-sim-save';
@@ -71,12 +74,17 @@ function createInitialState(): GameState {
         { id: 'screen-6', name: 'Screen 6', seats: 40, quality: 'basic' as ScreenQuality, condition: 0, currentMovieId: null, showtimeHours: [15, 20], ticketPrice: 8, unlocked: false, upgrading: false, upgradeCompletesAt: null },
       ],
       upgrades: [],
-      concessionStand: { capacity: 50, level: 0, upgradeCost: 1000 },
-      concessionMenu: ['popcorn-small', 'soda-small'],
+      concessionStand: { maxStock: 100, level: 0, upgradeCost: 1500 },
+      concessionStock: [
+        { itemId: 'popcorn-small', stock: 30, sellingPrice: 4.00, totalSold: 0 },
+        { itemId: 'soda-small', stock: 30, sellingPrice: 3.50, totalSold: 0 },
+      ],
       restorationTasks: defaultRestorationTasks.map(t => ({ ...t })),
       condition: 15,
     },
     staff: [],
+    hiringPool: generateHiringPool(),
+    lastPoolRefresh: 1,
     licensedMovies: [],
     dailyReports: [],
     franchiseLocations: defaultFranchiseLocations.map(f => ({ ...f })),
@@ -283,25 +291,77 @@ function getCustomerCount(state: GameState, screen: Screen): number {
   return Math.min(Math.max(0, customers), screen.seats);
 }
 
-function calculateConcessionRevenue(state: GameState, totalCustomers: number): number {
+/** Concession price demand: how player price vs base price affects sales rate */
+function getConcessionDemandMultiplier(sellingPrice: number, basePrice: number): number {
+  if (basePrice <= 0) return 1;
+  const ratio = sellingPrice / basePrice;
+  if (ratio <= 0.8) return 1.4; // big discount = more sales
+  if (ratio <= 1.0) return 1 + (1 - ratio) * 1.5; // slight discount
+  // Overpriced: steep dropoff
+  return Math.max(0.1, 1 / Math.pow(ratio, 1.5));
+}
+
+interface ConcessionResult {
+  revenue: number;
+  updatedStock: ConcessionStock[];
+  unitsSold: number;
+}
+
+function calculateConcessionSales(state: GameState, totalCustomers: number): ConcessionResult {
   const concessionWorkers = countStaffByRole(state.staff, 'concessions');
-  if (concessionWorkers === 0) return 0;
+  if (concessionWorkers === 0) return { revenue: 0, updatedStock: state.theatre.concessionStock, unitsSold: 0 };
 
-  // Each customer has a chance to buy concessions
-  const buyRate = 0.4 + (concessionWorkers * 0.1); // 40% base + 10% per worker
-  const buyers = Math.floor(totalCustomers * Math.min(buyRate, 0.85));
+  const stockedItems = state.theatre.concessionStock.filter(s => s.stock > 0);
+  if (stockedItems.length === 0) return { revenue: 0, updatedStock: state.theatre.concessionStock, unitsSold: 0 };
 
-  // Average spend based on unlocked items
-  const unlockedItems = allConcessions.filter(c => state.theatre.concessionMenu.includes(c.id));
-  if (unlockedItems.length === 0) return 0;
+  // Base buy rate: 40% + 10% per worker, capped at 85%
+  const buyRate = Math.min(0.85, 0.4 + concessionWorkers * 0.1);
+  const potentialBuyers = Math.floor(totalCustomers * buyRate);
 
-  const avgPrice = unlockedItems.reduce((sum, item) => sum + item.price * (item.popularity / 100), 0) / unlockedItems.length;
-  const avgCost = unlockedItems.reduce((sum, item) => sum + item.cost * (item.popularity / 100), 0) / unlockedItems.length;
+  let totalRevenue = 0;
+  let totalUnitsSold = 0;
+  const updatedStock = state.theatre.concessionStock.map(s => ({ ...s }));
 
-  const revenue = buyers * avgPrice;
-  const costs = buyers * avgCost;
+  // Each potential buyer picks an item weighted by popularity * demand
+  for (let i = 0; i < potentialBuyers; i++) {
+    // Build weighted pool of in-stock items
+    const available = updatedStock.filter(s => s.stock > 0);
+    if (available.length === 0) break;
 
-  return Math.floor((revenue - costs) * 100) / 100;
+    let totalWeight = 0;
+    const weights: { stock: ConcessionStock; item: typeof allConcessions[0]; weight: number }[] = [];
+    for (const s of available) {
+      const item = allConcessions.find(c => c.id === s.itemId);
+      if (!item) continue;
+      const demandMult = getConcessionDemandMultiplier(s.sellingPrice, item.basePrice);
+      const weight = (item.popularity / 100) * demandMult;
+      totalWeight += weight;
+      weights.push({ stock: s, item, weight });
+    }
+
+    if (totalWeight <= 0) break;
+
+    // Weighted random pick
+    let roll = Math.random() * totalWeight;
+    let picked: typeof weights[0] | null = null;
+    for (const w of weights) {
+      roll -= w.weight;
+      if (roll <= 0) { picked = w; break; }
+    }
+    if (!picked) picked = weights[weights.length - 1];
+
+    // Sell one unit
+    picked.stock.stock -= 1;
+    picked.stock.totalSold += 1;
+    totalRevenue += picked.stock.sellingPrice;
+    totalUnitsSold += 1;
+  }
+
+  return {
+    revenue: Math.floor(totalRevenue * 100) / 100,
+    updatedStock,
+    unitsSold: totalUnitsSold,
+  };
 }
 
 function calculateDailyExpenses(state: GameState): number {
@@ -490,7 +550,7 @@ function checkMilestones(state: GameState): GameState {
         achieved = state.theatre.screens.some(s => s.quality === 'premium' || s.quality === 'imax' || s.quality === 'dolby');
         break;
       case 'concession-king':
-        achieved = state.theatre.concessionMenu.length >= 10;
+        achieved = state.theatre.concessionStock.length >= 10;
         break;
       case 'blockbuster': {
         achieved = state.licensedMovies.some(lm => {
@@ -673,9 +733,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
 
-        const concessionRev = calculateConcessionRevenue(newState, hourlyCustomers);
+        const concessionResult = calculateConcessionSales(newState, hourlyCustomers);
 
-        let totalHourlyRevenue = hourlyTicketRevenue + concessionRev;
+        // Apply stock changes from concession sales
+        newState.theatre = {
+          ...newState.theatre,
+          concessionStock: concessionResult.updatedStock,
+        };
+
+        let totalHourlyRevenue = hourlyTicketRevenue + concessionResult.revenue;
 
         // Event revenue multipliers
         for (const event of newState.activeEvents) {
@@ -696,7 +762,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ...newState.stats,
           totalRevenue: newState.stats.totalRevenue + totalHourlyRevenue,
           totalTicketsSold: newState.stats.totalTicketsSold + hourlyTicketsSold,
-          totalConcessionsSold: newState.stats.totalConcessionsSold + (concessionRev > 0 ? hourlyCustomers : 0),
+          totalConcessionsSold: newState.stats.totalConcessionsSold + concessionResult.unitsSold,
         };
       }
 
@@ -808,16 +874,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
 
-        // Staff morale and skill changes
+        // Staff morale, XP, leveling, and raise requests
         const managers = countStaffByRole(newState.staff, 'manager');
         const activeScreenCount = newState.theatre.screens.filter(s => s.unlocked && s.currentMovieId && !s.upgrading).length;
 
         newState.staff = newState.staff.map(s => {
           let morale = s.morale;
           let skill = s.skill;
+          let experience = s.experience;
+          let raiseRequestDay = s.raiseRequestDay;
 
-          // Morale tends toward 50 naturally, +3 if manager exists
-          if (managers > 0) morale = Math.min(100, morale + 3);
+          // Morale tends toward 50 naturally, +5 if manager exists
+          if (managers > 0) morale = Math.min(100, morale + 5);
           if (morale > 50) morale -= 1;
           else if (morale < 50) morale += 1;
 
@@ -842,26 +910,79 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
           morale = Math.max(0, Math.min(100, morale));
 
-          // Skill slowly improves
+          // XP gain: base 1/day, trait modifiers
+          let xpGain = 1;
+          if (s.trait === 'hardworker') xpGain *= 1.2;
+          if (s.trait === 'ambitious') xpGain *= 1.3;
+          if (s.trait === 'lazy') xpGain *= 0.85;
+          experience += xpGain;
+
+          // Level up check
+          const newLevel = getStaffLevel(experience);
           const template = staffTemplates.find(t => t.role === s.role);
+
+          // Skill improves with experience
           if (template && skill < template.maxSkill) {
-            skill = Math.min(template.maxSkill, skill + 0.5);
+            const skillGain = 0.5 + (newLevel - 1) * 0.1; // higher level = slightly faster skill gain
+            skill = Math.min(template.maxSkill, skill + skillGain);
           }
 
-          return { ...s, morale, skill, daysEmployed: s.daysEmployed + 1 };
+          // Raise request logic: every 14 days, check if underpaid
+          if (template && s.daysEmployed > 0 && s.daysEmployed % 14 === 0 && raiseRequestDay === null) {
+            const fairWage = getFairWage(template.baseWage, newLevel);
+            if (s.wage < fairWage) {
+              raiseRequestDay = newDay;
+            }
+          }
+          // Ambitious staff check more often (every 10 days)
+          if (template && s.trait === 'ambitious' && s.daysEmployed > 0 && s.daysEmployed % 10 === 0 && raiseRequestDay === null) {
+            const fairWage = getFairWage(template.baseWage, newLevel);
+            if (s.wage < fairWage) {
+              raiseRequestDay = newDay;
+            }
+          }
+
+          // Underpaid morale penalty
+          if (template) {
+            const fairWage = getFairWage(template.baseWage, newLevel);
+            if (s.wage < fairWage * 0.85) {
+              morale -= 3; // significantly underpaid
+            } else if (s.wage < fairWage) {
+              morale -= 1; // slightly underpaid
+            }
+          }
+
+          morale = Math.max(0, Math.min(100, morale));
+
+          return { ...s, morale, skill, experience, level: newLevel, daysEmployed: s.daysEmployed + 1, raiseRequestDay };
         });
 
-        // Staff quitting: morale < 20 = 10% chance to quit each day
+        // Staff quitting: morale < 20 = 10% chance, OR ignored raise request for 7+ days
         const quitters: StaffMember[] = [];
         newState.staff = newState.staff.filter(s => {
+          // Low morale quit
           if (s.morale < 20 && Math.random() < 0.1) {
             quitters.push(s);
             return false;
           }
+          // Ignored raise request quit: after 7 days of waiting, 15% daily chance
+          if (s.raiseRequestDay !== null && (newDay - s.raiseRequestDay) >= 7) {
+            if (Math.random() < 0.15) {
+              quitters.push(s);
+              return false;
+            }
+          }
           return true;
         });
         for (const q of quitters) {
-          newState.messageLog = [...newState.messageLog, addMessage(newState, `${q.name} (${q.role}) quit due to low morale!`, '😤', 'warning')].slice(-50);
+          const reason = q.raiseRequestDay !== null ? 'quit over pay!' : 'quit due to low morale!';
+          newState.messageLog = [...newState.messageLog, addMessage(newState, `${q.name} (${q.role}) ${reason}`, '😤', 'warning')].slice(-50);
+        }
+
+        // Auto-refresh hiring pool every 7 days
+        if (newDay - (newState.lastPoolRefresh || 1) >= 7) {
+          newState.hiringPool = generateHiringPool();
+          newState.lastPoolRefresh = newDay;
         }
 
         // Generate daily report
@@ -1020,6 +1141,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (screen.quality !== upgrade.fromQuality) return state;
       if (state.resources.money < upgrade.cost) return state;
       if (screen.upgrading) return state;
+      // Gate: must have at least 2 unlocked screens before upgrading
+      const unlockedScreenCount = state.theatre.screens.filter(s => s.unlocked).length;
+      if (unlockedScreenCount < 2) return state;
 
       return {
         ...state,
@@ -1086,15 +1210,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!template) return state;
 
       const name = staffNames[Math.floor(Math.random() * staffNames.length)];
+      const trait = staffTraits[Math.floor(Math.random() * staffTraits.length)];
       const newStaff: StaffMember = {
         id: `staff-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name,
         role: action.role,
         skill: template.startingSkill,
+        level: 1,
+        experience: 0,
         wage: template.baseWage,
         morale: 60,
         hired: true,
         daysEmployed: 0,
+        trait: trait.id,
+        raiseRequestDay: null,
       };
 
       return {
@@ -1102,6 +1231,77 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         staff: [...state.staff, newStaff],
         stats: { ...state.stats, totalStaffHired: state.stats.totalStaffHired + 1 },
         messageLog: [...state.messageLog, addMessage(state, `Hired ${name} as ${template.name}`, template.icon, 'info')].slice(-50),
+      };
+    }
+
+    case 'HIRE_FROM_POOL': {
+      const candidate = state.hiringPool.find(c => c.id === action.candidateId);
+      if (!candidate) return state;
+      const template = staffTemplates.find(t => t.role === candidate.role);
+      if (!template) return state;
+
+      const newStaff: StaffMember = {
+        id: `staff-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: candidate.name,
+        role: candidate.role,
+        skill: candidate.skill,
+        level: candidate.level,
+        experience: candidate.experience,
+        wage: candidate.minimumWage,
+        morale: candidate.morale,
+        hired: true,
+        daysEmployed: 0,
+        trait: candidate.trait,
+        raiseRequestDay: null,
+      };
+
+      return {
+        ...state,
+        staff: [...state.staff, newStaff],
+        hiringPool: state.hiringPool.filter(c => c.id !== action.candidateId),
+        stats: { ...state.stats, totalStaffHired: state.stats.totalStaffHired + 1 },
+        messageLog: [...state.messageLog, addMessage(state, `Hired ${candidate.name} as ${template.name} (Lv.${candidate.level})`, template.icon, 'success')].slice(-50),
+      };
+    }
+
+    case 'GRANT_RAISE': {
+      const member = state.staff.find(s => s.id === action.staffId);
+      if (!member) return state;
+      const template = staffTemplates.find(t => t.role === member.role);
+      if (!template) return state;
+      const fairWage = getFairWage(template.baseWage, member.level);
+
+      return {
+        ...state,
+        staff: state.staff.map(s =>
+          s.id === action.staffId
+            ? { ...s, wage: fairWage, raiseRequestDay: null, morale: Math.min(100, s.morale + 15) }
+            : s
+        ),
+        messageLog: [...state.messageLog, addMessage(state, `Gave ${member.name} a raise to $${fairWage}/day`, '💰', 'info')].slice(-50),
+      };
+    }
+
+    case 'DENY_RAISE': {
+      const member = state.staff.find(s => s.id === action.staffId);
+      if (!member) return state;
+
+      return {
+        ...state,
+        staff: state.staff.map(s =>
+          s.id === action.staffId
+            ? { ...s, raiseRequestDay: null, morale: Math.max(0, s.morale - 20) }
+            : s
+        ),
+        messageLog: [...state.messageLog, addMessage(state, `Denied ${member.name}'s raise request. They're not happy...`, '😠', 'warning')].slice(-50),
+      };
+    }
+
+    case 'REFRESH_POOL': {
+      return {
+        ...state,
+        hiringPool: generateHiringPool(),
+        lastPoolRefresh: state.time.day,
       };
     }
 
@@ -1153,17 +1353,72 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'UNLOCK_CONCESSION': {
       const item = allConcessions.find(c => c.id === action.itemId);
       if (!item) return state;
-      if (state.theatre.concessionMenu.includes(action.itemId)) return state;
+      if (state.theatre.concessionStock.some(s => s.itemId === action.itemId)) return state;
       if (state.resources.money < item.unlockCost) return state;
+      // Gating: required screens
+      const unlockedScreens = state.theatre.screens.filter(s => s.unlocked).length;
+      if (unlockedScreens < item.requiredScreens) return state;
+      // Gating: required concession workers
+      const concWorkers = countStaffByRole(state.staff, 'concessions');
+      if (concWorkers < item.requiredWorkers) return state;
+
+      const newStock: ConcessionStock = {
+        itemId: item.id,
+        stock: 0,
+        sellingPrice: item.basePrice,
+        totalSold: 0,
+      };
 
       return {
         ...state,
         resources: { ...state.resources, money: state.resources.money - item.unlockCost },
         theatre: {
           ...state.theatre,
-          concessionMenu: [...state.theatre.concessionMenu, action.itemId],
+          concessionStock: [...state.theatre.concessionStock, newStock],
         },
-        messageLog: [...state.messageLog, addMessage(state, `Added ${item.name} to the menu!`, item.icon, 'success')].slice(-50),
+        messageLog: [...state.messageLog, addMessage(state, `Added ${item.name} to the menu! Stock up to start selling.`, item.icon, 'success')].slice(-50),
+      };
+    }
+
+    case 'RESTOCK_CONCESSION': {
+      const item = allConcessions.find(c => c.id === action.itemId);
+      const stockEntry = state.theatre.concessionStock.find(s => s.itemId === action.itemId);
+      if (!item || !stockEntry) return state;
+      const qty = Math.max(1, action.quantity);
+      const totalCost = qty * item.cost;
+      if (state.resources.money < totalCost) return state;
+      // Check storage limit
+      const currentTotal = state.theatre.concessionStock.reduce((sum, s) => sum + s.stock, 0);
+      const maxCanAdd = state.theatre.concessionStand.maxStock - currentTotal;
+      if (maxCanAdd <= 0) return state;
+      const actualQty = Math.min(qty, maxCanAdd);
+      const actualCost = actualQty * item.cost;
+
+      return {
+        ...state,
+        resources: { ...state.resources, money: Math.floor((state.resources.money - actualCost) * 100) / 100 },
+        theatre: {
+          ...state.theatre,
+          concessionStock: state.theatre.concessionStock.map(s =>
+            s.itemId === action.itemId ? { ...s, stock: s.stock + actualQty } : s
+          ),
+        },
+      };
+    }
+
+    case 'SET_CONCESSION_PRICE': {
+      const stockEntry = state.theatre.concessionStock.find(s => s.itemId === action.itemId);
+      if (!stockEntry) return state;
+      const newPrice = Math.max(0.50, Math.min(50, Math.round(action.price * 100) / 100));
+
+      return {
+        ...state,
+        theatre: {
+          ...state.theatre,
+          concessionStock: state.theatre.concessionStock.map(s =>
+            s.itemId === action.itemId ? { ...s, sellingPrice: newPrice } : s
+          ),
+        },
       };
     }
 
@@ -1178,11 +1433,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         theatre: {
           ...state.theatre,
           concessionStand: {
-            capacity: state.theatre.concessionStand.capacity + 25,
+            maxStock: state.theatre.concessionStand.maxStock + 50,
             level: newLevel,
             upgradeCost: Math.floor(cost * 1.8),
           },
         },
+        messageLog: [...state.messageLog, addMessage(state, `Concession stand upgraded! Storage +50 (now ${state.theatre.concessionStand.maxStock + 50})`, '📦', 'success')].slice(-50),
       };
     }
 
@@ -1349,6 +1605,45 @@ export function useGameState() {
         if (merged.reviews === undefined) merged.reviews = [];
         if (merged.overallRating === undefined) merged.overallRating = 3;
         if (merged.dailyCustomerCount === undefined) merged.dailyCustomerCount = 0;
+        // Migrate staff: add new fields if missing
+        if (merged.staff) {
+          merged.staff = merged.staff.map((s: StaffMember) => ({
+            ...s,
+            level: s.level ?? getStaffLevel(s.experience ?? 0),
+            experience: s.experience ?? 0,
+            trait: s.trait ?? staffTraits[Math.floor(Math.random() * staffTraits.length)].id,
+            raiseRequestDay: s.raiseRequestDay ?? null,
+          }));
+        }
+        // Ensure hiring pool exists
+        if (!merged.hiringPool || merged.hiringPool.length === 0) {
+          merged.hiringPool = generateHiringPool();
+        }
+        if (merged.lastPoolRefresh === undefined) merged.lastPoolRefresh = merged.time?.day ?? 1;
+        // Migrate concessionMenu (string[]) → concessionStock (ConcessionStock[])
+        if (parsed.theatre?.concessionMenu && !parsed.theatre?.concessionStock) {
+          merged.theatre.concessionStock = (parsed.theatre.concessionMenu as string[]).map((itemId: string) => {
+            const item = allConcessions.find(c => c.id === itemId);
+            return {
+              itemId,
+              stock: 20,
+              sellingPrice: item?.basePrice ?? 5,
+              totalSold: 0,
+            };
+          });
+        }
+        // Migrate concessionStand: capacity → maxStock
+        if (merged.theatre.concessionStand && merged.theatre.concessionStand.capacity !== undefined && merged.theatre.concessionStand.maxStock === undefined) {
+          merged.theatre.concessionStand = {
+            maxStock: merged.theatre.concessionStand.capacity || 100,
+            level: merged.theatre.concessionStand.level || 0,
+            upgradeCost: merged.theatre.concessionStand.upgradeCost || 1500,
+          };
+        }
+        // Ensure concessionStock exists
+        if (!merged.theatre.concessionStock) {
+          merged.theatre.concessionStock = initial.theatre.concessionStock;
+        }
         return merged;
       } catch {
         return createInitialState();
@@ -1382,10 +1677,16 @@ export function useGameState() {
   const unlockScreen = useCallback((screenId: string) => dispatch({ type: 'UNLOCK_SCREEN', screenId }), []);
   const repairScreen = useCallback((screenId: string) => dispatch({ type: 'REPAIR_SCREEN', screenId }), []);
   const hireStaff = useCallback((role: StaffRole) => dispatch({ type: 'HIRE_STAFF', role }), []);
+  const hireFromPool = useCallback((candidateId: string) => dispatch({ type: 'HIRE_FROM_POOL', candidateId }), []);
   const fireStaff = useCallback((staffId: string) => dispatch({ type: 'FIRE_STAFF', staffId }), []);
+  const grantRaise = useCallback((staffId: string) => dispatch({ type: 'GRANT_RAISE', staffId }), []);
+  const denyRaise = useCallback((staffId: string) => dispatch({ type: 'DENY_RAISE', staffId }), []);
+  const refreshPool = useCallback(() => dispatch({ type: 'REFRESH_POOL' }), []);
   const licenseMovie = useCallback((movieId: string) => dispatch({ type: 'LICENSE_MOVIE', movieId }), []);
   const dropMovie = useCallback((movieId: string) => dispatch({ type: 'DROP_MOVIE', movieId }), []);
   const unlockConcession = useCallback((itemId: string) => dispatch({ type: 'UNLOCK_CONCESSION', itemId }), []);
+  const restockConcession = useCallback((itemId: string, quantity: number) => dispatch({ type: 'RESTOCK_CONCESSION', itemId, quantity }), []);
+  const setConcessionPrice = useCallback((itemId: string, price: number) => dispatch({ type: 'SET_CONCESSION_PRICE', itemId, price }), []);
   const upgradeConcessionStand = useCallback(() => dispatch({ type: 'UPGRADE_CONCESSION_STAND' }), []);
   const purchaseUpgrade = useCallback((upgradeId: string) => dispatch({ type: 'PURCHASE_UPGRADE', upgradeId }), []);
   const purchaseFranchise = useCallback((locationId: string) => dispatch({ type: 'PURCHASE_FRANCHISE', locationId }), []);
@@ -1406,10 +1707,16 @@ export function useGameState() {
     unlockScreen,
     repairScreen,
     hireStaff,
+    hireFromPool,
     fireStaff,
+    grantRaise,
+    denyRaise,
+    refreshPool,
     licenseMovie,
     dropMovie,
     unlockConcession,
+    restockConcession,
+    setConcessionPrice,
     upgradeConcessionStand,
     purchaseUpgrade,
     purchaseFranchise,
