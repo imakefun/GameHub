@@ -10,6 +10,11 @@ const STATIC = import.meta.env.BASE_URL + 'community-levels.json';
 // 2. Use Apps Script: See docs/google-apps-script.js for setup
 const SHEETS_API = import.meta.env.VITE_SHEETS_API || '';
 
+/** True when running on local dev server (not GitHub Pages) */
+function isLocalDev(): boolean {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 /**
  * Error class for API submission errors with details
  */
@@ -24,14 +29,41 @@ export class SubmissionError extends Error {
 }
 
 /**
+ * Parse a single SheetDB row into a SubmittedLevel
+ */
+function parseSheetRow(row: Record<string, unknown>): SubmittedLevel | null {
+  try {
+    if (!row.id) return null;
+    return {
+      id: String(row.id),
+      name: String(row.name || ''),
+      description: String(row.description || ''),
+      rows: Number(row.rows) || 8,
+      cols: Number(row.cols) || 8,
+      grid: typeof row.grid === 'string' ? JSON.parse(row.grid) : (row.grid || []),
+      availableGems: typeof row.availableGems === 'string' ? JSON.parse(row.availableGems) : (row.availableGems || []),
+      objectives: typeof row.objectives === 'string' ? JSON.parse(row.objectives) : (row.objectives || []),
+      maxMoves: Number(row.maxMoves) || 25,
+      starThresholds: typeof row.starThresholds === 'string' ? JSON.parse(row.starThresholds) : (row.starThresholds || [1000, 2000, 3500]),
+      submittedAt: Number(row.submittedAt) || Date.now(),
+    } as SubmittedLevel;
+  } catch {
+    // Skip malformed rows
+    return null;
+  }
+}
+
+/**
  * Fetch all submitted community levels
  */
 export async function fetchSubmittedLevels(): Promise<SubmittedLevel[]> {
-  // Try local API first (dev server)
-  try {
-    const res = await fetch(API);
-    if (res.ok) return res.json();
-  } catch { /* dev server not running */ }
+  // Try local API first (dev server only — skip on GitHub Pages to avoid HTML 404 responses)
+  if (isLocalDev()) {
+    try {
+      const res = await fetch(API);
+      if (res.ok) return await res.json();
+    } catch { /* dev server not running */ }
+  }
 
   // Try Google Sheets API (production on GitHub Pages)
   if (SHEETS_API) {
@@ -39,29 +71,24 @@ export async function fetchSubmittedLevels(): Promise<SubmittedLevel[]> {
       const res = await fetch(SHEETS_API);
       if (res.ok) {
         const data = await res.json();
-        // SheetDB returns array of row objects with string values
-        // Parse JSON fields back to objects
-        return (Array.isArray(data) ? data : []).map((row: Record<string, unknown>) => ({
-          id: String(row.id || ''),
-          name: String(row.name || ''),
-          description: String(row.description || ''),
-          rows: Number(row.rows) || 8,
-          cols: Number(row.cols) || 8,
-          grid: typeof row.grid === 'string' ? JSON.parse(row.grid) : row.grid,
-          availableGems: typeof row.availableGems === 'string' ? JSON.parse(row.availableGems) : row.availableGems,
-          objectives: typeof row.objectives === 'string' ? JSON.parse(row.objectives) : row.objectives,
-          maxMoves: Number(row.maxMoves) || 25,
-          starThresholds: typeof row.starThresholds === 'string' ? JSON.parse(row.starThresholds) : row.starThresholds,
-          submittedAt: Number(row.submittedAt) || Date.now(),
-        })).filter((level: SubmittedLevel) => level.id); // Filter out empty rows
+        const rows = Array.isArray(data) ? data : [];
+        const levels = rows
+          .map((row: Record<string, unknown>) => parseSheetRow(row))
+          .filter((level): level is SubmittedLevel => level !== null);
+        return levels;
       }
-    } catch { /* sheets API failed */ }
+      console.warn('[community-levels] Sheets API returned status:', res.status);
+    } catch (err) {
+      console.warn('[community-levels] Sheets API fetch failed:', err);
+    }
+  } else if (!isLocalDev()) {
+    console.warn('[community-levels] VITE_SHEETS_API is not configured — community levels will not load');
   }
 
   // Fall back to static JSON file
   try {
     const fallback = await fetch(STATIC);
-    if (fallback.ok) return fallback.json();
+    if (fallback.ok) return await fallback.json();
   } catch { /* offline / broken */ }
 
   return [];
@@ -72,32 +99,28 @@ export async function fetchSubmittedLevels(): Promise<SubmittedLevel[]> {
  * Throws SubmissionError with details if validation fails
  */
 export async function submitLevel(level: DesignerLevel): Promise<SubmittedLevel> {
-  // Try local API first (dev server)
-  try {
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(level),
-    });
+  // Try local API first (dev server only)
+  if (isLocalDev()) {
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(level),
+      });
 
-    if (res.ok) {
-      return res.json();
-    }
+      if (res.ok) {
+        return await res.json();
+      }
 
-    // If we got an error response from the local API, handle it
-    if (res.status !== 404 && res.status !== 405) {
       const errorData = await parseErrorResponse(res);
       throw new SubmissionError(
         errorData?.error || `Server error (${res.status})`,
         errorData?.details
       );
+    } catch (err) {
+      if (err instanceof SubmissionError) throw err;
+      // Local API not available — fall through to Sheets
     }
-  } catch (err) {
-    // If it's already a SubmissionError, rethrow it
-    if (err instanceof SubmissionError) {
-      throw err;
-    }
-    // Otherwise, local API not available - try Google Sheets
   }
 
   // Try Google Sheets API (production on GitHub Pages)
@@ -133,7 +156,6 @@ export async function submitLevel(level: DesignerLevel): Promise<SubmittedLevel>
       });
 
       if (res.ok) {
-        // Return the submitted level with generated fields
         return {
           ...level,
           id,
@@ -147,9 +169,7 @@ export async function submitLevel(level: DesignerLevel): Promise<SubmittedLevel>
         errorData?.details
       );
     } catch (err) {
-      if (err instanceof SubmissionError) {
-        throw err;
-      }
+      if (err instanceof SubmissionError) throw err;
       throw new SubmissionError('Failed to submit to Google Sheets. Check your connection.');
     }
   }
@@ -166,12 +186,8 @@ export async function submitLevel(level: DesignerLevel): Promise<SubmittedLevel>
 async function parseErrorResponse(res: Response): Promise<{ error?: string; message?: string; details?: string[] } | null> {
   try {
     const text = await res.text();
-    if (text) {
-      return JSON.parse(text);
-    }
-  } catch {
-    // Response wasn't JSON
-  }
+    if (text) return JSON.parse(text);
+  } catch { /* Response wasn't JSON */ }
   return null;
 }
 
