@@ -88,6 +88,7 @@ interface GameDataContextType {
   isUsingSheets: boolean;
   loadReport: LoadReport | null;
   refresh: () => Promise<void>;
+  disconnect: () => void;
 }
 
 const GameDataContext = createContext<GameDataContextType | null>(null);
@@ -203,6 +204,38 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     await loadData();
   };
 
+  const disconnect = () => {
+    clearCache();
+    setCards(localCardsWithArt);
+    setPacks(localPacks);
+    setExpeditions(localExpeditions);
+    setTypeSynergies(localTypeSynergies);
+    setCrossTypeSynergies(localCrossSynergies);
+    setFeatureUnlocks(localFeatureUnlocks);
+    setCLRewards(localCLRewards);
+    setDailyQuestPool(localDailyQuestPool);
+    setTypeUnlockCL(localTypeUnlockCL);
+    setCryptSlotUnlocks(localCryptSlotUnlocks);
+    setLootTables(localLootTables);
+    setSettings(localSettings);
+    setUpgradeCosts(UPGRADE_COSTS);
+    setUpgradeTierProductionBonus(UPGRADE_TIER_PRODUCTION_BONUS);
+    setTierDuplicateShards(TIER_DUPLICATE_SHARDS);
+    setTypeSpecializations(TYPE_SPECIALIZATIONS);
+    setLcEssenceRate(LC_ESSENCE_RATE);
+    setLcShardsRate(LC_SHARDS_RATE);
+    setWeeklyMilestones(WEEKLY_MILESTONES);
+    setLoginStreakMilestones(LOGIN_STREAK_MILESTONES);
+    setDailyQuestEasyCount(DAILY_QUEST_EASY_COUNT);
+    setDailyQuestHardCount(DAILY_QUEST_HARD_COUNT);
+    setExtraCryptSlotLCCost(EXTRA_CRYPT_SLOT_LC_COST);
+    setMaxPurchasedCryptSlots(MAX_PURCHASED_CRYPT_SLOTS);
+    setEternalDuplicateVoidEnergy(ETERNAL_DUPLICATE_VOID_ENERGY);
+    setIsUsingSheets(false);
+    setError(null);
+    setLoadReport(null);
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -236,7 +269,7 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <GameDataContext.Provider value={{ config, isLoading, error, isUsingSheets, loadReport, refresh }}>
+    <GameDataContext.Provider value={{ config, isLoading, error, isUsingSheets, loadReport, refresh, disconnect }}>
       {children}
     </GameDataContext.Provider>
   );
