@@ -7,6 +7,7 @@ import {
   RotateCcw,
   RefreshCw,
   Cloud,
+  CloudOff,
   Database,
 } from 'lucide-react';
 import type { CardDefinition, CLReward, DailyQuest, CardType, UpgradeTier } from './types';
@@ -31,7 +32,7 @@ import { isNightTime, getLunarPhase } from './hooks/useGameState';
 type Tab = 'crypt' | 'collection' | 'shop' | 'expeditions' | 'grimoire';
 
 function CreaturesGame() {
-  const { config, isLoading, error, isUsingSheets, loadReport, refresh } = useGameData();
+  const { config, isLoading, error, isUsingSheets, loadReport, refresh, disconnect } = useGameData();
   const {
     state,
     collectCard,
@@ -636,9 +637,20 @@ function CreaturesGame() {
                       <span className="text-surface-400">Using local data</span>
                     </>
                   )}
-                  <button onClick={refresh} className="ml-auto p-1.5 hover:bg-white/10 rounded transition-colors">
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
+                  <div className="ml-auto flex items-center gap-1">
+                    {isUsingSheets && (
+                      <button
+                        onClick={disconnect}
+                        title="Disconnect from sheets and use local data"
+                        className="p-1.5 hover:bg-white/10 rounded transition-colors text-surface-400 hover:text-red-400"
+                      >
+                        <CloudOff className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button onClick={refresh} title="Reconnect to sheets" className="p-1.5 hover:bg-white/10 rounded transition-colors">
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 {loadReport && !loadReport.cached && loadReport.entries.length > 0 && (
                   <div className="border-t border-purple-500/10 pt-2 space-y-1">
