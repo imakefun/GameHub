@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type {
   CardDefinition,
+  CardTier,
   CardType,
   PackDefinition,
   ExpeditionZone,
@@ -14,6 +15,26 @@ import type {
   LootTableEntry,
   GameConfig,
   GameSettings,
+  UpgradeTier,
+  UpgradeCost,
+  TypeSpecialization,
+  WeeklyMilestone,
+  LoginStreakMilestone,
+} from '../types';
+import {
+  UPGRADE_COSTS,
+  UPGRADE_TIER_PRODUCTION_BONUS,
+  TIER_DUPLICATE_SHARDS,
+  TYPE_SPECIALIZATIONS,
+  LC_ESSENCE_RATE,
+  LC_SHARDS_RATE,
+  WEEKLY_MILESTONES,
+  LOGIN_STREAK_MILESTONES,
+  DAILY_QUEST_EASY_COUNT,
+  DAILY_QUEST_HARD_COUNT,
+  EXTRA_CRYPT_SLOT_LC_COST,
+  MAX_PURCHASED_CRYPT_SLOTS,
+  ETERNAL_DUPLICATE_VOID_ENERGY,
 } from '../types';
 import { fetchGameData, clearCache } from '../services/sheetsService';
 import type { LoadReport } from '../services/sheetsService';
@@ -84,6 +105,19 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
   const [cryptSlotUnlocks, setCryptSlotUnlocks] = useState<CryptSlotUnlock[]>(localCryptSlotUnlocks);
   const [lootTables, setLootTables] = useState<LootTableEntry[]>(localLootTables);
   const [settings, setSettings] = useState<GameSettings>(localSettings);
+  const [upgradeCosts, setUpgradeCosts] = useState<Record<Exclude<UpgradeTier, 'base'>, UpgradeCost>>(UPGRADE_COSTS);
+  const [upgradeTierProductionBonus, setUpgradeTierProductionBonus] = useState<Record<UpgradeTier, number>>(UPGRADE_TIER_PRODUCTION_BONUS);
+  const [tierDuplicateShards, setTierDuplicateShards] = useState<Record<CardTier, number>>(TIER_DUPLICATE_SHARDS);
+  const [typeSpecializations, setTypeSpecializations] = useState<Record<CardType, TypeSpecialization>>(TYPE_SPECIALIZATIONS);
+  const [lcEssenceRate, setLcEssenceRate] = useState<number>(LC_ESSENCE_RATE);
+  const [lcShardsRate, setLcShardsRate] = useState<number>(LC_SHARDS_RATE);
+  const [weeklyMilestones, setWeeklyMilestones] = useState<WeeklyMilestone[]>(WEEKLY_MILESTONES);
+  const [loginStreakMilestones, setLoginStreakMilestones] = useState<LoginStreakMilestone[]>(LOGIN_STREAK_MILESTONES);
+  const [dailyQuestEasyCount, setDailyQuestEasyCount] = useState<number>(DAILY_QUEST_EASY_COUNT);
+  const [dailyQuestHardCount, setDailyQuestHardCount] = useState<number>(DAILY_QUEST_HARD_COUNT);
+  const [extraCryptSlotLCCost, setExtraCryptSlotLCCost] = useState<number>(EXTRA_CRYPT_SLOT_LC_COST);
+  const [maxPurchasedCryptSlots, setMaxPurchasedCryptSlots] = useState<number>(MAX_PURCHASED_CRYPT_SLOTS);
+  const [eternalDuplicateVoidEnergy, setEternalDuplicateVoidEnergy] = useState<number>(ETERNAL_DUPLICATE_VOID_ENERGY);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUsingSheets, setIsUsingSheets] = useState(false);
@@ -137,6 +171,23 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
         setLootTables(data.lootTables);
       }
       setSettings(data.settings);
+      if (data.upgradeTiers) {
+        setUpgradeCosts(data.upgradeTiers.upgradeCosts);
+        setUpgradeTierProductionBonus(data.upgradeTiers.upgradeTierProductionBonus);
+        setTierDuplicateShards(data.upgradeTiers.tierDuplicateShards);
+      }
+      if (data.typeSpecializations) {
+        setTypeSpecializations(data.typeSpecializations);
+      }
+      if (data.lcEssenceRate != null) setLcEssenceRate(data.lcEssenceRate);
+      if (data.lcShardsRate != null) setLcShardsRate(data.lcShardsRate);
+      if (data.weeklyMilestones && data.weeklyMilestones.length > 0) setWeeklyMilestones(data.weeklyMilestones);
+      if (data.loginStreakMilestones && data.loginStreakMilestones.length > 0) setLoginStreakMilestones(data.loginStreakMilestones);
+      if (data.dailyQuestEasyCount != null) setDailyQuestEasyCount(data.dailyQuestEasyCount);
+      if (data.dailyQuestHardCount != null) setDailyQuestHardCount(data.dailyQuestHardCount);
+      if (data.extraCryptSlotLCCost != null) setExtraCryptSlotLCCost(data.extraCryptSlotLCCost);
+      if (data.maxPurchasedCryptSlots != null) setMaxPurchasedCryptSlots(data.maxPurchasedCryptSlots);
+      if (data.eternalDuplicateVoidEnergy != null) setEternalDuplicateVoidEnergy(data.eternalDuplicateVoidEnergy);
       setIsUsingSheets(true);
     } catch (err) {
       console.error('[Creatures] Using local data:', err);
@@ -169,6 +220,19 @@ export function GameDataProvider({ children }: { children: ReactNode }) {
     cryptSlotUnlocks,
     lootTables,
     settings,
+    upgradeCosts,
+    upgradeTierProductionBonus,
+    tierDuplicateShards,
+    typeSpecializations,
+    lcEssenceRate,
+    lcShardsRate,
+    weeklyMilestones,
+    loginStreakMilestones,
+    dailyQuestEasyCount,
+    dailyQuestHardCount,
+    extraCryptSlotLCCost,
+    maxPurchasedCryptSlots,
+    eternalDuplicateVoidEnergy,
   };
 
   return (

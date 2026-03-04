@@ -262,6 +262,7 @@ export interface CLReward {
 export interface DailyQuest {
   id: string;
   description: string;
+  triggerType: string;  // what game action triggers progress (e.g. 'collect_card', 'upgrade', 'open_pack')
   target: number;
   difficulty: 'easy' | 'hard';
   rewards: {
@@ -270,6 +271,46 @@ export interface DailyQuest {
     lunarCrystals?: number;
   };
 }
+
+// --- Weekly Challenge Milestone ---
+export interface WeeklyMilestone {
+  quests: number;
+  rewards: {
+    shadowEssence?: number;
+    soulShards?: number;
+    lunarCrystals?: number;
+    tome?: string;
+  };
+}
+
+export const WEEKLY_MILESTONES: WeeklyMilestone[] = [
+  { quests: 5, rewards: { tome: 'standard-tome' } },
+  { quests: 10, rewards: { soulShards: 100, tome: 'standard-tome' } },
+  { quests: 15, rewards: { soulShards: 200, tome: 'enhanced-tome' } },
+  { quests: 20, rewards: { lunarCrystals: 3, tome: 'premium-tome' } },
+  { quests: 25, rewards: { lunarCrystals: 5, tome: 'premium-tome' } },
+];
+
+// --- Login Streak Milestone ---
+export interface LoginStreakMilestone {
+  days: number;
+  lunarCrystals: number;
+}
+
+export const LOGIN_STREAK_MILESTONES: LoginStreakMilestone[] = [
+  { days: 7, lunarCrystals: 5 },
+  { days: 14, lunarCrystals: 5 },
+  { days: 30, lunarCrystals: 15 },
+  { days: 60, lunarCrystals: 20 },
+  { days: 90, lunarCrystals: 30 },
+];
+
+// --- Quest / Economy defaults ---
+export const DAILY_QUEST_EASY_COUNT = 4;
+export const DAILY_QUEST_HARD_COUNT = 2;
+export const EXTRA_CRYPT_SLOT_LC_COST = 15;
+export const MAX_PURCHASED_CRYPT_SLOTS = 3;
+export const ETERNAL_DUPLICATE_VOID_ENERGY = 10;
 
 // --- Active Expedition ---
 export interface ActiveExpedition {
@@ -410,6 +451,21 @@ export interface GameConfig {
   cryptSlotUnlocks: CryptSlotUnlock[];
   lootTables: LootTableEntry[];
   settings: GameSettings;
+  // Economy config (sheet-overridable)
+  upgradeCosts: Record<Exclude<UpgradeTier, 'base'>, UpgradeCost>;
+  upgradeTierProductionBonus: Record<UpgradeTier, number>;
+  tierDuplicateShards: Record<CardTier, number>;
+  typeSpecializations: Record<CardType, TypeSpecialization>;
+  lcEssenceRate: number;
+  lcShardsRate: number;
+  // Milestones & misc economy (sheet-overridable)
+  weeklyMilestones: WeeklyMilestone[];
+  loginStreakMilestones: LoginStreakMilestone[];
+  dailyQuestEasyCount: number;
+  dailyQuestHardCount: number;
+  extraCryptSlotLCCost: number;
+  maxPurchasedCryptSlots: number;
+  eternalDuplicateVoidEnergy: number;
 }
 
 export interface GameSettings {

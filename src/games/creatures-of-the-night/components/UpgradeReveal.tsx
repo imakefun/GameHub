@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { CardDefinition, UpgradeTier } from '../types';
+import type { CardDefinition, UpgradeTier, GameConfig } from '../types';
 import {
   UPGRADE_TIER_COLORS,
   UPGRADE_TIER_LABELS,
-  UPGRADE_COSTS,
   CARD_TYPE_INFO,
 } from '../types';
 
@@ -13,13 +12,14 @@ interface UpgradeRevealProps {
   fromTier: UpgradeTier;
   toTier: Exclude<UpgradeTier, 'base'>;
   onDismiss: () => void;
+  config: GameConfig;
 }
 
-export function UpgradeReveal({ card, fromTier, toTier, onDismiss }: UpgradeRevealProps) {
+export function UpgradeReveal({ card, fromTier, toTier, onDismiss, config }: UpgradeRevealProps) {
   const [phase, setPhase] = useState<'charge' | 'transform' | 'complete'>('charge');
   const fromColor = UPGRADE_TIER_COLORS[fromTier];
   const toColor = UPGRADE_TIER_COLORS[toTier];
-  const clGain = UPGRADE_COSTS[toTier].clGain;
+  const clGain = config.upgradeCosts[toTier].clGain;
   const typeInfo = CARD_TYPE_INFO[card.type];
 
   useEffect(() => {

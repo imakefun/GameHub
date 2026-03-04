@@ -16,11 +16,28 @@ import type {
   DailyQuest,
   LootTableEntry,
   GameSettings,
+  UpgradeTier,
+  UpgradeCost,
+  TypeSpecialization,
+  WeeklyMilestone,
+  LoginStreakMilestone,
+} from '../types';
+import {
+  UPGRADE_COSTS,
+  UPGRADE_TIER_PRODUCTION_BONUS,
+  TIER_DUPLICATE_SHARDS,
+  TYPE_SPECIALIZATIONS,
 } from '../types';
 
 // ============================================================
 // Cache
 // ============================================================
+
+interface UpgradeTiersData {
+  upgradeCosts: Record<Exclude<UpgradeTier, 'base'>, UpgradeCost>;
+  upgradeTierProductionBonus: Record<UpgradeTier, number>;
+  tierDuplicateShards: Record<CardTier, number>;
+}
 
 interface SheetsCache {
   cards: CardDefinition[] | null;
@@ -35,6 +52,17 @@ interface SheetsCache {
   cryptSlotUnlocks: CryptSlotUnlock[] | null;
   lootTables: LootTableEntry[] | null;
   settings: GameSettings | null;
+  upgradeTiers: UpgradeTiersData | null;
+  typeSpecializations: Record<CardType, TypeSpecialization> | null;
+  lcEssenceRate: number | null;
+  lcShardsRate: number | null;
+  weeklyMilestones: WeeklyMilestone[] | null;
+  loginStreakMilestones: LoginStreakMilestone[] | null;
+  dailyQuestEasyCount: number | null;
+  dailyQuestHardCount: number | null;
+  extraCryptSlotLCCost: number | null;
+  maxPurchasedCryptSlots: number | null;
+  eternalDuplicateVoidEnergy: number | null;
   lastFetch: number;
 }
 
@@ -53,6 +81,17 @@ const cache: SheetsCache = {
   cryptSlotUnlocks: null,
   lootTables: null,
   settings: null,
+  upgradeTiers: null,
+  typeSpecializations: null,
+  lcEssenceRate: null,
+  lcShardsRate: null,
+  weeklyMilestones: null,
+  loginStreakMilestones: null,
+  dailyQuestEasyCount: null,
+  dailyQuestHardCount: null,
+  extraCryptSlotLCCost: null,
+  maxPurchasedCryptSlots: null,
+  eternalDuplicateVoidEnergy: null,
   lastFetch: 0,
 };
 
@@ -227,6 +266,7 @@ function parseDailyQuests(rows: Record<string, string>[]): DailyQuest[] {
     .map((row) => ({
       id: row['id'] || '',
       description: row['description'] || '',
+      triggerType: row['triggerType'] || '',
       target: parseInt(row['target'] || '1'),
       difficulty: (row['difficulty'] || 'easy') as DailyQuest['difficulty'],
       rewards: {
@@ -235,24 +275,73 @@ function parseDailyQuests(rows: Record<string, string>[]): DailyQuest[] {
         lunarCrystals: row['rewardLC'] ? parseInt(row['rewardLC']) : undefined,
       },
     }))
-    .filter((q) => q.id && q.description);
+    .filter((q) => q.id && q.description && q.triggerType);
 }
 
-function parseSettings(rows: Record<string, string>[]): GameSettings {
-  const settings = { ...DEFAULT_SETTINGS };
+interface ParsedSettings {
+  settings: GameSettings;
+  lcEssenceRate: number | null;
+  lcShardsRate: number | null;
+  dailyQuestEasyCount: number | null;
+  dailyQuestHardCount: number | null;
+  extraCryptSlotLCCost: number | null;
+  maxPurchasedCryptSlots: number | null;
+  eternalDuplicateVoidEnergy: number | null;
+}
+
+// Maps lowercase key to ParsedSettings field name (for non-GameSettings keys)
+const SETTINGS_KEY_MAP: Record<string, keyof Omit<ParsedSettings, 'settings'>> = {
+  'lcessencerate': 'lcEssenceRate',
+  'lc_essence_rate': 'lcEssenceRate',
+  'lcshardsrate': 'lcShardsRate',
+  'lc_shards_rate': 'lcShardsRate',
+  'dailyquesteasycount': 'dailyQuestEasyCount',
+  'daily_quest_easy_count': 'dailyQuestEasyCount',
+  'dailyquesthardcount': 'dailyQuestHardCount',
+  'daily_quest_hard_count': 'dailyQuestHardCount',
+  'extracryptslotlccost': 'extraCryptSlotLCCost',
+  'extra_crypt_slot_lc_cost': 'extraCryptSlotLCCost',
+  'maxpurchasedcryptslots': 'maxPurchasedCryptSlots',
+  'max_purchased_crypt_slots': 'maxPurchasedCryptSlots',
+  'eternalduplicatevoidenergy': 'eternalDuplicateVoidEnergy',
+  'eternal_duplicate_void_energy': 'eternalDuplicateVoidEnergy',
+};
+
+function parseSettings(rows: Record<string, string>[]): ParsedSettings {
+  const result: ParsedSettings = {
+    settings: { ...DEFAULT_SETTINGS },
+    lcEssenceRate: null,
+    lcShardsRate: null,
+    dailyQuestEasyCount: null,
+    dailyQuestHardCount: null,
+    extraCryptSlotLCCost: null,
+    maxPurchasedCryptSlots: null,
+    eternalDuplicateVoidEnergy: null,
+  };
+
   rows.forEach((row) => {
-    const key = row['key']?.toLowerCase().trim();
+    const key = row['key']?.trim();
+    const keyLower = key?.toLowerCase();
     const value = row['value'];
     if (!key || !value) return;
 
-    if (key in settings) {
+    // Check non-GameSettings keys (case-insensitive)
+    const mapped = keyLower ? SETTINGS_KEY_MAP[keyLower] : undefined;
+    if (mapped) {
+      const num = parseFloat(value);
+      if (!isNaN(num)) (result as unknown as Record<string, number | null>)[mapped] = num;
+      return;
+    }
+
+    // Standard settings (case-sensitive keys matching GameSettings)
+    if (key in result.settings) {
       const num = parseFloat(value);
       if (!isNaN(num)) {
-        (settings as Record<string, number>)[key] = num;
+        (result.settings as unknown as Record<string, number>)[key] = num;
       }
     }
   });
-  return settings;
+  return result;
 }
 
 function parseCLRewards(rows: Record<string, string>[]): CLReward[] {
@@ -332,6 +421,153 @@ function parseLootTables(rows: Record<string, string>[]): LootTableEntry[] {
 }
 
 // ============================================================
+// UpgradeTiers parser — combines upgrade costs, production bonus, duplicate shards
+// Expected columns: tier, shadowEssence, shards, clGain, productionBonus, duplicateShards
+// ============================================================
+
+const UPGRADE_TIER_LIST: Exclude<UpgradeTier, 'base'>[] = ['twilight', 'dusk', 'midnight', 'umbral', 'eternal', 'cosmic'];
+const CARD_TIER_LIST: CardTier[] = ['twilight', 'dusk', 'midnight', 'umbral', 'eternal'];
+
+function parseUpgradeTiers(rows: Record<string, string>[]): UpgradeTiersData | null {
+  if (rows.length === 0) return null;
+
+  const costs = { ...UPGRADE_COSTS };
+  const prodBonus: Record<string, number> = {};
+  const dupShards: Record<string, number> = {};
+
+  // Seed defaults
+  for (const tier of Object.keys(UPGRADE_TIER_PRODUCTION_BONUS)) {
+    prodBonus[tier] = UPGRADE_TIER_PRODUCTION_BONUS[tier as UpgradeTier];
+  }
+  for (const tier of Object.keys(TIER_DUPLICATE_SHARDS)) {
+    dupShards[tier] = TIER_DUPLICATE_SHARDS[tier as CardTier];
+  }
+
+  for (const row of rows) {
+    const tier = (row['tier'] || '').trim().toLowerCase();
+    if (!tier) continue;
+
+    // Upgrade costs (only non-base tiers)
+    if (UPGRADE_TIER_LIST.includes(tier as Exclude<UpgradeTier, 'base'>)) {
+      const t = tier as Exclude<UpgradeTier, 'base'>;
+      costs[t] = {
+        shadowEssence: row['shadowEssence'] ? parseInt(row['shadowEssence']) : costs[t].shadowEssence,
+        shards: row['shards'] ? parseInt(row['shards']) : costs[t].shards,
+        clGain: row['clGain'] ? parseInt(row['clGain']) : costs[t].clGain,
+      };
+    }
+
+    // Production bonus (all tiers including base)
+    if (row['productionBonus']) {
+      prodBonus[tier] = parseFloat(row['productionBonus']);
+    }
+
+    // Duplicate shards (card tiers only, not upgrade tiers)
+    if (row['duplicateShards'] && CARD_TIER_LIST.includes(tier as CardTier)) {
+      dupShards[tier] = parseInt(row['duplicateShards']);
+    }
+  }
+
+  return {
+    upgradeCosts: costs,
+    upgradeTierProductionBonus: prodBonus as Record<UpgradeTier, number>,
+    tierDuplicateShards: dupShards as Record<CardTier, number>,
+  };
+}
+
+// ============================================================
+// TypeSpecializations parser
+// Expected columns: type, amountMultiplier, intervalMultiplier,
+//   nightAmountMultiplier, nightIntervalMultiplier, doubleChance,
+//   failChance, randomVariance, fullMoonBonus
+// ============================================================
+
+function parseTypeSpecializations(rows: Record<string, string>[]): Record<CardType, TypeSpecialization> | null {
+  if (rows.length === 0) return null;
+
+  // Start from defaults
+  const result: Record<string, TypeSpecialization> = {};
+  for (const [type, spec] of Object.entries(TYPE_SPECIALIZATIONS)) {
+    result[type] = { ...spec };
+  }
+
+  for (const row of rows) {
+    const type = (row['type'] || '').trim().toLowerCase();
+    if (!type || !(type in result)) continue;
+
+    const spec: TypeSpecialization = {
+      amountMultiplier: row['amountMultiplier'] ? parseFloat(row['amountMultiplier']) : result[type].amountMultiplier,
+      intervalMultiplier: row['intervalMultiplier'] ? parseFloat(row['intervalMultiplier']) : result[type].intervalMultiplier,
+    };
+
+    if (row['nightAmountMultiplier']) spec.nightAmountMultiplier = parseFloat(row['nightAmountMultiplier']);
+    else if (result[type].nightAmountMultiplier) spec.nightAmountMultiplier = result[type].nightAmountMultiplier;
+
+    if (row['nightIntervalMultiplier']) spec.nightIntervalMultiplier = parseFloat(row['nightIntervalMultiplier']);
+    else if (result[type].nightIntervalMultiplier) spec.nightIntervalMultiplier = result[type].nightIntervalMultiplier;
+
+    if (row['doubleChance']) spec.doubleChance = parseFloat(row['doubleChance']);
+    else if (result[type].doubleChance) spec.doubleChance = result[type].doubleChance;
+
+    if (row['failChance']) spec.failChance = parseFloat(row['failChance']);
+    else if (result[type].failChance) spec.failChance = result[type].failChance;
+
+    if (row['randomVariance']) spec.randomVariance = parseFloat(row['randomVariance']);
+    else if (result[type].randomVariance) spec.randomVariance = result[type].randomVariance;
+
+    if (row['fullMoonBonus']) spec.fullMoonBonus = parseFloat(row['fullMoonBonus']);
+    else if (result[type].fullMoonBonus) spec.fullMoonBonus = result[type].fullMoonBonus;
+
+    result[type] = spec;
+  }
+
+  return result as Record<CardType, TypeSpecialization>;
+}
+
+// ============================================================
+// WeeklyMilestones parser
+// Expected columns: quests, rewardSE, rewardSS, rewardLC, rewardTome
+// ============================================================
+
+function parseWeeklyMilestones(rows: Record<string, string>[]): WeeklyMilestone[] | null {
+  if (rows.length === 0) return null;
+
+  const milestones = rows
+    .map((row) => ({
+      quests: parseInt(row['quests'] || '0'),
+      rewards: {
+        shadowEssence: row['rewardSE'] ? parseInt(row['rewardSE']) : undefined,
+        soulShards: row['rewardSS'] ? parseInt(row['rewardSS']) : undefined,
+        lunarCrystals: row['rewardLC'] ? parseInt(row['rewardLC']) : undefined,
+        tome: row['rewardTome'] || undefined,
+      },
+    }))
+    .filter((m) => m.quests > 0)
+    .sort((a, b) => a.quests - b.quests);
+
+  return milestones.length > 0 ? milestones : null;
+}
+
+// ============================================================
+// LoginStreakMilestones parser
+// Expected columns: days, lunarCrystals
+// ============================================================
+
+function parseLoginStreakMilestones(rows: Record<string, string>[]): LoginStreakMilestone[] | null {
+  if (rows.length === 0) return null;
+
+  const milestones = rows
+    .map((row) => ({
+      days: parseInt(row['days'] || '0'),
+      lunarCrystals: parseInt(row['lunarCrystals'] || '0'),
+    }))
+    .filter((m) => m.days > 0 && m.lunarCrystals > 0)
+    .sort((a, b) => a.days - b.days);
+
+  return milestones.length > 0 ? milestones : null;
+}
+
+// ============================================================
 // Public API
 // ============================================================
 
@@ -360,6 +596,17 @@ export interface GameSheetData {
   cryptSlotUnlocks: CryptSlotUnlock[] | null;
   lootTables: LootTableEntry[] | null;
   settings: GameSettings;
+  upgradeTiers: UpgradeTiersData | null;
+  typeSpecializations: Record<CardType, TypeSpecialization> | null;
+  lcEssenceRate: number | null;
+  lcShardsRate: number | null;
+  weeklyMilestones: WeeklyMilestone[] | null;
+  loginStreakMilestones: LoginStreakMilestone[] | null;
+  dailyQuestEasyCount: number | null;
+  dailyQuestHardCount: number | null;
+  extraCryptSlotLCCost: number | null;
+  maxPurchasedCryptSlots: number | null;
+  eternalDuplicateVoidEnergy: number | null;
   loadReport: LoadReport;
 }
 
@@ -383,6 +630,17 @@ export async function fetchGameData(): Promise<GameSheetData> {
       cryptSlotUnlocks: cache.cryptSlotUnlocks,
       lootTables: cache.lootTables,
       settings: cache.settings,
+      upgradeTiers: cache.upgradeTiers,
+      typeSpecializations: cache.typeSpecializations,
+      lcEssenceRate: cache.lcEssenceRate,
+      lcShardsRate: cache.lcShardsRate,
+      weeklyMilestones: cache.weeklyMilestones,
+      loginStreakMilestones: cache.loginStreakMilestones,
+      dailyQuestEasyCount: cache.dailyQuestEasyCount,
+      dailyQuestHardCount: cache.dailyQuestHardCount,
+      extraCryptSlotLCCost: cache.extraCryptSlotLCCost,
+      maxPurchasedCryptSlots: cache.maxPurchasedCryptSlots,
+      eternalDuplicateVoidEnergy: cache.eternalDuplicateVoidEnergy,
       loadReport: { entries: [], cached: true },
     };
   }
@@ -407,6 +665,10 @@ export async function fetchGameData(): Promise<GameSheetData> {
       clConfigRows,
       settingsRows,
       lootTableRows,
+      upgradeTierRows,
+      typeSpecRows,
+      weeklyMilestoneRows,
+      loginStreakRows,
     ] = await Promise.all([
       fetchSheet(SHEETS_CONFIG.sheets.cards),
       fetchSheet(SHEETS_CONFIG.sheets.packs).catch((e: Error) => { errors['Packs'] = e.message; return []; }),
@@ -419,6 +681,10 @@ export async function fetchGameData(): Promise<GameSheetData> {
       fetchSheet(SHEETS_CONFIG.sheets.clConfig).catch((e: Error) => { errors['CL Config'] = e.message; return []; }),
       fetchSheet(SHEETS_CONFIG.sheets.settings).catch((e: Error) => { errors['Settings'] = e.message; return []; }),
       fetchSheet(SHEETS_CONFIG.sheets.lootTables).catch((e: Error) => { errors['Loot Tables'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.upgradeTiers).catch((e: Error) => { errors['Upgrade Tiers'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.typeSpecializations).catch((e: Error) => { errors['Type Specializations'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.weeklyMilestones).catch((e: Error) => { errors['Weekly Milestones'] = e.message; return []; }),
+      fetchSheet(SHEETS_CONFIG.sheets.loginStreakMilestones).catch((e: Error) => { errors['Login Streak Milestones'] = e.message; return []; }),
     ]);
 
     const cards = parseCards(cardRows);
@@ -431,7 +697,11 @@ export async function fetchGameData(): Promise<GameSheetData> {
     const featureUnlocks = featureUnlockRows.length > 0 ? parseFeatureUnlocks(featureUnlockRows) : null;
     const clConfig = clConfigRows.length > 0 ? parseCLConfig(clConfigRows) : { typeUnlockCL: null, cryptSlotUnlocks: null };
     const lootTables = lootTableRows.length > 0 ? parseLootTables(lootTableRows) : null;
-    const settings = parseSettings(settingsRows);
+    const settingsParsed = parseSettings(settingsRows);
+    const upgradeTiers = parseUpgradeTiers(upgradeTierRows);
+    const typeSpecs = parseTypeSpecializations(typeSpecRows);
+    const weeklyMilestones = parseWeeklyMilestones(weeklyMilestoneRows);
+    const loginStreakMilestones = parseLoginStreakMilestones(loginStreakRows);
 
     // Build load report
     const track = (name: string, parsed: unknown[] | null, rawRows: unknown[]) => {
@@ -446,6 +716,19 @@ export async function fetchGameData(): Promise<GameSheetData> {
       }
     };
 
+    // trackObj for single-object results (not arrays)
+    const trackObj = (name: string, parsed: unknown, rawRows: unknown[]) => {
+      if (errors[name]) {
+        entries.push({ name, count: 0, source: 'local', error: errors[name] });
+      } else if (parsed) {
+        entries.push({ name, count: rawRows.length, source: 'sheets' });
+      } else if (rawRows.length === 0) {
+        entries.push({ name, count: 0, source: 'local' });
+      } else {
+        entries.push({ name, count: 0, source: 'local', error: `${rawRows.length} rows fetched but parse returned null` });
+      }
+    };
+
     track('Cards', cards.length > 0 ? cards : null, cardRows);
     track('Packs', packs, packRows);
     track('Expeditions', expeditions, expeditionRows);
@@ -456,6 +739,10 @@ export async function fetchGameData(): Promise<GameSheetData> {
     track('Feature Unlocks', featureUnlocks, featureUnlockRows);
     track('CL Config', clConfig.typeUnlockCL ? Object.keys(clConfig.typeUnlockCL) : null, clConfigRows);
     track('Loot Tables', lootTables, lootTableRows);
+    trackObj('Upgrade Tiers', upgradeTiers, upgradeTierRows);
+    trackObj('Type Specializations', typeSpecs, typeSpecRows);
+    track('Weekly Milestones', weeklyMilestones, weeklyMilestoneRows);
+    track('Login Streak Milestones', loginStreakMilestones, loginStreakRows);
 
     cache.cards = cards;
     cache.packs = packs;
@@ -468,7 +755,18 @@ export async function fetchGameData(): Promise<GameSheetData> {
     cache.typeUnlockCL = clConfig.typeUnlockCL;
     cache.cryptSlotUnlocks = clConfig.cryptSlotUnlocks;
     cache.lootTables = lootTables;
-    cache.settings = settings;
+    cache.settings = settingsParsed.settings;
+    cache.upgradeTiers = upgradeTiers;
+    cache.typeSpecializations = typeSpecs;
+    cache.lcEssenceRate = settingsParsed.lcEssenceRate;
+    cache.lcShardsRate = settingsParsed.lcShardsRate;
+    cache.weeklyMilestones = weeklyMilestones;
+    cache.loginStreakMilestones = loginStreakMilestones;
+    cache.dailyQuestEasyCount = settingsParsed.dailyQuestEasyCount;
+    cache.dailyQuestHardCount = settingsParsed.dailyQuestHardCount;
+    cache.extraCryptSlotLCCost = settingsParsed.extraCryptSlotLCCost;
+    cache.maxPurchasedCryptSlots = settingsParsed.maxPurchasedCryptSlots;
+    cache.eternalDuplicateVoidEnergy = settingsParsed.eternalDuplicateVoidEnergy;
     cache.lastFetch = now;
 
     const report: LoadReport = { entries, cached: false };
@@ -487,7 +785,18 @@ export async function fetchGameData(): Promise<GameSheetData> {
       typeUnlockCL: clConfig.typeUnlockCL,
       cryptSlotUnlocks: clConfig.cryptSlotUnlocks,
       lootTables,
-      settings,
+      settings: settingsParsed.settings,
+      upgradeTiers,
+      typeSpecializations: typeSpecs,
+      lcEssenceRate: settingsParsed.lcEssenceRate,
+      lcShardsRate: settingsParsed.lcShardsRate,
+      weeklyMilestones,
+      loginStreakMilestones,
+      dailyQuestEasyCount: settingsParsed.dailyQuestEasyCount,
+      dailyQuestHardCount: settingsParsed.dailyQuestHardCount,
+      extraCryptSlotLCCost: settingsParsed.extraCryptSlotLCCost,
+      maxPurchasedCryptSlots: settingsParsed.maxPurchasedCryptSlots,
+      eternalDuplicateVoidEnergy: settingsParsed.eternalDuplicateVoidEnergy,
       loadReport: report,
     };
   } catch (error) {
@@ -509,6 +818,17 @@ export function clearCache(): void {
   cache.cryptSlotUnlocks = null;
   cache.lootTables = null;
   cache.settings = null;
+  cache.upgradeTiers = null;
+  cache.typeSpecializations = null;
+  cache.lcEssenceRate = null;
+  cache.lcShardsRate = null;
+  cache.weeklyMilestones = null;
+  cache.loginStreakMilestones = null;
+  cache.dailyQuestEasyCount = null;
+  cache.dailyQuestHardCount = null;
+  cache.extraCryptSlotLCCost = null;
+  cache.maxPurchasedCryptSlots = null;
+  cache.eternalDuplicateVoidEnergy = null;
   cache.lastFetch = 0;
 }
 

@@ -21,8 +21,6 @@ function formatNumber(n: number): string {
   return Math.floor(n).toString();
 }
 
-const MAX_PURCHASED = 3;
-const SLOT_LC_COST = 15;
 
 export function CryptBoard({
   ownedCards,
@@ -156,17 +154,17 @@ export function CryptBoard({
       )}
 
       {/* Buy extra crypt slot */}
-      {purchasedCryptSlots < MAX_PURCHASED && (
+      {purchasedCryptSlots < config.maxPurchasedCryptSlots && (
         <button
           onClick={onBuyCryptSlot}
-          disabled={lunarCrystals < SLOT_LC_COST}
+          disabled={lunarCrystals < config.extraCryptSlotLCCost}
           className={`w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-            lunarCrystals >= SLOT_LC_COST
+            lunarCrystals >= config.extraCryptSlotLCCost
               ? 'border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300'
               : 'border-surface-700 bg-surface-800/30 text-surface-500 cursor-not-allowed'
           }`}
         >
-          Buy Extra Slot ({SLOT_LC_COST} 🌙) &mdash; {purchasedCryptSlots}/{MAX_PURCHASED} purchased
+          Buy Extra Slot ({config.extraCryptSlotLCCost} 🌙) &mdash; {purchasedCryptSlots}/{config.maxPurchasedCryptSlots} purchased
         </button>
       )}
 
