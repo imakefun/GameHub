@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import type { CardDefinition, CLReward, DailyQuest, CardType, UpgradeTier } from './types';
 import { CARD_TYPE_INFO } from './types';
-import { useGameState } from './hooks/useGameState';
+import { useGameState, STORAGE_KEY } from './hooks/useGameState';
 import { Filter, ArrowUpDown } from 'lucide-react';
 import { useGameData, GameDataProvider } from './context/GameDataContext';
 import { ResourceBar } from './components/ResourceBar';
@@ -245,6 +245,18 @@ function CreaturesGame() {
             🌑
           </motion.div>
           <p className="text-purple-300">Awakening the creatures...</p>
+          <button
+            onClick={() => {
+              if (confirm('Reset all progress? This cannot be undone!')) {
+                localStorage.removeItem(STORAGE_KEY);
+                window.location.reload();
+              }
+            }}
+            className="mt-6 flex items-center gap-2 px-4 py-2 mx-auto bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reset Progress
+          </button>
         </div>
       </div>
     );

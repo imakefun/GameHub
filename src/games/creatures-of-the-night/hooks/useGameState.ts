@@ -18,7 +18,7 @@ import {
   UPGRADE_TIER_PRODUCTION_BONUS,
 } from '../types';
 
-const STORAGE_KEY = 'creatures-of-the-night-save';
+export const STORAGE_KEY = 'creatures-of-the-night-save';
 
 // ============================================================
 // Exported Helpers
