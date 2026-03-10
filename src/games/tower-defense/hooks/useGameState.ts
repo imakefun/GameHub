@@ -302,7 +302,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const result = tick(state, action.dt, level);
 
       // Check if wave is complete (no enemies left, no spawns left, wave was active)
-      let waveActive = state.waveActive;
+      let waveActive: boolean = state.waveActive;
       if (result.spawnQueue.length === 0 && result.enemies.filter(e => e.alive).length === 0 && !state.allWavesSpawned) {
         waveActive = false;
       }
