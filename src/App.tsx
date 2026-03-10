@@ -13,6 +13,7 @@ import { AdminPanel } from './games/creatures-of-the-night/components/AdminPanel
 import ForageOrDie from './games/forage-or-die/ForageOrDie';
 import { TheatreSim } from './games/theatre-sim/TheatreSim';
 import { TheatreAdmin } from './games/theatre-sim/admin/TheatreAdmin';
+import { TowerDefense } from './games/tower-defense/TowerDefense';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="/play/forage-or-die" element={<ForageOrDie />} />
         <Route path="/play/theatre-sim" element={<TheatreSim />} />
         <Route path="/play/theatre-sim/admin" element={<TheatreAdmin />} />
+        <Route path="/play/tower-defense" element={<TowerDefense />} />
       </Routes>
     </HashRouter>
   );
