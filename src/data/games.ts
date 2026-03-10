@@ -255,6 +255,20 @@ export const games: Game[] = [
     difficulty: 'medium',
     playUrl: '/play/theatre-sim',
   },
+  {
+    id: 'tower-defense',
+    title: 'Tower Defense: Kingdom Guardians',
+    description: 'Defend your kingdom across 45+ levels in 6 unique worlds! Place towers, upgrade them, and defeat waves of cute but dangerous enemies. Features a saga-style world map and built-in level editor.',
+    thumbnail: 'https://images.unsplash.com/photo-1519074069444-1ba4fff66d16?w=400&h=300&fit=crop',
+    category: 'strategy',
+    tags: ['tower-defense', 'strategy', 'mobile', 'casual', 'puzzle'],
+    playCount: 0,
+    rating: 5.0,
+    featured: true,
+    createdAt: '2026-03-10',
+    difficulty: 'medium',
+    playUrl: '/play/tower-defense',
+  },
 ];
 
 export const leaderboards: Record<string, LeaderboardEntry[]> = {
