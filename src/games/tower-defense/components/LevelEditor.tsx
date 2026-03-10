@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import type { EditorState, EditorTool, WorldTheme, WaveGroup, EnemyId } from '../types';
 import { ENEMY_LIST } from '../data/enemies';
 

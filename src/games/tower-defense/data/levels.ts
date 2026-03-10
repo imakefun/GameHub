@@ -1,4 +1,4 @@
-import type { LevelDef, GridCell, PathPoint, Wave, WorldTheme } from '../types';
+import type { LevelDef, GridCell, PathPoint, Wave, WaveGroup, WorldTheme } from '../types';
 
 // Helper to create a grid
 function makeGrid(rows: number, cols: number, pathCoords: [number, number][], startCoord: [number, number], endCoord: [number, number]): GridCell[][] {
@@ -28,7 +28,7 @@ function w(enemyId: string, count: number, interval = 800, delay = 0, hpMult = 1
   return { enemyId: enemyId as any, count, interval, delay, hpMultiplier: hpMult, speedMultiplier: speedMult };
 }
 
-function wave(...groups: Wave['groups']): Wave {
+function wave(...groups: WaveGroup[]): Wave {
   return { groups };
 }
 

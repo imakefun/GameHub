@@ -24,7 +24,7 @@ const THEME_COLORS: Record<string, { bg: string; node: string; path: string }> =
   crystal: { bg: 'from-cyan-900 via-teal-950 to-emerald-950', node: 'bg-cyan-500', path: 'border-cyan-600' },
 };
 
-function isLevelUnlocked(levelId: string, world: number, worldIndex: number, levelStars: Record<string, number>): boolean {
+function isLevelUnlocked(_levelId: string, world: number, worldIndex: number, levelStars: Record<string, number>): boolean {
   // First level of first world is always unlocked
   if (world === 1 && worldIndex === 0) return true;
 
