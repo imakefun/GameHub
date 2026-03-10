@@ -1,8 +1,8 @@
 import type {
   GameState, ActiveEnemy, PlacedTower, Projectile, FloatingText,
-  LevelDef, Wave, PathPoint, TowerId,
+  LevelDef, Wave, PathPoint,
 } from '../types';
-import { getTowerDef, getTowerDamageAtLevel, getEnemyDef, getLevelById } from '../data';
+import { getTowerDef, getTowerDamageAtLevel, getEnemyDef } from '../data';
 
 // ============================================================
 // Coordinate helpers
@@ -232,7 +232,6 @@ export function tick(state: GameState, dt: number, level: LevelDef): TickResult 
   // --- Nature tower gold generation ---
   for (const tower of towers) {
     if (tower.towerId === 'nature') {
-      const def = getTowerDef('nature');
       const level2 = tower.level;
       const goldPerSec = 2 * (1 + level2 * 0.5);
       gold += goldPerSec * dtSec;
@@ -472,7 +471,7 @@ export function tick(state: GameState, dt: number, level: LevelDef): TickResult 
   }
 
   // --- Check game result ---
-  let gameResult: 'won' | 'lost' | null = state.gameResult;
+  let gameResult: 'playing' | 'won' | 'lost' | null = state.gameResult;
   if (lives <= 0) {
     gameResult = 'lost';
     lives = 0;
