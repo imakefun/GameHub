@@ -28,7 +28,7 @@ function w(enemyId: string, count: number, interval = 800, delay = 0, hpMult = 1
   return { enemyId: enemyId as any, count, interval, delay, hpMultiplier: hpMult, speedMultiplier: speedMult };
 }
 
-function wave(...groups: WaveGroup[]): Wave {
+function wave(groups: WaveGroup[]): Wave {
   return { groups };
 }
 
