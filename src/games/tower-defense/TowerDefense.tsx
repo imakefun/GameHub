@@ -173,7 +173,7 @@ export function TowerDefense() {
         </div>
 
         {/* Result modal */}
-        {state.gameResult && (
+        {(state.gameResult === 'won' || state.gameResult === 'lost') && (
           <ResultModal
             result={state.gameResult}
             stars={state.starsEarned}

@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import type { GameState, LevelDef, TowerId } from '../types';
-import { getTowerDef, TOWER_LIST } from '../data';
-import { WORLDS } from '../data/worlds';
+import { TOWER_LIST } from '../data';
 
 interface Props {
   state: GameState;
@@ -16,7 +15,6 @@ interface Props {
 export function GameHUD({ state, level, onStartWave, onSetPlacing, onPause, onSetSpeed, onExit }: Props) {
   const currentWaveDisplay = state.waveIndex;
   const totalWaves = level.waves.length;
-  const world = WORLDS.find(w => w.id === level.world);
 
   // Filter available towers by world unlock
   const availableTowers = TOWER_LIST.filter(t => t.unlockWorld <= (level.world || 6));

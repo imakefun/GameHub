@@ -1,6 +1,6 @@
 import { useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { GameState, LevelDef, TowerId, PlacedTower, ActiveEnemy } from '../types';
+import type { GameState, LevelDef, TowerId, PlacedTower } from '../types';
 import { getTowerDef, getTowerDamageAtLevel, getTowerUpgradeCost, getTowerSellValue } from '../data';
 import { getEnemyDef } from '../data/enemies';
 
