@@ -111,7 +111,7 @@ export interface TickResult {
   gameTime: number;
   allWavesSpawned: boolean;
   floatingTexts: FloatingText[];
-  gameResult: 'won' | 'lost' | null;
+  gameResult: 'playing' | 'won' | 'lost' | null;
 }
 
 export function tick(state: GameState, dt: number, level: LevelDef): TickResult {
