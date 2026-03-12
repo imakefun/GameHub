@@ -3,7 +3,7 @@
 // Headless simulation engine for modeling difficulty and balance
 // ============================================================
 
-import type { LevelDef, TowerId, PlacedTower, ActiveEnemy, Wave } from '../types';
+import type { LevelDef, TowerId, PlacedTower, ActiveEnemy } from '../types';
 import { TOWER_DEFS, getTowerDef, getTowerDamageAtLevel } from '../data/towers';
 import { getEnemyDef, ENEMY_DEFS } from '../data/enemies';
 import { LEVELS, getLevelsForWorld } from '../data/levels';
