@@ -672,6 +672,9 @@ export function useGameState() {
   const editorExit = useCallback(() => dispatch({ type: 'EDITOR_EXIT' }), []);
   const deleteCustomLevel = useCallback((levelId: string) => dispatch({ type: 'DELETE_CUSTOM_LEVEL', levelId }), []);
   const gameOver = useCallback((result: 'won' | 'lost') => dispatch({ type: 'GAME_OVER', result }), []);
+  const toggleSfx = useCallback(() => dispatch({ type: 'TOGGLE_SFX' }), []);
+  const toggleMusic = useCallback(() => dispatch({ type: 'TOGGLE_MUSIC' }), []);
+  const toggleRanges = useCallback(() => dispatch({ type: 'TOGGLE_RANGES' }), []);
 
   return {
     state,
@@ -705,5 +708,8 @@ export function useGameState() {
     editorExit,
     deleteCustomLevel,
     gameOver,
+    toggleSfx,
+    toggleMusic,
+    toggleRanges,
   };
 }
