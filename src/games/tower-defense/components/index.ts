@@ -4,3 +4,6 @@ export { GameBoard } from './GameBoard';
 export { GameHUD } from './GameHUD';
 export { ResultModal } from './ResultModal';
 export { LevelEditor } from './LevelEditor';
+export { SettingsScreen } from './SettingsScreen';
+export { PauseMenu } from './PauseMenu';
+export { GemShop } from './GemShop';

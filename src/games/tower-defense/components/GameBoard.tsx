@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { GameState, LevelDef, TowerId, PlacedTower } from '../types';
 import { getTowerDef, getTowerDamageAtLevel, getTowerUpgradeCost, getTowerSellValue } from '../data';
 import { getEnemyDef } from '../data/enemies';
+import { getSpriteUrl, getTerrainUrl } from '../assets/sprites';
 
 interface Props {
   state: GameState;
@@ -14,23 +15,12 @@ interface Props {
   showRanges: boolean;
 }
 
-const THEME_COLORS: Record<string, { path: string; buildable: string; blocked: string; bg: string; border: string }> = {
-  forest: { path: '#4a3728', buildable: '#2d5a27', blocked: '#1a3a15', bg: '#1a2e1a', border: '#3a5a30' },
-  desert: { path: '#8b7355', buildable: '#6b5a3a', blocked: '#4a3a20', bg: '#3a2e1a', border: '#7a6a4a' },
-  ice: { path: '#6b8ba0', buildable: '#3a5a6a', blocked: '#2a3a4a', bg: '#1a2a3a', border: '#4a6a7a' },
-  volcano: { path: '#5a3030', buildable: '#4a2020', blocked: '#3a1515', bg: '#2a1010', border: '#6a3030' },
-  shadow: { path: '#4a3a5a', buildable: '#2a2035', blocked: '#1a1525', bg: '#100a15', border: '#3a2a4a' },
-  crystal: { path: '#3a5a5a', buildable: '#2a4a4a', blocked: '#1a3535', bg: '#0a2525', border: '#3a5555' },
-};
-
 export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTower, onUpgradeTower, showRanges }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
-  const theme = THEME_COLORS[level.theme] || THEME_COLORS.forest;
 
   // Calculate cell size to fit the screen
   const cellSize = useMemo(() => {
-    // Target size to fill available space
-    return Math.min(44, Math.floor((window.innerWidth - 16) / level.cols));
+    return Math.min(48, Math.floor((window.innerWidth - 16) / level.cols));
   }, [level.cols]);
 
   const boardWidth = cellSize * level.cols;
@@ -64,48 +54,67 @@ export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTow
     <div className="flex flex-col items-center">
       <div
         ref={boardRef}
-        className="relative select-none touch-none"
+        className="relative select-none touch-none rounded-lg overflow-hidden shadow-2xl"
         style={{ width: boardWidth, height: boardHeight }}
       >
-        {/* Grid cells */}
+        {/* Grid cells with SVG terrain */}
         {level.grid.map((row, r) =>
           row.map((cell, c) => {
             const tower = state.towers.find(t => t.row === r && t.col === c);
             const canPlace = state.placingTowerId && cell.type === 'buildable' && !tower;
+            const terrainUrl = getTerrainUrl(
+              level.theme,
+              cell.type === 'start' || cell.type === 'end' ? 'path' : cell.type,
+            );
 
             return (
               <div
                 key={`${r}-${c}`}
                 onClick={() => handleCellClick(r, c)}
-                className="absolute transition-colors"
+                className="absolute transition-opacity"
                 style={{
                   left: c * cellSize,
                   top: r * cellSize,
                   width: cellSize,
                   height: cellSize,
-                  backgroundColor:
-                    cell.type === 'path' || cell.type === 'start' || cell.type === 'end'
-                      ? theme.path
-                      : cell.type === 'blocked'
-                        ? theme.blocked
-                        : theme.buildable,
-                  border: `1px solid ${theme.border}`,
+                  backgroundImage: terrainUrl ? `url("${terrainUrl}")` : undefined,
+                  backgroundSize: 'cover',
                   cursor: canPlace ? 'pointer' : tower ? 'pointer' : 'default',
                   opacity: canPlace ? 0.8 : 1,
                 }}
               >
                 {/* Start/End markers */}
                 {cell.type === 'start' && (
-                  <div className="w-full h-full flex items-center justify-center text-xs sm:text-sm">🚪</div>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-3/4 h-3/4 rounded bg-blue-600/60 flex items-center justify-center border border-blue-400/40">
+                      <svg className="w-3/5 h-3/5 text-blue-200" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" opacity="0.6"/>
+                        <path d="M10 4l4 4-4 4z"/>
+                      </svg>
+                    </div>
+                  </div>
                 )}
                 {cell.type === 'end' && (
-                  <div className="w-full h-full flex items-center justify-center text-xs sm:text-sm">🏠</div>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-3/4 h-3/4 rounded bg-red-600/60 flex items-center justify-center border border-red-400/40">
+                      <svg className="w-3/5 h-3/5 text-red-200" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8 2 4 6 4 10c0 6 8 12 8 12s8-6 8-12c0-4-4-8-8-8zm0 11c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
+                      </svg>
+                    </div>
+                  </div>
                 )}
+
+                {/* Grid line overlay */}
+                <div className="absolute inset-0 border border-white/5" />
 
                 {/* Placement ghost */}
                 {canPlace && state.placingTowerId && (
-                  <div className="w-full h-full flex items-center justify-center text-lg opacity-40">
-                    {getTowerDef(state.placingTowerId).emoji}
+                  <div className="w-full h-full flex items-center justify-center">
+                    <img
+                      src={getSpriteUrl('tower', state.placingTowerId)}
+                      alt=""
+                      className="w-3/4 h-3/4 opacity-40"
+                    />
                   </div>
                 )}
               </div>
@@ -120,46 +129,50 @@ export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTow
           const cx = (selectedTower.col + 0.5) * cellSize;
           const cy = (selectedTower.row + 0.5) * cellSize;
           return (
-            <div
-              className="absolute rounded-full border-2 border-white/30 bg-white/5 pointer-events-none"
-              style={{
-                left: cx - range,
-                top: cy - range,
-                width: range * 2,
-                height: range * 2,
-              }}
-            />
+            <>
+              <div
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  left: cx - range,
+                  top: cy - range,
+                  width: range * 2,
+                  height: range * 2,
+                  border: '2px solid rgba(255,255,255,0.25)',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)',
+                }}
+              />
+              {/* Buff range ring */}
+              {selectedTower.towerId === 'buff' && (() => {
+                const bDef = getTowerDef('buff');
+                const bRange = (bDef.buffRange + selectedTower.level * 0.3) * cellSize;
+                return (
+                  <div
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
+                      left: cx - bRange,
+                      top: cy - bRange,
+                      width: bRange * 2,
+                      height: bRange * 2,
+                      border: '2px solid rgba(244,114,182,0.35)',
+                      background: 'radial-gradient(circle, rgba(244,114,182,0.1) 0%, transparent 70%)',
+                    }}
+                  />
+                );
+              })()}
+            </>
           );
         })()}
 
-        {/* Buff tower range rings */}
-        {showRanges && selectedTower && selectedTower.towerId === 'buff' && (() => {
-          const def = getTowerDef('buff');
-          const range = (def.buffRange + selectedTower.level * 0.3) * cellSize;
-          const cx = (selectedTower.col + 0.5) * cellSize;
-          const cy = (selectedTower.row + 0.5) * cellSize;
-          return (
-            <div
-              className="absolute rounded-full border-2 border-pink-400/40 bg-pink-400/10 pointer-events-none"
-              style={{
-                left: cx - range,
-                top: cy - range,
-                width: range * 2,
-                height: range * 2,
-              }}
-            />
-          );
-        })()}
-
-        {/* Placed towers */}
+        {/* Placed towers - SVG sprites */}
         {state.towers.map(tower => {
-          const def = getTowerDef(tower.towerId);
           const isSelected = tower.id === state.selectedTowerInstanceId;
+          const spriteUrl = getSpriteUrl('tower', tower.towerId);
           return (
             <motion.div
               key={tower.id}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
+              initial={{ scale: 0, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', damping: 12 }}
               className={`absolute flex items-center justify-center pointer-events-none ${
                 isSelected ? 'z-20' : 'z-10'
               }`}
@@ -170,12 +183,17 @@ export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTow
                 height: cellSize,
               }}
             >
-              <div className={`relative ${isSelected ? 'ring-2 ring-white rounded-lg' : ''}`}>
-                <span className="text-lg sm:text-xl">{def.emoji}</span>
+              <div className={`relative ${isSelected ? 'ring-2 ring-white/60 rounded-lg shadow-lg shadow-white/20' : ''}`}
+                style={{ width: cellSize * 0.85, height: cellSize * 0.85 }}
+              >
+                <img
+                  src={spriteUrl}
+                  alt=""
+                  className="w-full h-full drop-shadow-md"
+                />
+                {/* Level badge */}
                 {tower.level > 0 && (
-                  <div
-                    className="absolute -bottom-1 -right-1 bg-amber-500 text-[8px] text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold"
-                  >
+                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-amber-400 to-amber-600 text-[8px] text-white rounded-full w-4 h-4 flex items-center justify-center font-bold shadow-sm border border-amber-300/50">
                     {tower.level}
                   </div>
                 )}
@@ -184,57 +202,70 @@ export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTow
           );
         })}
 
-        {/* Enemies */}
+        {/* Enemies - SVG sprites */}
         {state.enemies.filter(e => e.alive).map(enemy => {
           const def = getEnemyDef(enemy.enemyId);
           const hpPercent = enemy.hp / enemy.maxHp;
           const isSlow = enemy.slowTimer > 0;
           const isStealth = enemy.stealthTimer > 0;
+          const spriteUrl = getSpriteUrl('enemy', enemy.enemyId);
+          const enemySize = def.isBoss ? cellSize * 1.0 : cellSize * 0.75;
 
           return (
             <motion.div
               key={enemy.id}
               className="absolute pointer-events-none z-30"
               style={{
-                left: enemy.x * cellSize - cellSize * 0.4,
-                top: enemy.y * cellSize - cellSize * 0.4,
-                width: cellSize * 0.8,
-                height: cellSize * 0.8,
-                opacity: isStealth ? 0.3 : 1,
+                left: enemy.x * cellSize - enemySize / 2,
+                top: enemy.y * cellSize - enemySize / 2,
+                width: enemySize,
+                height: enemySize,
+                opacity: isStealth ? 0.25 : 1,
+                filter: isSlow ? 'hue-rotate(180deg) brightness(1.2)' : undefined,
               }}
             >
               {/* HP bar */}
-              <div className="absolute -top-2 left-0 right-0 h-1.5 bg-black/50 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
+              <div className="absolute -top-2.5 left-0 right-0 h-2 bg-black/60 rounded-full overflow-hidden border border-black/30">
+                <motion.div
+                  className="h-full rounded-full"
+                  initial={false}
+                  animate={{ width: `${hpPercent * 100}%` }}
+                  transition={{ duration: 0.15 }}
                   style={{
-                    width: `${hpPercent * 100}%`,
-                    backgroundColor: hpPercent > 0.5 ? '#4ade80' : hpPercent > 0.25 ? '#fbbf24' : '#ef4444',
+                    background: hpPercent > 0.5
+                      ? 'linear-gradient(to right, #22c55e, #4ade80)'
+                      : hpPercent > 0.25
+                        ? 'linear-gradient(to right, #eab308, #fbbf24)'
+                        : 'linear-gradient(to right, #dc2626, #ef4444)',
                   }}
                 />
               </div>
               {/* Shield bar */}
               {enemy.shieldHp > 0 && (
-                <div className="absolute -top-3.5 left-0 right-0 h-1 bg-black/50 rounded-full overflow-hidden">
+                <div className="absolute -top-4.5 left-0 right-0 h-1.5 bg-black/60 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-sky-400 rounded-full"
+                    className="h-full bg-gradient-to-r from-sky-400 to-cyan-400 rounded-full"
                     style={{ width: `${(enemy.shieldHp / (enemy.maxHp * 0.3)) * 100}%` }}
                   />
                 </div>
               )}
               {/* Enemy sprite */}
-              <div className={`w-full h-full flex items-center justify-center text-base sm:text-lg ${isSlow ? 'text-cyan-300' : ''}`}>
-                {def.emoji}
-              </div>
+              <img
+                src={spriteUrl}
+                alt=""
+                className="w-full h-full drop-shadow-md"
+              />
               {/* Boss crown */}
               {def.isBoss && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px]">👑</div>
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <img src={getSpriteUrl('ui', 'crown')} alt="" className="w-4 h-4" />
+                </div>
               )}
             </motion.div>
           );
         })}
 
-        {/* Projectiles */}
+        {/* Projectiles - enhanced with glow */}
         {state.projectiles.map(proj => {
           const x = proj.fromX + (proj.toX - proj.fromX) * proj.progress;
           const y = proj.fromY + (proj.toY - proj.fromY) * proj.progress;
@@ -242,32 +273,34 @@ export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTow
           return (
             <div
               key={proj.id}
-              className="absolute w-2 h-2 rounded-full z-20 pointer-events-none"
+              className="absolute rounded-full z-20 pointer-events-none"
               style={{
-                left: x * cellSize - 4,
-                top: y * cellSize - 4,
+                left: x * cellSize - 3,
+                top: y * cellSize - 3,
+                width: 6,
+                height: 6,
                 backgroundColor: def.color,
-                boxShadow: `0 0 6px ${def.color}`,
+                boxShadow: `0 0 8px ${def.color}, 0 0 3px ${def.color}`,
               }}
             />
           );
         })}
 
-        {/* Floating texts */}
+        {/* Floating texts - enhanced */}
         <AnimatePresence>
           {state.floatingTexts.map(ft => (
             <motion.div
               key={ft.id}
-              initial={{ opacity: 1, y: 0 }}
-              animate={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 0, y: -24, scale: 1.2 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.8 }}
-              className="absolute text-xs font-bold pointer-events-none z-40"
+              className="absolute text-xs font-extrabold pointer-events-none z-40"
               style={{
                 left: ft.x * cellSize,
                 top: ft.y * cellSize,
                 color: ft.color,
-                textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.5)',
               }}
             >
               {ft.text}
@@ -276,14 +309,14 @@ export function GameBoard({ state, level, onPlaceTower, onSelectTower, onSellTow
         </AnimatePresence>
       </div>
 
-      {/* Selected tower info */}
+      {/* Selected tower info panel */}
       <AnimatePresence>
         {selectedTower && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="mt-2 bg-black/60 backdrop-blur-sm rounded-xl p-3 w-full max-w-sm"
+            className="mt-3 bg-black/70 backdrop-blur-md rounded-2xl p-4 w-full max-w-sm border border-white/10"
           >
             <TowerInfo
               tower={selectedTower}
@@ -311,32 +344,42 @@ function TowerInfo({ tower, gold, onSell, onUpgrade, onDeselect }: {
   const upgradeCost = tower.level < def.maxLevel ? getTowerUpgradeCost(def, tower.level) : null;
   const sellValue = getTowerSellValue(def, tower.level);
   const canUpgrade = upgradeCost !== null && gold >= upgradeCost;
+  const spriteUrl = getSpriteUrl('tower', tower.towerId);
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{def.emoji}</span>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center p-1">
+            <img src={spriteUrl} alt={def.name} className="w-full h-full" />
+          </div>
           <div>
             <div className="text-white font-bold text-sm">
-              {def.name} <span className="text-amber-400">Lv.{tower.level + 1}</span>
+              {def.name} <span className="text-amber-400 text-xs bg-amber-400/10 px-1.5 py-0.5 rounded">Lv.{tower.level + 1}</span>
             </div>
-            <div className="text-white/60 text-xs">
-              {dmg} dmg · {def.attackSpeed}/s · {tower.kills} kills
+            <div className="text-white/50 text-xs space-x-2">
+              <span>{dmg} dmg</span>
+              <span>·</span>
+              <span>{def.attackSpeed}/s</span>
+              <span>·</span>
+              <span>{tower.kills} kills</span>
             </div>
           </div>
         </div>
-        <button onClick={onDeselect} className="text-white/40 text-sm px-2">✕</button>
+        <button onClick={onDeselect} className="text-white/30 hover:text-white/60 text-sm px-2 py-1 rounded hover:bg-white/10 transition-colors">✕</button>
       </div>
+      {def.description && (
+        <p className="text-white/40 text-xs mb-3 italic">{def.description}</p>
+      )}
       <div className="flex gap-2">
         {upgradeCost !== null && (
           <button
             onClick={onUpgrade}
             disabled={!canUpgrade}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-bold ${
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors ${
               canUpgrade
-                ? 'bg-emerald-600 text-white active:bg-emerald-700'
-                : 'bg-slate-700 text-slate-400'
+                ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow shadow-emerald-500/30 active:from-emerald-700'
+                : 'bg-slate-700/50 text-slate-500'
             }`}
           >
             Upgrade ({upgradeCost}g)
@@ -344,7 +387,7 @@ function TowerInfo({ tower, gold, onSell, onUpgrade, onDeselect }: {
         )}
         <button
           onClick={onSell}
-          className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600/80 text-white active:bg-red-700"
+          className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-600/60 text-white active:bg-red-700/60 transition-colors"
         >
           Sell (+{sellValue}g)
         </button>
