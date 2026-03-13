@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import { useGameState } from './hooks/useGameState';
-import { TitleScreen, WorldMap, GameBoard, GameHUD, ResultModal, LevelEditor, SettingsScreen } from './components';
+import { TitleScreen, WorldMap, GameBoard, GameHUD, ResultModal, LevelEditor, SettingsScreen, GemShop } from './components';
 import { getLevelById, LEVELS } from './data';
 import { audioManager, THEME_TO_MUSIC } from './audio/AudioManager';
 
@@ -143,7 +143,14 @@ export function TowerDefense() {
         onPlay={() => setScreen('worldMap')}
         onEditor={() => openEditor()}
         onSettings={() => setScreen('settings')}
+        onShop={() => setScreen('shop')}
       />
+    );
+  }
+
+  if (state.screen === 'shop') {
+    return (
+      <GemShop onBack={() => setScreen('title')} />
     );
   }
 
@@ -260,6 +267,7 @@ export function TowerDefense() {
       onPlay={() => setScreen('worldMap')}
       onEditor={() => openEditor()}
       onSettings={() => setScreen('settings')}
+      onShop={() => setScreen('shop')}
     />
   );
 }

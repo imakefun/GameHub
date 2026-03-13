@@ -7,6 +7,7 @@ interface Props {
   onPlay: () => void;
   onEditor: () => void;
   onSettings: () => void;
+  onShop: () => void;
 }
 
 const FLOATING_ITEMS = [
@@ -34,7 +35,7 @@ const FLOATING_ITEMS = [
 
 const HERO_SPRITES = ['archer', 'mage', 'cannon', 'frost', 'lightning'] as const;
 
-export function TitleScreen({ totalStars, onPlay, onEditor, onSettings }: Props) {
+export function TitleScreen({ totalStars, onPlay, onEditor, onSettings, onShop }: Props) {
   const gems = monetizationManager.getGems();
   const gemIconUrl = getSpriteUrl('ui', 'gem');
 
@@ -163,12 +164,22 @@ export function TitleScreen({ totalStars, onPlay, onEditor, onSettings }: Props)
 
           <div className="flex gap-3">
             <motion.button
-              onClick={onEditor}
-              className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-base shadow-lg shadow-purple-500/20 active:scale-95 transition-transform"
+              onClick={onShop}
+              className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-base shadow-lg shadow-purple-500/20 active:scale-95 transition-transform flex items-center justify-center gap-2"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
             >
-              Level Editor
+              <img src={gemIconUrl} alt="" className="w-5 h-5" />
+              Shop
+            </motion.button>
+
+            <motion.button
+              onClick={onEditor}
+              className="flex-1 px-4 py-3 rounded-2xl bg-white/10 text-white/80 font-bold text-base active:scale-95 transition-transform"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              Editor
             </motion.button>
 
             <motion.button

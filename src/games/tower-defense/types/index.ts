@@ -243,7 +243,7 @@ export type EditorTool = 'path' | 'buildable' | 'blocked' | 'start' | 'end' | 'e
 
 // --- Game State ---
 
-export type Screen = 'title' | 'worldMap' | 'playing' | 'editor' | 'towerSelect' | 'settings';
+export type Screen = 'title' | 'worldMap' | 'playing' | 'editor' | 'towerSelect' | 'settings' | 'shop';
 
 export interface GameState {
   screen: Screen;
