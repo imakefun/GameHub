@@ -1,6 +1,4 @@
 import { motion } from 'framer-motion';
-import { monetizationManager, IAP_PRODUCTS } from '../systems/monetization';
-import { getSpriteUrl } from '../assets/sprites';
 
 interface Props {
   sfxEnabled: boolean;
@@ -44,9 +42,6 @@ export function SettingsScreen({
   sfxEnabled, musicEnabled, showRanges,
   onToggleSfx, onToggleMusic, onToggleRanges, onBack,
 }: Props) {
-  const gemState = monetizationManager.getState();
-  const gemIconUrl = getSpriteUrl('ui', 'gem');
-
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900">
       {/* Header */}
@@ -94,98 +89,6 @@ export function SettingsScreen({
               enabled={showRanges}
               onToggle={onToggleRanges}
             />
-          </div>
-        </section>
-
-        {/* Premium Currency */}
-        <section>
-          <h3 className="text-amber-400 font-bold text-sm mb-2 uppercase tracking-wide">Gems</h3>
-          <div className="bg-white/5 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              {gemIconUrl && <img src={gemIconUrl} alt="gem" className="w-6 h-6" />}
-              <span className="text-purple-300 font-bold text-xl">{gemState.gems}</span>
-              <span className="text-white/50 text-sm">gems</span>
-            </div>
-            <div className="text-white/40 text-xs space-y-0.5">
-              <div>Total earned: {gemState.totalGemsEarned}</div>
-              <div>Total spent: {gemState.totalGemsSpent}</div>
-              <div>Ads watched: {gemState.totalAdsWatched}</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Gem Store */}
-        <section>
-          <h3 className="text-amber-400 font-bold text-sm mb-2 uppercase tracking-wide">Gem Store</h3>
-          <div className="space-y-2">
-            {IAP_PRODUCTS.map(product => (
-              <motion.button
-                key={product.id}
-                onClick={() => {
-                  // PLACEHOLDER: In production, trigger platform billing flow
-                  monetizationManager.purchaseProduct(product.id);
-                }}
-                className={`w-full flex items-center justify-between p-3 rounded-xl bg-white/5 active:bg-white/10 transition-colors relative overflow-hidden ${
-                  product.bestValue ? 'ring-1 ring-amber-400/50' : ''
-                }`}
-                whileTap={{ scale: 0.98 }}
-              >
-                {product.popular && (
-                  <div className="absolute top-0 right-0 bg-amber-500 text-[9px] font-bold text-black px-2 py-0.5 rounded-bl-lg">
-                    POPULAR
-                  </div>
-                )}
-                {product.bestValue && (
-                  <div className="absolute top-0 right-0 bg-emerald-500 text-[9px] font-bold text-white px-2 py-0.5 rounded-bl-lg">
-                    BEST VALUE
-                  </div>
-                )}
-                <div className="text-left">
-                  <div className="text-white font-semibold text-sm">{product.name}</div>
-                  <div className="text-white/40 text-xs">{product.description}</div>
-                </div>
-                <div className="text-right flex-shrink-0 ml-2">
-                  <div className="text-purple-300 font-bold text-sm">
-                    {product.gems} {product.bonusPercent > 0 && (
-                      <span className="text-emerald-400 text-xs">+{product.bonusPercent}%</span>
-                    )}
-                  </div>
-                  <div className="text-amber-400 font-bold text-xs">${product.priceUSD.toFixed(2)}</div>
-                </div>
-              </motion.button>
-            ))}
-          </div>
-          <p className="text-white/30 text-xs mt-2 px-1">
-            In-app purchases are placeholders. Integrate with platform billing SDK for production.
-          </p>
-        </section>
-
-        {/* Rewarded Video */}
-        <section>
-          <h3 className="text-amber-400 font-bold text-sm mb-2 uppercase tracking-wide">Free Gems</h3>
-          <div className="bg-white/5 rounded-xl p-4">
-            <motion.button
-              onClick={() => {
-                if (monetizationManager.canWatchRewardedVideo()) {
-                  monetizationManager.watchRewardedVideo('free_gems');
-                }
-              }}
-              disabled={!monetizationManager.canWatchRewardedVideo()}
-              className={`w-full py-3 rounded-xl font-bold text-sm ${
-                monetizationManager.canWatchRewardedVideo()
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                  : 'bg-slate-700 text-slate-500'
-              }`}
-              whileTap={monetizationManager.canWatchRewardedVideo() ? { scale: 0.98 } : undefined}
-            >
-              Watch Video → +5 Gems
-            </motion.button>
-            <div className="text-white/40 text-xs mt-2 text-center">
-              {monetizationManager.getDailyAdsRemaining()} / 10 daily views remaining
-            </div>
-            <p className="text-white/30 text-xs mt-1 text-center">
-              Rewarded video is a placeholder. Integrate with ad SDK for production.
-            </p>
           </div>
         </section>
 
